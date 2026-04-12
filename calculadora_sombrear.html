@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Calculadora de Insumos — Sombrite | Sombrear</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--verde:#9ACD32;--verde-d:#6FAE2E;--cinza:#5A5A5A;--bg:#F3F3F3;--branco:#fff;--border:#E0E0E0;--shadow:0 2px 10px rgba(0,0,0,.08)}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:Arial,Calibri,sans-serif;background:var(--bg);color:var(--cinza);font-size:14px;line-height:1.6}
+h1,h2,h3,.poppins{font-family:'Poppins',sans-serif}
+
+/* HEADER */
+.header{background:var(--branco);border-bottom:3px solid var(--verde);padding:14px 28px;display:flex;align-items:center;justify-content:space-between;box-shadow:var(--shadow);position:sticky;top:0;z-index:100}
+.header-left{display:flex;align-items:center;gap:14px}
+.header img{height:48px;width:auto;object-fit:contain}
+.header-title h1{font-size:17px;font-weight:700;color:var(--cinza)}
+.header-title span{font-size:11px;color:var(--verde-d);font-weight:500}
+.header-right{font-size:11px;color:#999;text-align:right}
+
+/* CONTAINER */
+.container{max-width:1200px;margin:0 auto;padding:22px 16px}
+
+/* CARD */
+.card{background:var(--branco);border-radius:10px;box-shadow:var(--shadow);margin-bottom:20px;overflow:hidden}
+.card-header{background:linear-gradient(135deg,var(--verde),var(--verde-d));padding:11px 20px;display:flex;align-items:center;gap:9px}
+.card-header h2{color:#fff;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+.card-body{padding:20px}
+
+/* FORM */
+.form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:16px}
+.form-group{display:flex;flex-direction:column;gap:5px}
+.form-group label{font-size:11px;font-weight:700;color:var(--cinza);text-transform:uppercase;letter-spacing:.4px}
+.form-group input,.form-group select{padding:9px 13px;border:2px solid var(--border);border-radius:6px;font-size:14px;font-family:Arial,Calibri,sans-serif;color:var(--cinza);background:var(--branco);transition:border-color .2s;width:100%}
+.form-group input:focus,.form-group select:focus{outline:none;border-color:var(--verde)}
+.form-group input[type="number"]{text-align:center;font-size:15px;font-weight:700}
+.form-group input:disabled{background:#f5f5f5;opacity:.5}
+
+/* CHECKBOX */
+.chk-group{display:flex;align-items:center;gap:7px;margin-top:4px}
+.chk-group input[type="checkbox"]{width:16px;height:16px;accent-color:var(--verde);cursor:pointer;flex-shrink:0}
+.chk-group label{font-size:12px;cursor:pointer;color:var(--cinza)}
+
+/* MÓDULOS */
+.module-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.module-group{background:var(--bg);border-radius:8px;padding:14px;border-left:4px solid var(--verde)}
+.module-group h3{font-size:11px;font-weight:700;color:var(--verde-d);text-transform:uppercase;margin-bottom:10px}
+
+/* BOTÕES */
+.btn{display:inline-flex;align-items:center;gap:7px;padding:9px 18px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;border:none;transition:all .2s;font-family:'Poppins',sans-serif}
+.btn-verde{background:var(--verde);color:#fff}
+.btn-verde:hover{background:var(--verde-d);transform:translateY(-1px)}
+.btn-outline{background:transparent;color:var(--verde-d);border:2px solid var(--verde)}
+.btn-outline:hover{background:var(--verde);color:#fff}
+.btn-danger{background:#e53935;color:#fff;padding:5px 11px;font-size:12px;border-radius:4px}
+.btn-danger:hover{background:#b71c1c}
+.btn-suggest{background:#f0f9e0;color:var(--verde-d);border:2px solid var(--verde);font-size:12px;padding:7px 14px;margin-top:6px}
+.btn-suggest:hover{background:var(--verde);color:#fff}
+.btn-pdf{background:linear-gradient(135deg,var(--verde),var(--verde-d));color:#fff;font-size:15px;padding:15px 32px;border-radius:8px;box-shadow:0 4px 15px rgba(154,205,50,.35);width:100%;justify-content:center;margin-top:4px}
+.btn-pdf:hover{box-shadow:0 6px 20px rgba(154,205,50,.55);transform:translateY(-2px)}
+
+/* TABELA */
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+thead th{background:var(--bg);padding:9px 11px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--cinza);letter-spacing:.4px;border-bottom:2px solid var(--verde)}
+tbody tr:nth-child(even){background:#fafafa}
+tbody tr:hover{background:#f3fbea}
+tbody td{padding:7px 11px;border-bottom:1px solid var(--border);vertical-align:middle}
+td input[type="number"],td input[type="text"]{width:100%;padding:5px 8px;border:1px solid var(--border);border-radius:4px;font-size:13px;color:var(--cinza)}
+td input:focus{outline:none;border-color:var(--verde)}
+.qty-cell{font-weight:700;color:var(--verde-d);font-size:14px}
+.total-cell{font-weight:700}
+.tfoot-row td{background:var(--bg);font-weight:700;padding:10px 11px;border-top:2px solid var(--verde)}
+.table-footer{display:flex;justify-content:space-between;align-items:center;padding-top:14px;border-top:2px solid var(--verde);margin-top:10px}
+.total-custo{font-family:'Poppins',sans-serif;font-size:19px;font-weight:700;color:var(--verde-d)}
+.total-custo small{font-size:12px;color:var(--cinza);font-weight:400}
+
+/* RESULTS */
+.results-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:18px}
+.res-card{background:var(--bg);border-radius:8px;padding:14px;text-align:center;border-top:3px solid var(--verde)}
+.res-card .val{font-family:'Poppins',sans-serif;font-size:26px;font-weight:700;color:var(--verde-d);line-height:1}
+.res-card .lbl{font-size:10px;color:#888;margin-top:4px;font-weight:600;text-transform:uppercase}
+
+/* ALERT */
+.alert{background:#ecf9e4;border-left:4px solid var(--verde);padding:9px 13px;border-radius:4px;font-size:12px;margin-bottom:14px}
+
+/* FOOTER */
+footer{background:var(--cinza);color:#bbb;text-align:center;padding:11px;font-size:11px;margin-top:28px}
+footer strong{color:var(--verde)}
+
+/* Tooltip */
+.badge{display:inline-block;background:var(--verde);color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;margin-left:6px;vertical-align:middle}
+
+/* ═══ IMPRESSÃO / PDF ═══ */
+#printArea{display:none}
+@media print{
+  *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important}
+  body>*{display:none!important}
+  #printArea{display:block!important;font-family:Arial,sans-serif;color:#333;padding:0;margin:0}
+  .pr-page{padding:20mm 18mm;max-width:100%}
+  .pr-logo{height:42px}
+  .pr-title{font-size:15pt;font-weight:700;color:#9ACD32;text-transform:uppercase;letter-spacing:1px}
+  .pr-sub{font-size:8pt;color:#999;margin-top:2px}
+  .pr-line{height:3px;background:#9ACD32;margin:8px 0 16px}
+  .pr-sec{font-size:9pt;font-weight:700;color:#6FAE2E;text-transform:uppercase;letter-spacing:.8px;border-left:4px solid #9ACD32;padding-left:7px;margin:0 0 7px}
+  table{width:100%;border-collapse:collapse;font-size:9pt}
+  th{background:#9ACD32!important;color:#fff!important;padding:5px 8px;text-align:left}
+  .pr-tbl-alt tr:nth-child(even) td{background:#f5f5f5!important}
+  td{padding:5px 8px;border-bottom:1px solid #e0e0e0}
+  .pr-total-row td{background:#6FAE2E!important;color:#fff!important;font-weight:700;font-size:10pt}
+  .pr-sign-line{border-top:1.5px solid #333;padding-top:5px;text-align:center;width:240px;margin:0 auto}
+  .pr-green{color:#6FAE2E!important;font-weight:700}
+  .pr-bold{font-weight:700}
+  .pr-right{text-align:right}
+  .pr-center{text-align:center}
+}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════ CABEÇALHO ═══════════════ -->
+<header class="header">
+  <div class="header-left">
+    <img src="logo.png" alt="Sombrear" onerror="this.style.display='none'">
+    <div class="header-title">
+      <h1>Calculadora de Insumos — Sombrite</h1>
+      <span>Sombrear Estruturas Inteligentes</span>
+    </div>
+  </div>
+  <div class="header-right" id="datetime"></div>
+</header>
+
+<div class="container">
+
+  <!-- ═══ A. RESPONSÁVEL ═══ -->
+  <div class="card">
+    <div class="card-header"><h2>👤 Dados do Responsável</h2></div>
+    <div class="card-body">
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="nomeResp">Nome do Responsável</label>
+          <input type="text" id="nomeResp" placeholder="Ex: João Silva">
+        </div>
+        <div class="form-group">
+          <label for="funcaoResp">Função na Empresa</label>
+          <input type="text" id="funcaoResp" placeholder="Ex: Engenheiro Civil">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ B. PROJETO ═══ -->
+  <div class="card">
+    <div class="card-header"><h2>🏗️ Dados do Projeto</h2></div>
+    <div class="card-body">
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="nomeCondo">Nome do Condomínio / Obra</label>
+          <input type="text" id="nomeCondo" placeholder="Ex: Residencial das Flores">
+        </div>
+        <div class="form-group">
+          <label for="tipoFund">Tipo de Fundação</label>
+          <select id="tipoFund" onchange="calcular()">
+            <option value="direta">Fundação Direta</option>
+            <option value="chapa">Pé com Chapa</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="fatorRed">Fator de Redução de Tela</label>
+          <select id="fatorRed" onchange="calcular()">
+            <option value="0">0% — Sem Redução</option>
+            <option value="0.05">5% — Sobras Pequenas</option>
+            <option value="0.10">10% — Aproveitamento Médio</option>
+            <option value="0.15">15% — Aproveitamento Alto</option>
+            <option value="0.20">20% — Aproveitamento Máximo</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ C. DIMENSIONAMENTO ═══ -->
+  <div class="card">
+    <div class="card-header"><h2>📐 Dimensionamento</h2></div>
+    <div class="card-body">
+      <div class="form-grid" style="margin-bottom:16px">
+        <div class="form-group">
+          <label for="qtdVagas">Qtd Total de Vagas</label>
+          <input type="number" id="qtdVagas" min="0" value="0" oninput="calcular()">
+          <button class="btn btn-suggest" onclick="sugerirDistribuicao()">✨ Sugerir Distribuição</button>
+        </div>
+        <div class="form-group">
+          <label>Qtd de Alinhamentos (Sequências)</label>
+          <input type="number" id="qtdAlign" min="1" value="1" oninput="calcular()">
+          <div class="chk-group" style="margin-top:4px">
+            <input type="checkbox" id="semParam" onchange="toggleAlign()">
+            <label for="semParam">Sem parâmetro <small style="color:#aaa">(auto: 1 por cada 4 módulos)</small></label>
+          </div>
+        </div>
+      </div>
+
+      <div class="module-grid">
+        <div class="module-group">
+          <h3>📦 Módulos MA — Médio Apoio</h3>
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="m2vMA">Módulos 2V — MA</label>
+              <input type="number" id="m2vMA" min="0" value="0" oninput="calcular()">
+            </div>
+            <div class="form-group">
+              <label for="m3vMA">Módulos 3V — MA</label>
+              <input type="number" id="m3vMA" min="0" value="0" oninput="calcular()">
+            </div>
+          </div>
+        </div>
+        <div class="module-group">
+          <h3>📦 Módulos MT — Médio Topo</h3>
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="m2vMT">Módulos 2V — MT</label>
+              <input type="number" id="m2vMT" min="0" value="0" oninput="calcular()">
+            </div>
+            <div class="form-group">
+              <label for="m3vMT">Módulos 3V — MT</label>
+              <input type="number" id="m3vMT" min="0" value="0" oninput="calcular()">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ D. BANCO DE INSUMOS ═══ -->
+  <div class="card">
+    <div class="card-header"><h2>🗄️ Banco de Insumos e Custos</h2></div>
+    <div class="card-body">
+      <div class="alert">
+        💡 Edite os <strong>Preços Unitários</strong> diretamente na tabela. As quantidades são atualizadas automaticamente ao preencher o dimensionamento acima.
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:38%">Material / Insumo</th>
+              <th>Unidade</th>
+              <th>Qtd Calculada</th>
+              <th>Preço Unit. (R$)</th>
+              <th>Total (R$)</th>
+              <th style="width:55px">Ação</th>
+            </tr>
+          </thead>
+          <tbody id="tbodyInsumos"></tbody>
+        </table>
+      </div>
+      <div class="table-footer">
+        <button class="btn btn-outline" onclick="addCustom()">＋ Adicionar Item</button>
+        <div class="total-custo"><small>Custo Total Estimado:</small><br><span id="totalGeral">R$ 0,00</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ E. RESULTADOS ═══ -->
+  <div class="card">
+    <div class="card-header"><h2>📊 Resultados e Relatório</h2></div>
+    <div class="card-body">
+      <div class="results-grid">
+        <div class="res-card"><div class="val" id="r-mod">0</div><div class="lbl">Módulos</div></div>
+        <div class="res-card"><div class="val" id="r-pes">0</div><div class="lbl">Pés</div></div>
+        <div class="res-card"><div class="val" id="r-brc">0</div><div class="lbl">Braços</div></div>
+        <div class="res-card"><div class="val" id="r-arc">0</div><div class="lbl">Arcos</div></div>
+        <div class="res-card"><div class="val" id="r-est">0</div><div class="lbl">Estrelas</div></div>
+        <div class="res-card"><div class="val" id="r-area">0</div><div class="lbl">Área (m²)</div></div>
+        <div class="res-card"><div class="val" id="r-ali">0</div><div class="lbl">Alinhamentos</div></div>
+      </div>
+      <button class="btn btn-pdf" onclick="gerarPDF()">📄 Gerar Relatório Técnico (PDF)</button>
+    </div>
+  </div>
+
+</div><!-- /container -->
+
+<footer>
+  <strong>Sombrear Estruturas Inteligentes</strong> &nbsp;|&nbsp; CNPJ: 00.000.000/0000-00 &nbsp;|&nbsp; Sistema de Cálculo Interno
+</footer>
+
+<!-- ÁREA DE IMPRESSÃO (invisível na tela, visível apenas ao imprimir) -->
+<div id="printArea"></div>
+
+
+<script>
+// ════════════════════════════════════════════════════════
+// BANCO DE INSUMOS PADRÃO
+// ════════════════════════════════════════════════════════
+// Cada objeto: { id, nome, un, preco, qtd }
+var INSUMOS_BASE = [
+  // ─── TUBOS ───────────────────────────────────────────
+  { id:'t4_11',    nome:'Tubo 4" #11',            un:'barra 6m', preco:0, qtd:0 },
+  { id:'t2_14',    nome:'Tubo 2" #14',             un:'barra 6m', preco:0, qtd:0 },
+  { id:'t25_14',   nome:'Tubo 2½" #14',            un:'barra 6m', preco:0, qtd:0 },
+  { id:'t175_16',  nome:'Tubo 1¾" #16',            un:'barra 6m', preco:0, qtd:0 },
+  { id:'t175_12',  nome:'Tubo 1¾" #12',            un:'barra 6m', preco:0, qtd:0 },
+  { id:'ferro',    nome:'Ferro Chato 2¼"',          un:'barra 6m', preco:0, qtd:0 },
+  // ─── ESTRUTURAIS ─────────────────────────────────────
+  { id:'bandeja',  nome:'Bandeja',                  un:'un',       preco:0, qtd:0 },
+  { id:'cant',     nome:'Cantoneira',               un:'barra 6m', preco:0, qtd:0 },
+  { id:'chapa',    nome:'Chapa 300x250 #14',        un:'un',       preco:0, qtd:0 },
+  // ─── TELAS ───────────────────────────────────────────
+  { id:'tela3v',   nome:'Tela Sombrite 3V',         un:'rolo 50m', preco:0, qtd:0 },
+  { id:'tela2v',   nome:'Tela Sombrite 2V',         un:'rolo 50m', preco:0, qtd:0 },
+  // ─── FERRAGENS ───────────────────────────────────────
+  { id:'par_1',    nome:'Parafuso ½" × 1½"',        un:'un',       preco:0, qtd:0 },
+  { id:'prc_trv',  nome:'Porca Travante ½" × 2¼"',  un:'un',       preco:0, qtd:0 },
+  { id:'prc_pol',  nome:'Porca Polida ½"',           un:'un',       preco:0, qtd:0 },
+  { id:'par_4',    nome:'Parafuso ½" × 4"',          un:'un',       preco:0, qtd:0 },
+  { id:'par_225',  nome:'Parafuso ½" × 2¼"',         un:'un',       preco:0, qtd:0 },
+  { id:'prc_12',   nome:'Porca ½"',                  un:'un',       preco:0, qtd:0 },
+];
+
+// Estado em memória (cópia mutável)
+var insumos  = JSON.parse(JSON.stringify(INSUMOS_BASE));
+var customs  = [];
+var custId   = 1;
+
+// ════════════════════════════════════════════════════════
+// INICIALIZAÇÃO
+// ════════════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', function(){
+  tickClock();
+  setInterval(tickClock, 1000);
+  renderTabela();
+});
+
+function tickClock(){
+  var el = document.getElementById('datetime');
+  if(el) el.textContent = new Date().toLocaleString('pt-BR');
+}
+
+// ════════════════════════════════════════════════════════
+// TOGGLE ALINHAMENTOS
+// ════════════════════════════════════════════════════════
+function toggleAlign(){
+  var chk = document.getElementById('semParam');
+  var inp = document.getElementById('qtdAlign');
+  inp.disabled = chk.checked;
+  calcular();
+}
+
+// ════════════════════════════════════════════════════════
+// SUGERIR DISTRIBUIÇÃO
+// ════════════════════════════════════════════════════════
+function sugerirDistribuicao(){
+  var vagas = parseInt(document.getElementById('qtdVagas').value) || 0;
+  if(!vagas){ alert('Informe a quantidade de vagas primeiro.'); return; }
+  // Total de módulos ≈ vagas / 2.5 (média de vagas por módulo)
+  var totalMod = Math.round(vagas / 2.5);
+  var mod2v = Math.round(totalMod * 0.20);
+  var mod3v = totalMod - mod2v;
+  document.getElementById('m2vMA').value = mod2v;
+  document.getElementById('m3vMA').value = mod3v;
+  document.getElementById('m2vMT').value = 0;
+  document.getElementById('m3vMT').value = 0;
+  calcular();
+}
+
+// ════════════════════════════════════════════════════════
+// CÁLCULO PRINCIPAL
+// ════════════════════════════════════════════════════════
+function calcular(){
+  var vagas     = iv('qtdVagas');
+  var m2vMA     = iv('m2vMA');
+  var m3vMA     = iv('m3vMA');
+  var m2vMT     = iv('m2vMT');
+  var m3vMT     = iv('m3vMT');
+  var fund      = document.getElementById('tipoFund').value;
+  var fator     = parseFloat(document.getElementById('fatorRed').value) || 0;
+  var semParam  = document.getElementById('semParam').checked;
+
+  // Totais de módulos
+  var modMA    = m2vMA + m3vMA;
+  var modMT    = m2vMT + m3vMT;
+  var modTotal = modMA + modMT;
+  var mod2v    = m2vMA + m2vMT;
+  var mod3v    = m3vMA + m3vMT;
+
+  // Alinhamentos
+  // "Sem parâmetro": 1 alinhamento para cada 4 módulos
+  var align = semParam
+    ? Math.max(1, Math.ceil(modTotal / 4))
+    : Math.max(1, iv('qtdAlign'));
+  if(semParam) document.getElementById('qtdAlign').value = align;
+
+  // ─── QUANTIDADES ESTRUTURAIS ───────────────────────────
+  // Total Pés = Total Módulos + Total Alinhamentos
+  // Total Braços = Total Módulos + Total Alinhamentos
+  // (módulos em sequência compartilham pés/braços intermediários)
+  var qtdPes    = modTotal + align;
+  var qtdBracos = modTotal + align;
+
+  // Divisão proporcional MA vs MT
+  var ratioMT  = modTotal > 0 ? modMT / modTotal : 0;
+  var ratioMA  = 1 - ratioMT;
+  var pesMA    = Math.round(qtdPes    * ratioMA);
+  var pesMT    = qtdPes    - pesMA;
+  var bracosMA = Math.round(qtdBracos * ratioMA);
+  var bracosMT = qtdBracos - bracosMA;
+
+  // Arcos e estrelas por definição
+  var qtdArcos   = modTotal * 4;   // 4 arcos por módulo
+  var qtdEstrelas= modTotal * 2;   // 2 estrelas por módulo
+  var areaM2     = vagas * 12.5;   // Vaga padrão 5m×2,5m
+
+  // ─── CÁLCULO DE TUBOS ─────────────────────────────────
+
+  // PÉS MA (Fundação Direta):
+  var pMA_t4_11   = ceil6(3   * pesMA);        // Tubo 4"#11
+  var pMA_t2_14   = ceil6(3.3 * pesMA);        // Tubo 2"#14
+  var pMA_band    = pesMA;                     // Bandeja 1/pé
+  var pMA_cant    = ceil6(0.2 * pesMA);        // Cantoneira 20cm
+  var pMA_chapa   = fund==='chapa' ? pesMA:0; // Chapa (se com chapa)
+
+  // PÉS MT (Duplo — usa bracosMT como parâmetro conforme especificação):
+  // "Dobra o Tubo 2"#14 e a Cantoneira em relação ao Pé MA"
+  var pMT_t4_11   = ceil6(3   * bracosMT);     // Tubo 4"#11
+  var pMT_t25_14  = ceil6(6.6 * bracosMT);     // Tubo 2½"#14 (dobro→upgrade)
+  var pMT_band    = pesMT;                     // Bandeja 1/pé
+  var pMT_cant    = ceil6(0.4 * pesMT);        // Cantoneira dobrada
+  var pMT_chapa   = fund==='chapa' ? pesMT:0; // Chapa (se com chapa)
+
+  // BRAÇOS (MA e MT):
+  var br_t25_14   = qtdBracos;                 // Tubo 2½"#14 — 1 barra/braço
+  var br_t175_16  = ceil6(2   * qtdBracos);    // Tubo 1¾"#16
+  var br_cant     = ceil6(0.6 * qtdBracos);    // Cantoneira
+
+  // ARCOS:
+  // 3V: Tubo 1¾"#12 = (16 × mod3v) / 6
+  // 2V: Tubo 1¾"#12 = (8  × mod2v) / 6
+  var arc_t175_12 = Math.ceil((16*mod3v + 8*mod2v) / 6);
+
+  // ESTRELAS:
+  // Estrela 3V: Tubo 2"#14 = (1.5 × mod3v × 2)/6 ; Ferro = (0.4 × mod3v × 2)/6
+  // Estrela 2V: Tubo 2"#14 = (3.0 × mod2v × 2)/6 ; Ferro = (0.4 × mod2v × 2)/6
+  var est_t2_14   = Math.ceil((1.5*mod3v*2 + 3.0*mod2v*2) / 6);
+  var est_ferro   = Math.ceil((0.4*mod3v*2 + 0.4*mod2v*2) / 6);
+
+  // TELAS (aplica fator de redução antes de dividir por rolo):
+  // 3V: ((7.8 × mod3v) × (1-fator)) / 50  rolos
+  // 2V: ((5.2 × mod2v) × (1-fator)) / 50  rolos
+  var tela3v = Math.ceil((7.8 * mod3v) * (1-fator) / 50);
+  var tela2v = Math.ceil((5.2 * mod2v) * (1-fator) / 50);
+
+  // FERRAGENS (por módulo total):
+  var f_par1   = modTotal * 20;  // Parafuso ½" × 1½"
+  var f_prcTrv = modTotal *  8;  // Porca Travante
+  var f_prcPol = modTotal *  8;  // Porca Polida
+  var f_par4   = modTotal *  1;  // Parafuso ½" × 4"
+  var f_par225 = modTotal *  3;  // Parafuso ½" × 2¼"
+  var f_prc12  = modTotal *  3;  // Porca ½"
+
+  // ─── CONSOLIDAÇÃO (mesmo material somado de seções diferentes) ─
+  var qtds = {
+    t4_11:   pMA_t4_11  + pMT_t4_11,               // Pés MA + Pés MT
+    t2_14:   pMA_t2_14  + est_t2_14,               // Pés MA + Estrelas
+    t25_14:  pMT_t25_14 + br_t25_14,               // Pés MT + Braços
+    t175_16: br_t175_16,                            // Braços
+    t175_12: arc_t175_12,                           // Arcos
+    ferro:   est_ferro,                             // Estrelas
+    bandeja: pMA_band   + pMT_band,                 // Pés MA + Pés MT
+    cant:    pMA_cant   + pMT_cant   + br_cant,     // Pés MA + Pés MT + Braços
+    chapa:   pMA_chapa  + pMT_chapa,                // (0 se Fundação Direta)
+    tela3v:  tela3v,
+    tela2v:  tela2v,
+    par_1:   f_par1,
+    prc_trv: f_prcTrv,
+    prc_pol: f_prcPol,
+    par_4:   f_par4,
+    par_225: f_par225,
+    prc_12:  f_prc12,
+  };
+
+  // Atualizar qtd nos insumos base
+  insumos.forEach(function(it){ it.qtd = qtds[it.id] || 0; });
+
+  // Atualizar resumo
+  setText('r-mod',  modTotal);
+  setText('r-pes',  qtdPes);
+  setText('r-brc',  qtdBracos);
+  setText('r-arc',  qtdArcos);
+  setText('r-est',  qtdEstrelas);
+  setText('r-area', areaM2.toLocaleString('pt-BR'));
+  setText('r-ali',  align);
+
+  // Atualizar tabela
+  atualizarQtds();
+}
+
+// ════════════════════════════════════════════════════════
+// TABELA
+// ════════════════════════════════════════════════════════
+function renderTabela(){
+  var tbody = document.getElementById('tbodyInsumos');
+  tbody.innerHTML = '';
+  insumos.forEach(function(it){ tbody.appendChild(linhaTabela(it, false)); });
+  customs.forEach(function(it){ tbody.appendChild(linhaTabela(it, true));  });
+  recalcTotal();
+}
+
+function linhaTabela(it, isCustom){
+  var tr = document.createElement('tr');
+  tr.setAttribute('data-id', it.id);
+  var total = (it.qtd||0) * (it.preco||0);
+  tr.innerHTML =
+    '<td>' +
+      (isCustom
+        ? '<input type="text" value="'+esc(it.nome)+'" style="width:100%" onchange="setNome(\''+it.id+'\',this.value)">'
+        : '<strong>'+esc(it.nome)+'</strong>') +
+    '</td>' +
+    '<td>'+esc(it.un)+'</td>' +
+    '<td class="qty-cell" id="q-'+it.id+'">'+(it.qtd||0)+'</td>' +
+    '<td><input type="number" min="0" step="0.01" value="'+(it.preco||0).toFixed(2)+'" style="width:100px" ' +
+         'oninput="setPreco(\''+it.id+'\',this.value)"></td>' +
+    '<td class="total-cell" id="tot-'+it.id+'">'+brl(total)+'</td>' +
+    '<td>'+(isCustom?'<button class="btn btn-danger" onclick="delItem(\''+it.id+'\')">✕</button>':'—')+'</td>';
+  return tr;
+}
+
+function atualizarQtds(){
+  insumos.forEach(function(it){
+    var qEl = document.getElementById('q-'+it.id);
+    var tEl = document.getElementById('tot-'+it.id);
+    if(qEl) qEl.textContent = it.qtd||0;
+    if(tEl) tEl.textContent = brl((it.qtd||0)*(it.preco||0));
+  });
+  recalcTotal();
+}
+
+function setPreco(id, val){
+  var p = parseFloat(val)||0;
+  var it = findItem(id);
+  if(it){
+    it.preco = p;
+    var tEl = document.getElementById('tot-'+id);
+    if(tEl) tEl.textContent = brl((it.qtd||0)*p);
+    recalcTotal();
+  }
+}
+
+function setNome(id, val){
+  var it = customs.find(function(x){ return x.id===id; });
+  if(it) it.nome = val;
+}
+
+function addCustom(){
+  var id = 'c'+custId++;
+  var it = { id:id, nome:'Novo Item', un:'un', preco:0, qtd:0 };
+  customs.push(it);
+  var tbody = document.getElementById('tbodyInsumos');
+  tbody.appendChild(linhaTabela(it, true));
+  recalcTotal();
+}
+
+function delItem(id){
+  var idx = customs.findIndex(function(x){ return x.id===id; });
+  if(idx>-1){
+    customs.splice(idx,1);
+    var row = document.querySelector('tr[data-id="'+id+'"]');
+    if(row) row.remove();
+    recalcTotal();
+  }
+}
+
+function recalcTotal(){
+  var tot = 0;
+  insumos.concat(customs).forEach(function(it){ tot += (it.qtd||0)*(it.preco||0); });
+  document.getElementById('totalGeral').textContent = brl(tot);
+}
+
+// ════════════════════════════════════════════════════════
+// GERAÇÃO DO PDF via window.print()
+// (usa CSS @media print — funciona 100% em file://, sem CDN)
+// ════════════════════════════════════════════════════════
+function gerarPDF(){
+  var nome    = document.getElementById('nomeResp').value   || '—';
+  var funcao  = document.getElementById('funcaoResp').value || '—';
+  var condo   = document.getElementById('nomeCondo').value  || '—';
+  var fundSel = document.getElementById('tipoFund');
+  var fundTxt = fundSel.options[fundSel.selectedIndex].text;
+  var vagas   = document.getElementById('qtdVagas').value   || '0';
+  var dtHr    = new Date().toLocaleString('pt-BR');
+
+  var modTot  = document.getElementById('r-mod').textContent;
+  var pesTot  = document.getElementById('r-pes').textContent;
+  var brcTot  = document.getElementById('r-brc').textContent;
+  var arcTot  = document.getElementById('r-arc').textContent;
+  var estTot  = document.getElementById('r-est').textContent;
+  var areaTot = document.getElementById('r-area').textContent;
+  var aliTot  = document.getElementById('r-ali').textContent;
+  var totalG  = document.getElementById('totalGeral').textContent;
+
+  // Linhas da tabela — inclui todos os itens com qtd > 0
+  var linhas = '';
+  insumos.concat(customs).forEach(function(it){
+    if((it.qtd||0) === 0 && (it.preco||0) === 0) return;
+    linhas +=
+      '<tr>'+
+        '<td>'+esc(it.nome)+'</td>'+
+        '<td class="pr-center">'+esc(it.un)+'</td>'+
+        '<td class="pr-center pr-green pr-bold">'+(it.qtd||0)+'</td>'+
+        '<td class="pr-right">'+brl(it.preco||0)+'</td>'+
+        '<td class="pr-right pr-bold">'+brl((it.qtd||0)*(it.preco||0))+'</td>'+
+      '</tr>';
+  });
+  if(!linhas){
+    linhas = '<tr><td colspan="5" class="pr-center" style="color:#999;font-style:italic">Preencha o dimensionamento para calcular os insumos.</td></tr>';
+  }
+
+  // Monta o conteúdo do relatório
+  document.getElementById('printArea').innerHTML =
+  '<div class="pr-page">'+
+
+  // Cabeçalho
+  '<table style="width:100%;margin-bottom:6px"><tr>'+
+    '<td style="vertical-align:top;width:50%">'+
+      '<img src="logo.png" class="pr-logo" alt="Sombrear">'+
+      '<div class="pr-sub">CNPJ: 00.000.000/0000-00</div>'+
+    '</td>'+
+    '<td style="vertical-align:top;text-align:right">'+
+      '<div class="pr-title">Memorial de Cálculo de Materiais</div>'+
+      '<div class="pr-sub">Emissão: '+dtHr+'</div>'+
+    '</td>'+
+  '</tr></table>'+
+  '<div class="pr-line"></div>'+
+
+  // Seção 1
+  '<div style="margin-bottom:14px">'+
+    '<div class="pr-sec">1. Dados do Projeto</div>'+
+    '<table><tbody>'+
+      prRow('Condomínio / Obra', esc(condo),    'Qtd de Vagas',   vagas)+
+      prRow('Tipo de Fundação',  esc(fundTxt),  'Responsável',    esc(nome))+
+      prRow('Função',            esc(funcao),   'Alinhamentos',   aliTot)+
+    '</tbody></table>'+
+  '</div>'+
+
+  // Seção 2
+  '<div style="margin-bottom:14px">'+
+    '<div class="pr-sec">2. Resumo Estrutural</div>'+
+    '<table><thead><tr>'+
+      '<th class="pr-center">Módulos</th><th class="pr-center">Pés</th><th class="pr-center">Braços</th>'+
+      '<th class="pr-center">Arcos</th><th class="pr-center">Estrelas</th><th class="pr-center">Área (m²)</th>'+
+    '</tr></thead><tbody><tr>'+
+      '<td class="pr-center pr-bold">'+modTot+'</td>'+
+      '<td class="pr-center pr-bold">'+pesTot+'</td>'+
+      '<td class="pr-center pr-bold">'+brcTot+'</td>'+
+      '<td class="pr-center pr-bold">'+arcTot+'</td>'+
+      '<td class="pr-center pr-bold">'+estTot+'</td>'+
+      '<td class="pr-center pr-bold">'+areaTot+'</td>'+
+    '</tr></tbody></table>'+
+  '</div>'+
+
+  // Seção 3
+  '<div style="margin-bottom:14px">'+
+    '<div class="pr-sec">3. Lista de Materiais para Compra</div>'+
+    '<table class="pr-tbl-alt"><thead><tr>'+
+      '<th>Material / Insumo</th>'+
+      '<th class="pr-center">Unidade</th>'+
+      '<th class="pr-center">Quantidade</th>'+
+      '<th class="pr-right">Preço Unit.</th>'+
+      '<th class="pr-right">Total</th>'+
+    '</tr></thead><tbody>'+linhas+'</tbody>'+
+    '<tfoot><tr class="pr-total-row">'+
+      '<td colspan="4" class="pr-right">CUSTO TOTAL ESTIMADO:</td>'+
+      '<td class="pr-right">'+totalG+'</td>'+
+    '</tr></tfoot></table>'+
+  '</div>'+
+
+  // Assinatura
+  '<div style="margin-top:30px;text-align:center">'+
+    '<div class="pr-sign-line">'+
+      '<div class="pr-bold">'+esc(nome)+'</div>'+
+      '<div>'+esc(funcao)+'</div>'+
+      '<div style="font-size:8pt;color:#999">Sombrear Estruturas Inteligentes</div>'+
+    '</div>'+
+  '</div>'+
+
+  '</div>'; // pr-page
+
+  // Abre o diálogo de impressão (Ctrl+P / Salvar como PDF)
+  window.print();
+}
+
+function prRow(l1, v1, l2, v2){
+  return '<tr>'+
+    '<td class="pr-bold" style="background:#f5f5f5;width:22%">'+l1+'</td>'+
+    '<td style="width:28%">'+v1+'</td>'+
+    '<td class="pr-bold" style="background:#f5f5f5;width:22%">'+l2+'</td>'+
+    '<td>'+v2+'</td>'+
+  '</tr>';
+}
+
+// ════════════════════════════════════════════════════════
+// HELPERS
+// ════════════════════════════════════════════════════════
+function iv(id){ return parseInt(document.getElementById(id).value)||0; }
+function ceil6(n){ return Math.ceil(n/6); }
+function setText(id,v){ var el=document.getElementById(id); if(el)el.textContent=v; }
+function brl(n){ return 'R$ '+(n||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function findItem(id){ return insumos.find(function(x){return x.id===id;})||customs.find(function(x){return x.id===id;}); }
+</script>
+</body>
+</html>
