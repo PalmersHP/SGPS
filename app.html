@@ -499,11 +499,12 @@ var DB = {
     var tables=['filiais','pedidos','usuarios','catalogo'];
     return Promise.all(tables.map(function(t){
       return supaGet(t).then(function(d){
-        if(d&&d.length){DB_CACHE[t]=d;}
-        else if(!d){
-          // Primeira vez: sobe o seed
+        if(d&&d.length){
+          DB_CACHE[t]=d; // dados existentes no Supabase
+        } else {
+          // Primeira vez ou tabela vazia — sobe o seed
           DB_CACHE[t]=SEED[t]||[];
-          if(DB_CACHE[t].length)supaSet(t,DB_CACHE[t]);
+          if(DB_CACHE[t].length) supaSet(t,DB_CACHE[t]);
         }
       });
     }));
@@ -1742,27 +1743,33 @@ window.addEventListener('hashchange',function(){
 
 (function boot(){
   if(!initAuth())return;
-  // Mostra loading enquanto busca dados do Supabase
-  document.getElementById('content').innerHTML=
-    '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:60vh;gap:12px">'+
-    '<div style="width:36px;height:36px;border:3px solid #e2e8f0;border-top-color:var(--verde);border-radius:50%;animation:spin 0.8s linear infinite"></div>'+
-    '<span style="font-size:13px;color:#64748b">Conectando ao servidor...</span></div>';
-  if(!document.getElementById('spinStyle')){
-    var st=document.createElement('style');st.id='spinStyle';
-    st.textContent='@keyframes spin{to{transform:rotate(360deg)}}';
-    document.head.appendChild(st);
-  }
+
+  // Overlay de loading (não destrói as view divs)
+  var ov=document.createElement('div');
+  ov.id='bootOv';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(240,244,248,.95);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;z-index:9999';
+  ov.innerHTML='<div style="width:40px;height:40px;border:4px solid #e2e8f0;border-top-color:#9ACD32;border-radius:50%;animation:spin .8s linear infinite"></div>'+
+    '<span style="font-size:14px;color:#64748b;font-family:Poppins,sans-serif">Conectando ao servidor...</span>';
+  var ss=document.createElement('style');
+  ss.textContent='@keyframes spin{to{transform:rotate(360deg)}}';
+  document.head.appendChild(ss);
+  document.body.appendChild(ov);
+
   DB.init().then(function(){
-    // Re-lê o usuário atual do DB para garantir dados atualizados
     var dbUser=DB.usuarios().find(function(u){return u.id===USER.id;});
     if(dbUser)USER=dbUser;
     buildSidebar();
     var startHash=location.hash.replace('#','')||'';
     navigate(startHash);
+    document.getElementById('bootOv').remove();
   }).catch(function(e){
     console.error('Boot error:',e);
-    document.getElementById('content').innerHTML=
-      '<div style="display:flex;align-items:center;justify-content:center;height:60vh;font-size:14px;color:#dc2626">⚠️ Erro ao conectar. Verifique sua conexão e recarregue a página.</div>';
+    document.getElementById('bootOv').innerHTML=
+      '<div style="text-align:center;font-family:Poppins,sans-serif">'+
+      '<div style="font-size:32px;margin-bottom:12px">⚠️</div>'+
+      '<div style="font-size:15px;font-weight:600;color:#dc2626;margin-bottom:8px">Erro ao conectar ao servidor</div>'+
+      '<div style="font-size:13px;color:#64748b;margin-bottom:20px">Verifique sua conexão e tente novamente.</div>'+
+      '<button onclick="location.reload()" style="padding:10px 24px;background:#9ACD32;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:Poppins,sans-serif">↺ Recarregar</button></div>';
   });
 }());
 </script>
