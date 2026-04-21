@@ -165,10 +165,22 @@ body{font-family:'Poppins',sans-serif;height:100vh;display:flex;overflow:hidden}
 
 <script>
 var role = 'sede';
-var USERS = [
-  {id:'u1',email:'sede@sombrear.com.br',senha:'sombrear2024',role:'sede',nome:'Carlos Alberto',cargo:'Gerente Industrial'},
-  {id:'u2',email:'df@sombrear.com.br',senha:'sombrear2024',role:'filial',nome:'Ricardo Mendes',cargo:'Engenheiro de Campo',filial_id:'f1',filial_nome:'Sombrear DF'}
+
+// Seed padrão — usado apenas se o DB ainda não foi inicializado pelo app.html
+var SEED_USERS = [
+  {id:'u1',email:'sede@sombrear.com.br',senha:'sombrear2024',role:'sede',nome:'Carlos Alberto',cargo:'Gerente Industrial',filial_id:'',filial_nome:'',ativo:true},
+  {id:'u2',email:'df@sombrear.com.br',senha:'sombrear2024',role:'filial',nome:'Ricardo Mendes',cargo:'Engenheiro de Campo',filial_id:'f1',filial_nome:'Sombrear DF',ativo:true}
 ];
+
+function getUsuarios(){
+  try{
+    var saved=JSON.parse(localStorage.getItem('smb_usuarios'));
+    if(saved&&saved.length)return saved;
+  }catch(e){}
+  // Primeira vez: inicializa o DB
+  localStorage.setItem('smb_usuarios',JSON.stringify(SEED_USERS));
+  return SEED_USERS;
+}
 
 function selectRole(r){
   role=r;
@@ -186,7 +198,8 @@ function fazerLogin(){
   var email=document.getElementById('inpEmail').value.trim().toLowerCase();
   var senha=document.getElementById('inpSenha').value;
   var err=document.getElementById('errBox');
-  var user=USERS.find(function(u){return u.email===email&&u.senha===senha&&u.role===role;});
+  var users=getUsuarios();
+  var user=users.find(function(u){return u.email===email&&u.senha===senha&&u.role===role&&u.ativo!==false;});
   if(user){
     err.style.display='none';
     localStorage.setItem('sombrear_session',JSON.stringify(user));
