@@ -164,30 +164,16 @@ body{font-family:'Poppins',sans-serif;height:100vh;display:flex;overflow:hidden}
 </div>
 
 <script>
-var role = 'sede';
+var SUPA_URL='https://gwcgcvgowoqyhthdbear.supabase.co';
+var SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd3Y2djdmdvd29xeWh0aGRiZWFyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyMjQ1NzUsImV4cCI6MjA5MTgwMDU3NX0.lBB4o9J6DPr5MNQUP9p2lCWzhUBBS7Hvu0JETmH7hjc';
 
-// Seed padrão — usado apenas se o DB ainda não foi inicializado pelo app.html
-var SEED_USERS = [
-  {id:'u1',email:'sede@sombrear.com.br',senha:'sombrear2024',role:'sede',nome:'Carlos Alberto',cargo:'Gerente Industrial',filial_id:'',filial_nome:'',ativo:true},
-  {id:'u2',email:'df@sombrear.com.br',senha:'sombrear2024',role:'filial',nome:'Ricardo Mendes',cargo:'Engenheiro de Campo',filial_id:'f1',filial_nome:'Sombrear DF',ativo:true}
-];
-
-function getUsuarios(){
-  try{
-    var saved=JSON.parse(localStorage.getItem('smb_usuarios'));
-    if(saved&&saved.length)return saved;
-  }catch(e){}
-  // Primeira vez: inicializa o DB
-  localStorage.setItem('smb_usuarios',JSON.stringify(SEED_USERS));
-  return SEED_USERS;
-}
+var role='sede';
 
 function selectRole(r){
   role=r;
   document.getElementById('rc-sede').classList.toggle('active',r==='sede');
   document.getElementById('rc-filial').classList.toggle('active',r==='filial');
 }
-
 function demo(e,s,r){
   document.getElementById('inpEmail').value=e;
   document.getElementById('inpSenha').value=s;
@@ -197,22 +183,39 @@ function demo(e,s,r){
 function fazerLogin(){
   var email=document.getElementById('inpEmail').value.trim().toLowerCase();
   var senha=document.getElementById('inpSenha').value;
+  var btn=document.querySelector('.btn-login');
   var err=document.getElementById('errBox');
-  var users=getUsuarios();
-  var user=users.find(function(u){return u.email===email&&u.senha===senha&&u.role===role&&u.ativo!==false;});
-  if(user){
-    err.style.display='none';
-    localStorage.setItem('sombrear_session',JSON.stringify(user));
-    window.location.href='app.html';
-  } else {
+  err.style.display='none';
+  btn.textContent='Verificando...';btn.disabled=true;
+
+  fetch(SUPA_URL+'/rest/v1/sgps_store?key=eq.usuarios&select=value',{
+    headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}
+  })
+  .then(function(r){return r.json();})
+  .then(function(rows){
+    var users=rows&&rows.length?rows[0].value:[];
+    var user=users.find(function(u){
+      return u.email===email&&u.senha===senha&&u.role===role&&u.ativo!==false;
+    });
+    if(user){
+      localStorage.setItem('sombrear_session',JSON.stringify(user));
+      window.location.href='app.html';
+    } else {
+      err.style.display='block';
+      btn.textContent='Entrar no Sistema →';btn.disabled=false;
+    }
+  })
+  .catch(function(){
+    err.textContent='Erro de conexão. Verifique sua internet e tente novamente.';
     err.style.display='block';
-  }
+    btn.textContent='Entrar no Sistema →';btn.disabled=false;
+  });
 }
 
 document.addEventListener('keydown',function(e){if(e.key==='Enter')fazerLogin();});
 
-// Auto-redirect if already logged in
-if(localStorage.getItem('sombrear_session')) window.location.href='app.html';
+// Auto-redirect se já logado
+if(localStorage.getItem('sombrear_session'))window.location.href='app.html';
 </script>
 </body>
 </html>

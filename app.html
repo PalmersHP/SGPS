@@ -469,22 +469,47 @@ function gerarItens(vagas,mod2vMA,mod3vMA,mod2vMT,mod3vMT,align,mult){
 }
 
 // ════════════════════════════════════════════
-// DB (localStorage)
 // ════════════════════════════════════════════
+// SUPABASE
+// ════════════════════════════════════════════
+var SUPA_URL='https://gwcgcvgowoqyhthdbear.supabase.co';
+var SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd3Y2djdmdvd29xeWh0aGRiZWFyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyMjQ1NzUsImV4cCI6MjA5MTgwMDU3NX0.lBB4o9J6DPr5MNQUP9p2lCWzhUBBS7Hvu0JETmH7hjc';
+var SUPA_HDR={'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json'};
+
+function supaGet(k){
+  return fetch(SUPA_URL+'/rest/v1/sgps_store?key=eq.'+k+'&select=value',{headers:SUPA_HDR})
+    .then(function(r){return r.json();})
+    .then(function(rows){return rows&&rows.length?rows[0].value:null;})
+    .catch(function(){return null;});
+}
+function supaSet(k,v){
+  return fetch(SUPA_URL+'/rest/v1/sgps_store',{
+    method:'POST',
+    headers:Object.assign({},SUPA_HDR,{'Prefer':'resolution=merge-duplicates'}),
+    body:JSON.stringify({key:k,value:v,updated_at:new Date().toISOString()})
+  }).catch(function(e){console.warn('supaSet error',e);});
+}
+
+// ════════════════════════════════════════════
+// DB (Supabase + cache em memória)
+// ════════════════════════════════════════════
+var DB_CACHE={filiais:[],pedidos:[],usuarios:[],catalogo:[]};
 var DB = {
   init:function(){
-    if(!localStorage.getItem('smb_seeded')){
-      localStorage.setItem('smb_filiais',JSON.stringify(SEED.filiais));
-      localStorage.setItem('smb_pedidos',JSON.stringify(SEED.pedidos));
-      localStorage.setItem('smb_usuarios',JSON.stringify(SEED.usuarios));
-      localStorage.setItem('smb_catalogo',JSON.stringify(SEED.catalogo));
-      localStorage.setItem('smb_seeded','1');
-    }
-    if(!localStorage.getItem('smb_usuarios')){localStorage.setItem('smb_usuarios',JSON.stringify(SEED.usuarios));}
-    if(!localStorage.getItem('smb_catalogo')){localStorage.setItem('smb_catalogo',JSON.stringify(SEED.catalogo));}
+    var tables=['filiais','pedidos','usuarios','catalogo'];
+    return Promise.all(tables.map(function(t){
+      return supaGet(t).then(function(d){
+        if(d&&d.length){DB_CACHE[t]=d;}
+        else if(!d){
+          // Primeira vez: sobe o seed
+          DB_CACHE[t]=SEED[t]||[];
+          if(DB_CACHE[t].length)supaSet(t,DB_CACHE[t]);
+        }
+      });
+    }));
   },
-  get:function(k){try{return JSON.parse(localStorage.getItem('smb_'+k))||[];}catch(e){return[];}},
-  set:function(k,v){localStorage.setItem('smb_'+k,JSON.stringify(v));},
+  get:function(k){return DB_CACHE[k]||[];},
+  set:function(k,v){DB_CACHE[k]=v;supaSet(k,v);},
   pedidos:function(){return this.get('pedidos');},
   savePedidos:function(p){this.set('pedidos',p);},
   filiais:function(){return this.get('filiais');},
@@ -511,11 +536,7 @@ var USER = null;
 function initAuth(){
   var s=localStorage.getItem('sombrear_session');
   if(!s){window.location.href='sistema.html';return false;}
-  var sess=JSON.parse(s);
-  // Re-lê do DB para pegar sempre o nome/cargo mais atualizado
-  DB.init();
-  var dbUser=DB.usuarios().find(function(u){return u.id===sess.id;});
-  USER=dbUser||sess;
+  USER=JSON.parse(s); // carregamento inicial — DB.init() atualiza depois
   return true;
 }
 function logout(){
@@ -1707,10 +1728,6 @@ function esc(s){return String(s||'').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 // ════════════════════════════════════════════
 // BOOT
 // ════════════════════════════════════════════
-if(!initAuth()){throw new Error('Not authenticated');}
-DB.init();
-buildSidebar();
-
 // Extend renderView for detail pages
 var _origRender=renderView;
 renderView=function(hash){
@@ -1723,8 +1740,31 @@ window.addEventListener('hashchange',function(){
   navigate(location.hash.replace('#',''));
 });
 
-var startHash=location.hash.replace('#','')||'';
-navigate(startHash);
+(function boot(){
+  if(!initAuth())return;
+  // Mostra loading enquanto busca dados do Supabase
+  document.getElementById('content').innerHTML=
+    '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:60vh;gap:12px">'+
+    '<div style="width:36px;height:36px;border:3px solid #e2e8f0;border-top-color:var(--verde);border-radius:50%;animation:spin 0.8s linear infinite"></div>'+
+    '<span style="font-size:13px;color:#64748b">Conectando ao servidor...</span></div>';
+  if(!document.getElementById('spinStyle')){
+    var st=document.createElement('style');st.id='spinStyle';
+    st.textContent='@keyframes spin{to{transform:rotate(360deg)}}';
+    document.head.appendChild(st);
+  }
+  DB.init().then(function(){
+    // Re-lê o usuário atual do DB para garantir dados atualizados
+    var dbUser=DB.usuarios().find(function(u){return u.id===USER.id;});
+    if(dbUser)USER=dbUser;
+    buildSidebar();
+    var startHash=location.hash.replace('#','')||'';
+    navigate(startHash);
+  }).catch(function(e){
+    console.error('Boot error:',e);
+    document.getElementById('content').innerHTML=
+      '<div style="display:flex;align-items:center;justify-content:center;height:60vh;font-size:14px;color:#dc2626">⚠️ Erro ao conectar. Verifique sua conexão e recarregue a página.</div>';
+  });
+}());
 </script>
 </body>
 </html>
