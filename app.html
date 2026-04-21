@@ -131,6 +131,24 @@ tbody tr:last-child td{border-bottom:none}
 .wz-panel.active{display:block}
 
 /* MODULE GROUPS */
+/* TIPO SELECTOR */
+.tipo-selector-label{font-size:11px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px}
+.tipo-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:4px}
+.tipo-card{border:2px solid #e2e8f0;border-radius:10px;padding:14px 10px;cursor:pointer;text-align:center;background:#fff;transition:all .2s;position:relative;user-select:none}
+.tipo-card:hover{border-color:#9ACD32;background:#f7fdf0;transform:translateY(-1px);box-shadow:0 4px 12px rgba(154,205,50,.15)}
+.tipo-card.active{border-color:#9ACD32;background:#f0fae0;box-shadow:0 0 0 3px rgba(154,205,50,.15)}
+.tipo-card .tipo-icon{font-size:26px;display:block;margin-bottom:6px}
+.tipo-card .tipo-label{font-size:13px;font-weight:700;color:#1e293b}
+.tipo-card .tipo-sub{font-size:10px;color:#94a3b8;margin-top:2px;line-height:1.3}
+.tipo-card.active .tipo-label{color:#6FAE2E}
+.tipo-card .tipo-check{position:absolute;top:7px;right:9px;font-size:11px;color:#9ACD32;font-weight:700;background:#fff;border-radius:50%;width:16px;height:16px;display:flex;align-items:center;justify-content:center;border:1.5px solid #9ACD32}
+.tipo-divider{height:1px;background:#e2e8f0;margin:16px 0}
+/* EM BREVE */
+.em-breve-box{text-align:center;padding:40px 20px;background:linear-gradient(135deg,#f8fafc,#f1f5f9);border:2px dashed #cbd5e1;border-radius:12px}
+.em-breve-icon{font-size:48px;display:block;margin-bottom:12px}
+.em-breve-title{font-size:18px;font-weight:700;color:#334155;margin-bottom:8px}
+.em-breve-desc{font-size:13px;color:#64748b;line-height:1.6;margin-bottom:16px}
+.em-breve-badge{display:inline-block;background:#fef3c7;color:#92400e;font-size:11px;font-weight:700;padding:5px 14px;border-radius:20px;border:1px solid #fde68a;letter-spacing:.5px}
 .mod-group{background:#f8fafc;border-radius:8px;padding:14px;border-left:3px solid var(--verde)}
 .mod-group h4{font-size:11px;font-weight:700;color:var(--verde-d);text-transform:uppercase;margin-bottom:10px;letter-spacing:.4px}
 .calc-summary{background:linear-gradient(135deg,#f0fae0,#e8f5cc);border:1px solid #c6e870;border-radius:8px;padding:14px 16px;margin-top:16px}
@@ -139,6 +157,13 @@ tbody tr:last-child td{border-bottom:none}
 .calc-item{text-align:center;background:#fff;border-radius:6px;padding:8px}
 .calc-item .cv{font-size:20px;font-weight:700;color:var(--verde-d)}
 .calc-item .cl{font-size:10px;color:#64748b;text-transform:uppercase}
+
+/* GESTOR BANNER */
+.gestor-banner{display:flex;align-items:center;gap:14px;background:linear-gradient(135deg,#f0fae0,#e8f5cc);border:1px solid #c6e870;border-radius:10px;padding:14px 18px;margin-bottom:20px}
+.gestor-banner-icon{font-size:26px;flex-shrink:0}
+.gestor-banner-label{font-size:10px;font-weight:700;color:#6FAE2E;text-transform:uppercase;letter-spacing:.5px}
+.gestor-banner-nome{font-size:15px;font-weight:700;color:#1e293b;margin-top:1px}
+.gestor-banner-filial{margin-left:auto;font-size:11px;color:#64748b;text-align:right;white-space:nowrap}
 
 /* DIRECTIVE CHIPS */
 .dir-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
@@ -268,9 +293,10 @@ tbody tr:last-child td{border-bottom:none}
     </div>
     <div class="tb-right">
       <button class="notif-btn" id="notifBtn" title="Notificações">🔔<span class="notif-dot" id="notifDot" style="display:none"></span></button>
-      <div class="tb-user">
+      <div class="tb-user" onclick="editarPerfil()" title="Editar perfil" style="cursor:pointer">
         <div class="tb-av" id="tbAv">?</div>
         <span class="tb-name" id="tbName">—</span>
+        <span style="font-size:11px;color:#94a3b8;margin-left:2px">✏️</span>
       </div>
     </div>
   </header>
@@ -314,7 +340,7 @@ tbody tr:last-child td{border-bottom:none}
 // ════════════════════════════════════════════
 var SEED = {
   filiais:[
-    {id:'f1',nome:'Sombrear DF',cidade:'Brasília - DF',cnpj:'40.123.456/0001-88',email:'df@sombrear.com.br',telefone:'(61) 99999-1234',ativo:true}
+    {id:'f1',nome:'Sombrear DF',cidade:'Brasília - DF',gestor:'Ricardo Mendes',cnpj:'40.123.456/0001-88',email:'df@sombrear.com.br',telefone:'(61) 99999-1234',ativo:true}
   ],
   pedidos:[
     {id:'p1',filial_id:'f1',filial_nome:'Sombrear DF',status:'entregue',tipo:'Sombrite',
@@ -505,7 +531,14 @@ function buildSidebar(){
   document.getElementById('sbNav').innerHTML=html;
   document.getElementById('userAv').textContent=initials(USER.nome);
   document.getElementById('userName').textContent=USER.nome;
-  document.getElementById('userRole').textContent=USER.role==='sede'?'Sede — Goiânia':'Filial: '+(USER.filial_nome||'');
+  if(USER.role==='filial'){
+    var filObj=DB.filiais().find(function(f){return f.id===USER.filial_id;});
+    var gestorNome=filObj&&filObj.gestor?filObj.gestor:'';
+    var roleLabel=(USER.filial_nome||'')+(gestorNome&&gestorNome!==USER.nome?' · Gest: '+gestorNome:'');
+    document.getElementById('userRole').textContent=roleLabel;
+  } else {
+    document.getElementById('userRole').textContent='Sede — Goiânia';
+  }
   document.getElementById('tbAv').textContent=initials(USER.nome);
   document.getElementById('tbName').textContent=USER.nome;
   if(USER.role==='sede'){
@@ -559,9 +592,15 @@ function renderFilialDash(){
     return '<tr><td><strong>'+p.cliente+'</strong></td><td>'+p.vagas+'</td><td>'+badge(p.status)+'</td><td>'+fmtDate(p.criado)+'</td><td><button class="btn btn-sm btn-outline" onclick="verPedidoFilial(\''+p.id+'\')">Ver →</button></td></tr>';
   }).join('');
 
+  var filObj=DB.filiais().find(function(f){return f.id===USER.filial_id;});
+  var gestorCard=filObj&&filObj.gestor?
+    '<div class="gestor-banner"><span class="gestor-banner-icon">👤</span><div><div class="gestor-banner-label">Gestor Responsável</div><div class="gestor-banner-nome">'+filObj.gestor+'</div></div><div class="gestor-banner-filial">'+filObj.nome+' · '+filObj.cidade+'</div></div>'
+    :'';
+
   document.getElementById('view-filial-dashboard').innerHTML=
   '<div class="page-hdr"><div><h1>Olá, '+USER.nome.split(' ')[0]+' 👋</h1><p>Aqui está o resumo da sua filial hoje.</p></div>'+
   '<button class="btn btn-primary" onclick="location.hash=\'filial-novo-pedido\'">➕ Novo Pedido</button></div>'+
+  gestorCard+
 
   '<div class="kpi-grid">'+
     '<div class="kpi" data-icon="📋"><div class="kpi-label">Total de Pedidos</div><div class="kpi-val">'+peds.length+'</div><div class="kpi-sub">histórico completo</div></div>'+
@@ -588,11 +627,11 @@ function renderFilialDash(){
 // ════════════════════════════════════════════
 // WIZARD STATE
 // ════════════════════════════════════════════
-var WZ={step:1,cliente:{},dim:{},dir:{},itens:[],prazos:prazoesPadrao()};
+var WZ={step:1,cliente:{},dim:{tipo:'Sombrite'},dir:{},itens:[],prazos:prazoesPadrao()};
 var WZ_CHARTS={};
 
 function renderNovoPedido(){
-  WZ={step:1,cliente:{},dim:{mod2vMA:0,mod3vMA:0,mod2vMT:0,mod3vMT:0,vagas:0,align:1,semParam:false},dir:{},itens:[],prazos:prazoesPadrao()};
+  WZ={step:1,cliente:{},dim:{tipo:'Sombrite',mod2vMA:0,mod3vMA:0,mod2vMT:0,mod3vMT:0,vagas:0,align:1,semParam:false},dir:{},itens:[],prazos:prazoesPadrao()};
   renderWizard();
 }
 
@@ -615,24 +654,51 @@ function renderWizard(){
   '<div class="fg"><label>Telefone de Contato</label><input type="text" id="w_tel" value="'+esc(WZ.cliente.tel||'')+'" placeholder="(00) 00000-0000"></div>'+
   '<div class="fg"><label>Síndico Responsável</label><input type="text" id="w_sindico" value="'+esc(WZ.cliente.sindico||'')+'" placeholder="Nome completo"></div>'+
   '<div class="fg"><label>E-mail</label><input type="email" id="w_email" value="'+esc(WZ.cliente.email||'')+'" placeholder="condo@email.com.br"></div>'+
-  '<div class="fg"><label>Tipo de Cobertura *</label><select id="w_tipo"><option value="Sombrite"'+(WZ.cliente.tipo==='Sombrite'?' selected':'')+'>Sombrite</option><option value="Telha em Solo"'+(WZ.cliente.tipo==='Telha em Solo'?' selected':'')+'>Telha em Solo</option><option value="Telha em Laje"'+(WZ.cliente.tipo==='Telha em Laje'?' selected':'')+'>Telha em Laje</option></select></div>'+
   '</div></div></div></div>';
 
   // Step 2
   var d=WZ.dim;
+  var tipoAtual=d.tipo||'Sombrite';
   var calc=calcularPecas(d);
+  var tipoCards=[
+    {id:'Sombrite',icon:'🌿',label:'Sombrite',sub:'Tela sombrite + estrutura metálica'},
+    {id:'Telha',icon:'🏠',label:'Telha',sub:'Telha em solo ou em laje'},
+    {id:'Carport',icon:'🚗',label:'Carport',sub:'Cobertura para veículos'}
+  ].map(function(t){
+    var active=tipoAtual===t.id;
+    return '<div class="tipo-card'+(active?' active':'')+'" onclick="wzSetTipo(\''+t.id+'\')">'+
+      '<div class="tipo-icon">'+t.icon+'</div>'+
+      '<div class="tipo-label">'+t.label+'</div>'+
+      '<div class="tipo-sub">'+t.sub+'</div>'+
+      (active?'<div class="tipo-check">✓</div>':'')+
+    '</div>';
+  }).join('');
+
+  var sombriteForm=tipoAtual==='Sombrite'?
+    '<div class="form-grid" style="margin-bottom:16px">'+
+    '<div class="fg"><label>Qtd Total de Vagas *</label><input type="number" id="w_vagas" min="0" value="'+(d.vagas||0)+'" oninput="wzCalc()"><button class="btn btn-outline btn-sm" style="margin-top:6px" onclick="wzSugerir()">✨ Sugerir Distribuição</button></div>'+
+    '<div class="fg"><label>Alinhamentos (Sequências)</label><input type="number" id="w_align" min="1" value="'+(d.align||1)+'" oninput="wzCalc()" '+(d.semParam?'disabled':'')+'>'+
+    '<div style="display:flex;align-items:center;gap:7px;margin-top:6px"><input type="checkbox" id="w_semParam" '+(d.semParam?'checked':'')+' onchange="wzToggleAlign()" style="width:16px;height:16px;accent-color:var(--verde)"><label for="w_semParam" style="font-size:12px;cursor:pointer;text-transform:none;letter-spacing:0">Sem parâmetro (auto: 1 por 4 módulos)</label></div></div>'+
+    '</div>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">'+
+    '<div class="mod-group"><h4>📦 Módulos MA — Médio Apoio</h4><div class="form-grid"><div class="fg"><label>2V — MA</label><input type="number" id="w_m2ma" min="0" value="'+(d.mod2vMA||0)+'" oninput="wzCalc()"></div><div class="fg"><label>3V — MA</label><input type="number" id="w_m3ma" min="0" value="'+(d.mod3vMA||0)+'" oninput="wzCalc()"></div></div></div>'+
+    '<div class="mod-group"><h4>📦 Módulos MT — Médio Topo</h4><div class="form-grid"><div class="fg"><label>2V — MT</label><input type="number" id="w_m2mt" min="0" value="'+(d.mod2vMT||0)+'" oninput="wzCalc()"></div><div class="fg"><label>3V — MT</label><input type="number" id="w_m3mt" min="0" value="'+(d.mod3vMT||0)+'" oninput="wzCalc()"></div></div></div>'+
+    '</div>'+
+    '<div class="calc-summary" id="wzCalcBox">'+renderCalcSummary(calc)+'</div>'
+  :
+    '<div class="em-breve-box">'+
+      '<div class="em-breve-icon">'+(tipoAtual==='Telha'?'🏠':'🚗')+'</div>'+
+      '<div class="em-breve-title">'+tipoAtual+' — Em desenvolvimento</div>'+
+      '<div class="em-breve-desc">O cálculo automático para <strong>'+tipoAtual+'</strong> estará disponível em breve.<br>Você já pode avançar e preencher os demais dados do pedido.</div>'+
+      '<div class="em-breve-badge">🔧 Em breve</div>'+
+    '</div>';
+
   panels+='<div class="wz-panel'+(WZ.step===2?' active':'')+'">'+
   '<div class="card"><div class="card-hdr"><h2>📐 Dimensionamento</h2></div><div class="card-body">'+
-  '<div class="form-grid" style="margin-bottom:16px">'+
-  '<div class="fg"><label>Qtd Total de Vagas *</label><input type="number" id="w_vagas" min="0" value="'+(d.vagas||0)+'" oninput="wzCalc()"><button class="btn btn-outline btn-sm" style="margin-top:6px" onclick="wzSugerir()">✨ Sugerir Distribuição</button></div>'+
-  '<div class="fg"><label>Alinhamentos (Sequências)</label><input type="number" id="w_align" min="1" value="'+(d.align||1)+'" oninput="wzCalc()" '+(d.semParam?'disabled':'')+'>'+
-  '<div style="display:flex;align-items:center;gap:7px;margin-top:6px"><input type="checkbox" id="w_semParam" '+(d.semParam?'checked':'')+' onchange="wzToggleAlign()" style="width:16px;height:16px;accent-color:var(--verde)"><label for="w_semParam" style="font-size:12px;cursor:pointer;text-transform:none;letter-spacing:0">Sem parâmetro (auto: 1 por 4 módulos)</label></div></div>'+
-  '</div>'+
-  '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">'+
-  '<div class="mod-group"><h4>📦 Módulos MA — Médio Apoio</h4><div class="form-grid"><div class="fg"><label>2V — MA</label><input type="number" id="w_m2ma" min="0" value="'+(d.mod2vMA||0)+'" oninput="wzCalc()"></div><div class="fg"><label>3V — MA</label><input type="number" id="w_m3ma" min="0" value="'+(d.mod3vMA||0)+'" oninput="wzCalc()"></div></div></div>'+
-  '<div class="mod-group"><h4>📦 Módulos MT — Médio Topo</h4><div class="form-grid"><div class="fg"><label>2V — MT</label><input type="number" id="w_m2mt" min="0" value="'+(d.mod2vMT||0)+'" oninput="wzCalc()"></div><div class="fg"><label>3V — MT</label><input type="number" id="w_m3mt" min="0" value="'+(d.mod3vMT||0)+'" oninput="wzCalc()"></div></div></div>'+
-  '</div>'+
-  '<div class="calc-summary" id="wzCalcBox">'+renderCalcSummary(calc)+'</div>'+
+  '<div class="tipo-selector-label">Tipo de cobertura vendida</div>'+
+  '<div class="tipo-grid">'+tipoCards+'</div>'+
+  '<div class="tipo-divider"></div>'+
+  sombriteForm+
   '</div></div></div>';
 
   // Step 3
@@ -742,14 +808,18 @@ function wzNext(){
   if(WZ.step===1){
     var nome=document.getElementById('w_cliente').value.trim();
     if(!nome){showToast('Informe o nome do condomínio.','error');return;}
-    WZ.cliente={nome:nome,cnpj:document.getElementById('w_cnpj').value,end:document.getElementById('w_end').value,tel:document.getElementById('w_tel').value,sindico:document.getElementById('w_sindico').value,email:document.getElementById('w_email').value,tipo:document.getElementById('w_tipo').value};
+    WZ.cliente={nome:nome,cnpj:document.getElementById('w_cnpj').value,end:document.getElementById('w_end').value,tel:document.getElementById('w_tel').value,sindico:document.getElementById('w_sindico').value,email:document.getElementById('w_email').value};
   }
   if(WZ.step===2){
-    wzCalc();
-    if(!WZ.dim.vagas){showToast('Informe a quantidade de vagas.','error');return;}
-    // Prepare itens for step 4
-    var d=WZ.dim,calc=calcularPecas(d);
-    WZ.itens=gerarItens(d.vagas,d.mod2vMA,d.mod3vMA,d.mod2vMT,d.mod3vMT,calc.align,1);
+    var tipo=WZ.dim.tipo||'Sombrite';
+    if(tipo==='Sombrite'){
+      wzCalc();
+      if(!WZ.dim.vagas){showToast('Informe a quantidade de vagas.','error');return;}
+      var d=WZ.dim,calc=calcularPecas(d);
+      WZ.itens=gerarItens(d.vagas,d.mod2vMA,d.mod3vMA,d.mod2vMT,d.mod3vMT,calc.align,1);
+    } else {
+      WZ.itens=[];
+    }
   }
   if(WZ.step===3){
     WZ.dir={estrutura:document.getElementById('w_estrutura').value,tela:document.getElementById('w_tela').value,chumb:document.getElementById('w_chumb').value,pilares:document.getElementById('w_pilares').value};
@@ -760,12 +830,14 @@ function wzNext(){
 
 function wzPrev(){WZ.step--;renderWizard();}
 
+function wzSetTipo(t){WZ.dim.tipo=t;renderWizard();}
+
 function wzEnviar(){
   var id=uid();
   var calc=calcularPecas(WZ.dim);
   var pedido={
     id:id,filial_id:USER.filial_id,filial_nome:USER.filial_nome,
-    status:'aguardando',tipo:WZ.cliente.tipo||'Sombrite',
+    status:'aguardando',tipo:WZ.dim.tipo||'Sombrite',
     cliente:WZ.cliente.nome,cnpj:WZ.cliente.cnpj,endereco:WZ.cliente.end,
     contato:WZ.cliente.tel,sindico:WZ.cliente.sindico,email:WZ.cliente.email,
     vagas:WZ.dim.vagas,cor_estrutura:WZ.dir.estrutura,cor_tela:WZ.dir.tela,
@@ -1075,12 +1147,26 @@ function renderFiliais(){
   var peds=DB.pedidos();
   var rows=fils.map(function(f){
     var cnt=peds.filter(function(p){return p.filial_id===f.id;}).length;
-    return'<tr><td><strong>'+f.nome+'</strong></td><td>'+f.cidade+'</td><td>'+f.cnpj+'</td><td>'+f.email+'</td><td>'+f.telefone+'</td><td>'+cnt+'</td><td><span style="color:'+( f.ativo?'#16a34a':'#ef4444')+'">●</span> '+(f.ativo?'Ativa':'Inativa')+'</td></tr>';
+    var fj=encodeURIComponent(JSON.stringify(f));
+    return'<tr>'+
+      '<td><strong>'+f.nome+'</strong></td>'+
+      '<td>'+f.cidade+'</td>'+
+      '<td>'+(f.gestor||'—')+'</td>'+
+      '<td>'+f.cnpj+'</td>'+
+      '<td>'+f.email+'</td>'+
+      '<td>'+f.telefone+'</td>'+
+      '<td>'+cnt+'</td>'+
+      '<td><span style="color:'+( f.ativo?'#16a34a':'#ef4444')+'">●</span> '+(f.ativo?'Ativa':'Inativa')+'</td>'+
+      '<td style="white-space:nowrap">'+
+        '<button class="btn btn-sm btn-outline" onclick="editarFilial(\''+f.id+'\')">✏️ Editar</button> '+
+        '<button class="btn btn-sm" style="background:#fef2f2;color:#dc2626;border:1px solid #fecaca" onclick="excluirFilial(\''+f.id+'\',\''+esc(f.nome)+'\')">🗑️</button>'+
+      '</td>'+
+    '</tr>';
   }).join('');
   document.getElementById('view-sede-filiais').innerHTML=
   '<div class="page-hdr"><div><h1>Filiais</h1><p>Gerencie as filiais cadastradas no sistema.</p></div>'+
   '<button class="btn btn-primary" onclick="novaFilial()">＋ Nova Filial</button></div>'+
-  '<div class="card"><div class="card-body" style="padding:0"><div class="tbl-wrap"><table><thead><tr><th>Nome</th><th>Cidade</th><th>CNPJ</th><th>E-mail</th><th>Telefone</th><th>Pedidos</th><th>Status</th></tr></thead><tbody>'+rows+'</tbody></table></div></div></div>';
+  '<div class="card"><div class="card-body" style="padding:0"><div class="tbl-wrap"><table><thead><tr><th>Nome</th><th>Cidade</th><th>Gestor</th><th>CNPJ</th><th>E-mail</th><th>Telefone</th><th>Pedidos</th><th>Status</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div></div></div>';
 }
 
 function novaFilial(){
@@ -1088,6 +1174,7 @@ function novaFilial(){
     '<div class="form-grid">'+
     '<div class="fg"><label>Nome *</label><input id="nf_nome" placeholder="Ex: Sombrear SP"></div>'+
     '<div class="fg"><label>Cidade *</label><input id="nf_cidade" placeholder="Ex: São Paulo - SP"></div>'+
+    '<div class="fg"><label>Gestor Responsável *</label><input id="nf_gestor" placeholder="Nome completo do gestor"></div>'+
     '<div class="fg"><label>CNPJ</label><input id="nf_cnpj" placeholder="00.000.000/0001-00"></div>'+
     '<div class="fg"><label>E-mail</label><input type="email" id="nf_email" placeholder="sp@sombrear.com.br"></div>'+
     '<div class="fg"><label>Telefone</label><input id="nf_tel" placeholder="(00) 00000-0000"></div>'+
@@ -1101,10 +1188,79 @@ function salvarFilial(){
   var nome=document.getElementById('nf_nome').value.trim();
   if(!nome){showToast('Informe o nome da filial.','error');return;}
   var fils=DB.filiais();
-  fils.push({id:'f'+Date.now(),nome:nome,cidade:document.getElementById('nf_cidade').value,cnpj:document.getElementById('nf_cnpj').value,email:document.getElementById('nf_email').value,telefone:document.getElementById('nf_tel').value,ativo:true});
+  var gestor=document.getElementById('nf_gestor').value.trim();
+  if(!gestor){showToast('Informe o nome do gestor.','error');return;}
+  fils.push({id:'f'+Date.now(),nome:nome,cidade:document.getElementById('nf_cidade').value,gestor:gestor,cnpj:document.getElementById('nf_cnpj').value,email:document.getElementById('nf_email').value,telefone:document.getElementById('nf_tel').value,ativo:true});
   DB.saveFiliais(fils);
   closeModal();showToast('Filial cadastrada com sucesso!','success');
   renderFiliais();
+}
+
+function editarFilial(id){
+  var f=DB.filiais().find(function(x){return x.id===id;});
+  if(!f)return;
+  openModal('Editar Filial',
+    '<div class="form-grid">'+
+    '<div class="fg"><label>Nome *</label><input id="ef_nome" value="'+esc(f.nome)+'"></div>'+
+    '<div class="fg"><label>Cidade *</label><input id="ef_cidade" value="'+esc(f.cidade)+'"></div>'+
+    '<div class="fg"><label>Gestor Responsável *</label><input id="ef_gestor" value="'+esc(f.gestor||'')+'"></div>'+
+    '<div class="fg"><label>CNPJ</label><input id="ef_cnpj" value="'+esc(f.cnpj||'')+'"></div>'+
+    '<div class="fg"><label>E-mail</label><input type="email" id="ef_email" value="'+esc(f.email||'')+'"></div>'+
+    '<div class="fg"><label>Telefone</label><input id="ef_tel" value="'+esc(f.telefone||'')+'"></div>'+
+    '<div class="fg"><label>Status</label><select id="ef_ativo"><option value="1"'+(f.ativo?' selected':'')+'>Ativa</option><option value="0"'+(!f.ativo?' selected':'')+'>Inativa</option></select></div>'+
+    '</div>',
+    '<button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>'+
+    '<button class="btn btn-primary" onclick="salvarEdicaoFilial(\''+id+'\')">Salvar Alterações</button>'
+  );
+}
+
+function salvarEdicaoFilial(id){
+  var nome=document.getElementById('ef_nome').value.trim();
+  var gestor=document.getElementById('ef_gestor').value.trim();
+  if(!nome){showToast('Informe o nome.','error');return;}
+  if(!gestor){showToast('Informe o gestor.','error');return;}
+  var fils=DB.filiais().map(function(f){
+    if(f.id!==id)return f;
+    return Object.assign({},f,{
+      nome:nome,cidade:document.getElementById('ef_cidade').value,
+      gestor:gestor,cnpj:document.getElementById('ef_cnpj').value,
+      email:document.getElementById('ef_email').value,
+      telefone:document.getElementById('ef_tel').value,
+      ativo:document.getElementById('ef_ativo').value==='1'
+    });
+  });
+  DB.saveFiliais(fils);
+  buildSidebar();
+  closeModal();showToast('Filial atualizada.','success');
+  navigate(location.hash.replace('#','')||'');
+}
+
+function excluirFilial(id,nome){
+  if(!confirm('Excluir a filial "'+nome+'"? Esta ação não pode ser desfeita.'))return;
+  DB.saveFiliais(DB.filiais().filter(function(f){return f.id!==id;}));
+  showToast('Filial excluída.','success');renderFiliais();
+}
+
+function editarPerfil(){
+  openModal('Editar Perfil',
+    '<div class="form-grid">'+
+    '<div class="fg" style="grid-column:1/-1"><label>Nome completo *</label><input id="ep_nome" value="'+esc(USER.nome)+'"></div>'+
+    '<div class="fg" style="grid-column:1/-1"><label>Cargo</label><input id="ep_cargo" value="'+esc(USER.cargo||'')+'"></div>'+
+    '</div>',
+    '<button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>'+
+    '<button class="btn btn-primary" onclick="salvarPerfil()">Salvar</button>'
+  );
+}
+
+function salvarPerfil(){
+  var nome=document.getElementById('ep_nome').value.trim();
+  if(!nome){showToast('Informe o nome.','error');return;}
+  USER.nome=nome;
+  USER.cargo=document.getElementById('ep_cargo').value.trim();
+  localStorage.setItem('sombrear_session',JSON.stringify(USER));
+  closeModal();showToast('Perfil atualizado.','success');
+  buildSidebar();
+  navigate(location.hash.replace('#','')||'');
 }
 
 // ════════════════════════════════════════════
