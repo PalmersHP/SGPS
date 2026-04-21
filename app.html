@@ -1,0 +1,1249 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sombrear — Sistema de Pedidos</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+:root{
+  --verde:#9ACD32;--verde-d:#6FAE2E;--verde-dark:#4a7a1e;
+  --sb:#162032;--sb-hover:#1e2d42;--sb-active:rgba(154,205,50,.13);
+  --bg:#f0f4f8;--card:#fff;--cinza:#5A5A5A;--border:#e2e8f0;
+  --shadow:0 1px 8px rgba(0,0,0,.08);--shadow-md:0 4px 20px rgba(0,0,0,.1);
+  --radius:10px;--sb-width:240px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Poppins',sans-serif;background:var(--bg);color:var(--cinza);display:flex;height:100vh;overflow:hidden}
+
+/* ══ SIDEBAR ══ */
+#sidebar{width:var(--sb-width);background:var(--sb);display:flex;flex-direction:column;height:100vh;position:fixed;left:0;top:0;z-index:200;transition:transform .3s;overflow-y:auto}
+.sb-logo{padding:20px 20px 16px;border-bottom:1px solid rgba(255,255,255,.07)}
+.sb-logo img{height:38px;filter:brightness(0) invert(1);display:block}
+.sb-logo-txt{color:#9ACD32;font-size:10px;font-weight:600;letter-spacing:2px;text-transform:uppercase;margin-top:4px}
+.sb-section{padding:16px 12px 6px;font-size:10px;font-weight:700;color:rgba(255,255,255,.3);text-transform:uppercase;letter-spacing:1.5px}
+.sb-nav{flex:1;padding:0 8px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;cursor:pointer;color:rgba(255,255,255,.6);font-size:13px;font-weight:500;transition:all .2s;margin-bottom:2px;text-decoration:none;position:relative}
+.nav-item:hover{background:var(--sb-hover);color:#fff}
+.nav-item.active{background:var(--sb-active);color:var(--verde)}
+.nav-item .ni-icon{font-size:16px;width:20px;text-align:center;flex-shrink:0}
+.nav-badge{background:#ef4444;color:#fff;font-size:10px;font-weight:700;padding:2px 6px;border-radius:10px;margin-left:auto}
+.sb-footer{padding:12px 12px 16px;border-top:1px solid rgba(255,255,255,.07);margin-top:auto}
+.user-card{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;background:rgba(255,255,255,.05)}
+.user-av{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--verde),var(--verde-d));display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;flex-shrink:0}
+.user-info{flex:1;min-width:0}
+.user-name{font-size:12px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.user-role{font-size:10px;color:rgba(255,255,255,.4)}
+.logout-btn{background:none;border:none;cursor:pointer;color:rgba(255,255,255,.4);font-size:16px;padding:4px;transition:color .2s}
+.logout-btn:hover{color:#ef4444}
+
+/* ══ MAIN ══ */
+#main{margin-left:var(--sb-width);flex:1;display:flex;flex-direction:column;height:100vh;overflow:hidden;transition:margin .3s}
+.topbar{background:#fff;border-bottom:1px solid var(--border);padding:0 24px;height:58px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;box-shadow:var(--shadow)}
+.tb-left{display:flex;align-items:center;gap:14px}
+.tb-toggle{background:none;border:none;cursor:pointer;font-size:20px;color:#64748b;padding:4px}
+.tb-title{font-size:15px;font-weight:600;color:#1e293b}
+.tb-right{display:flex;align-items:center;gap:12px}
+.notif-btn{position:relative;background:none;border:none;cursor:pointer;font-size:20px;color:#64748b;padding:6px}
+.notif-dot{position:absolute;top:4px;right:4px;width:8px;height:8px;border-radius:50%;background:#ef4444;border:2px solid #fff}
+.tb-user{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:8px;cursor:pointer;transition:background .2s}
+.tb-user:hover{background:var(--bg)}
+.tb-av{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,var(--verde),var(--verde-d));display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff}
+.tb-name{font-size:13px;font-weight:600;color:#334155}
+
+/* ══ CONTENT ══ */
+#content{flex:1;overflow-y:auto;padding:24px}
+.view{display:none}
+.view.active{display:block}
+
+/* ══ PAGE HEADER ══ */
+.page-hdr{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px}
+.page-hdr h1{font-size:20px;font-weight:700;color:#1e293b}
+.page-hdr p{font-size:13px;color:#64748b;margin-top:2px}
+
+/* ══ CARDS ══ */
+.card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:20px}
+.card-hdr{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.card-hdr h2{font-size:14px;font-weight:600;color:#1e293b}
+.card-body{padding:20px}
+
+/* KPI CARDS */
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:16px;margin-bottom:20px}
+.kpi{background:var(--card);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow);border-top:3px solid var(--verde);position:relative;overflow:hidden}
+.kpi::after{content:attr(data-icon);position:absolute;right:14px;top:14px;font-size:28px;opacity:.15}
+.kpi-label{font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.5px}
+.kpi-val{font-size:30px;font-weight:700;color:#1e293b;line-height:1.2;margin:6px 0 4px}
+.kpi-sub{font-size:12px;color:#94a3b8}
+
+/* STATUS BADGES */
+.badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;white-space:nowrap}
+.badge::before{content:'';width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.7}
+.s-rascunho{background:#f1f5f9;color:#64748b}
+.s-aguardando{background:#fffbeb;color:#d97706}
+.s-aprovado{background:#eff6ff;color:#2563eb}
+.s-em_fabricacao{background:#faf5ff;color:#7c3aed}
+.s-pronto_envio{background:#ecfeff;color:#0891b2}
+.s-em_transito{background:#fff7ed;color:#ea580c}
+.s-entregue{background:#f0fdf4;color:#16a34a}
+
+/* TABLES */
+.tbl-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+thead th{background:#f8fafc;padding:9px 12px;text-align:left;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.4px;border-bottom:2px solid var(--border);white-space:nowrap}
+tbody td{padding:11px 12px;border-bottom:1px solid #f1f5f9;vertical-align:middle}
+tbody tr:hover{background:#f8fafc}
+tbody tr:last-child td{border-bottom:none}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;border:none;font-family:'Poppins',sans-serif;transition:all .2s;text-decoration:none}
+.btn-primary{background:linear-gradient(135deg,var(--verde),var(--verde-d));color:#fff}
+.btn-primary:hover{transform:translateY(-1px);box-shadow:0 6px 18px rgba(154,205,50,.35)}
+.btn-outline{background:#fff;color:var(--verde-d);border:2px solid var(--verde)}
+.btn-outline:hover{background:var(--verde);color:#fff}
+.btn-sm{padding:5px 12px;font-size:12px}
+.btn-danger{background:#fef2f2;color:#dc2626;border:1px solid #fecaca}
+.btn-danger:hover{background:#dc2626;color:#fff}
+.btn-ghost{background:transparent;color:#64748b;border:1px solid var(--border)}
+.btn-ghost:hover{background:var(--bg)}
+.btn-approve{background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0}
+.btn-approve:hover{background:#16a34a;color:#fff}
+
+/* FORMS */
+.form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:16px}
+.fg{display:flex;flex-direction:column;gap:5px}
+.fg label{font-size:11px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.4px}
+.fg input,.fg select,.fg textarea{padding:9px 13px;border:2px solid var(--border);border-radius:7px;font-size:13px;font-family:'Poppins',sans-serif;color:#1e293b;background:#fff;transition:border-color .2s;width:100%}
+.fg input:focus,.fg select:focus,.fg textarea:focus{outline:none;border-color:var(--verde);box-shadow:0 0 0 3px rgba(154,205,50,.12)}
+.fg textarea{resize:vertical;min-height:70px}
+
+/* WIZARD */
+.wizard-steps{display:flex;align-items:center;margin-bottom:28px;background:#fff;padding:16px 24px;border-radius:var(--radius);box-shadow:var(--shadow)}
+.wz-step{display:flex;flex-direction:column;align-items:center;gap:4px;flex:1;position:relative}
+.wz-step::after{content:'';position:absolute;top:15px;left:50%;width:100%;height:2px;background:var(--border);z-index:0}
+.wz-step:last-child::after{display:none}
+.wz-num{width:30px;height:30px;border-radius:50%;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;background:#fff;color:#94a3b8;position:relative;z-index:1}
+.wz-step.done .wz-num{background:var(--verde);border-color:var(--verde);color:#fff}
+.wz-step.active .wz-num{border-color:var(--verde);color:var(--verde-d);background:#f0fae0}
+.wz-lbl{font-size:11px;color:#94a3b8;font-weight:500;white-space:nowrap}
+.wz-step.active .wz-lbl,.wz-step.done .wz-lbl{color:var(--verde-d)}
+.wz-panel{display:none}
+.wz-panel.active{display:block}
+
+/* MODULE GROUPS */
+.mod-group{background:#f8fafc;border-radius:8px;padding:14px;border-left:3px solid var(--verde)}
+.mod-group h4{font-size:11px;font-weight:700;color:var(--verde-d);text-transform:uppercase;margin-bottom:10px;letter-spacing:.4px}
+.calc-summary{background:linear-gradient(135deg,#f0fae0,#e8f5cc);border:1px solid #c6e870;border-radius:8px;padding:14px 16px;margin-top:16px}
+.calc-summary h4{font-size:12px;font-weight:700;color:var(--verde-d);margin-bottom:10px}
+.calc-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px}
+.calc-item{text-align:center;background:#fff;border-radius:6px;padding:8px}
+.calc-item .cv{font-size:20px;font-weight:700;color:var(--verde-d)}
+.calc-item .cl{font-size:10px;color:#64748b;text-transform:uppercase}
+
+/* DIRECTIVE CHIPS */
+.dir-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+.dir-card{background:#f8fafc;border:2px solid var(--border);border-radius:9px;padding:14px}
+.dir-card label{font-size:11px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:8px}
+.dir-card select{width:100%;padding:9px 12px;border:2px solid var(--border);border-radius:7px;font-size:13px;font-family:'Poppins',sans-serif;color:#1e293b;background:#fff}
+.dir-card select:focus{outline:none;border-color:var(--verde)}
+.dir-note{margin-top:8px}
+
+/* REVIEW TABLE */
+.rev-tbl input[type="number"]{width:70px;padding:4px 6px;border:1px solid var(--border);border-radius:4px;font-size:12px;text-align:center;font-family:'Poppins',sans-serif}
+.rev-tbl input[type="number"]:focus{outline:none;border-color:var(--verde)}
+.prazo-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px}
+.prazo-row{display:flex;align-items:center;justify-content:space-between;background:#f8fafc;border:1px solid var(--border);border-radius:7px;padding:10px 14px}
+.prazo-label{font-size:12px;font-weight:600;color:#334155}
+.prazo-select{padding:5px 10px;border:1px solid var(--border);border-radius:5px;font-size:12px;font-family:'Poppins',sans-serif;background:#fff}
+.prazo-select:focus{outline:none;border-color:var(--verde)}
+
+/* TIMELINE */
+.timeline{position:relative;padding-left:28px}
+.timeline::before{content:'';position:absolute;left:9px;top:4px;bottom:4px;width:2px;background:var(--border)}
+.tl-item{position:relative;padding-bottom:20px}
+.tl-item:last-child{padding-bottom:0}
+.tl-dot{position:absolute;left:-24px;top:3px;width:16px;height:16px;border-radius:50%;border:2px solid var(--border);background:#fff;display:flex;align-items:center;justify-content:center;font-size:8px}
+.tl-item.done .tl-dot{background:var(--verde);border-color:var(--verde);color:#fff}
+.tl-item.current .tl-dot{background:#fff;border-color:var(--verde);box-shadow:0 0 0 3px rgba(154,205,50,.2)}
+.tl-title{font-size:13px;font-weight:600;color:#1e293b}
+.tl-sub{font-size:11px;color:#94a3b8;margin-top:2px}
+
+/* SECTION DIVIDERS */
+.sec-title{font-size:12px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.8px;margin:20px 0 12px;display:flex;align-items:center;gap:8px}
+.sec-title::after{content:'';flex:1;height:1px;background:var(--border)}
+
+/* FILTER TABS */
+.filter-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px}
+.ftab{padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;border:2px solid var(--border);background:#fff;color:#64748b;transition:all .2s}
+.ftab:hover{border-color:var(--verde);color:var(--verde-d)}
+.ftab.active{background:var(--verde);border-color:var(--verde);color:#fff}
+
+/* CHART CONTAINERS */
+.chart-wrap{position:relative;height:240px}
+
+/* APPROVAL BOX */
+.apv-box{border-radius:9px;padding:16px 18px;margin-bottom:16px}
+.apv-pending{background:#fffbeb;border:1px solid #fde68a}
+.apv-info{background:#eff6ff;border:1px solid #bfdbfe}
+
+/* INFO GRID */
+.info-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:0}
+.info-row{display:flex;padding:9px 0;border-bottom:1px solid #f1f5f9}
+.info-row:last-child{border-bottom:none}
+.info-key{font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;width:140px;flex-shrink:0}
+.info-val{font-size:13px;color:#1e293b}
+
+/* TOAST */
+#toast{position:fixed;bottom:24px;right:24px;background:#1e293b;color:#fff;padding:12px 20px;border-radius:9px;font-size:13px;font-weight:500;box-shadow:var(--shadow-md);z-index:9999;transform:translateY(80px);opacity:0;transition:all .3s;max-width:320px}
+#toast.show{transform:translateY(0);opacity:1}
+#toast.success{background:#16a34a}
+#toast.error{background:#dc2626}
+
+/* MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px;display:none}
+.modal-overlay.open{display:flex}
+.modal{background:#fff;border-radius:12px;box-shadow:var(--shadow-md);width:100%;max-width:500px;max-height:90vh;overflow-y:auto}
+.modal-hdr{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.modal-hdr h3{font-size:15px;font-weight:700;color:#1e293b}
+.modal-close{background:none;border:none;cursor:pointer;font-size:20px;color:#94a3b8}
+.modal-body{padding:20px}
+.modal-footer{padding:14px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px}
+
+/* PRINT */
+#printArea{display:none}
+@media print{
+  *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+  body>*{display:none!important}
+  #printArea{display:block!important;font-family:Arial,sans-serif;color:#333;padding:20mm 18mm}
+  .pr-hdr table{width:100%;border-collapse:collapse}
+  .pr-logo{height:40px}
+  .pr-main-title{font-size:14pt;font-weight:700;color:#9ACD32;text-transform:uppercase;letter-spacing:1px}
+  .pr-line{height:3px;background:#9ACD32;margin:8px 0 16px;border-radius:2px}
+  .pr-sec{font-size:9pt;font-weight:700;color:#6FAE2E;text-transform:uppercase;letter-spacing:.8px;border-left:4px solid #9ACD32;padding-left:7px;margin:14px 0 8px}
+  table{width:100%;border-collapse:collapse;font-size:8.5pt}
+  th{background:#9ACD32!important;color:#fff!important;padding:5px 8px;text-align:left}
+  td{padding:5px 8px;border-bottom:1px solid #ddd}
+  tr:nth-child(even) td{background:#f5f5f5!important}
+  .pr-total td{background:#6FAE2E!important;color:#fff!important;font-weight:700;font-size:10pt}
+  .pr-sign{border-top:1.5px solid #333;padding-top:5px;width:220px;display:inline-block;text-align:center;font-size:8.5pt}
+  .pr-sign-wrap{margin-top:32px;display:flex;justify-content:space-around}
+}
+
+/* RESPONSIVE */
+@media(max-width:900px){
+  :root{--sb-width:0px}
+  #sidebar{transform:translateX(-240px)}
+  #sidebar.open{transform:translateX(0);width:240px}
+  #main{margin-left:0}
+}
+</style>
+</head>
+<body>
+
+<!-- ══ SIDEBAR ══ -->
+<nav id="sidebar">
+  <div class="sb-logo">
+    <img src="logo.png" alt="Sombrear" onerror="this.style.display='none'">
+    <div class="sb-logo-txt">Sistema de Pedidos</div>
+  </div>
+  <div class="sb-nav" id="sbNav"></div>
+  <div class="sb-footer">
+    <div class="user-card">
+      <div class="user-av" id="userAv">?</div>
+      <div class="user-info">
+        <div class="user-name" id="userName">—</div>
+        <div class="user-role" id="userRole">—</div>
+      </div>
+      <button class="logout-btn" onclick="logout()" title="Sair">⏻</button>
+    </div>
+  </div>
+</nav>
+
+<!-- ══ MAIN ══ -->
+<div id="main">
+  <header class="topbar">
+    <div class="tb-left">
+      <button class="tb-toggle" onclick="toggleSidebar()">☰</button>
+      <span class="tb-title" id="pageTitle">Dashboard</span>
+    </div>
+    <div class="tb-right">
+      <button class="notif-btn" id="notifBtn" title="Notificações">🔔<span class="notif-dot" id="notifDot" style="display:none"></span></button>
+      <div class="tb-user">
+        <div class="tb-av" id="tbAv">?</div>
+        <span class="tb-name" id="tbName">—</span>
+      </div>
+    </div>
+  </header>
+  <div id="content">
+    <!-- VIEWS -->
+    <div class="view" id="view-filial-dashboard"></div>
+    <div class="view" id="view-filial-novo-pedido"></div>
+    <div class="view" id="view-filial-pedidos"></div>
+    <div class="view" id="view-filial-pedido"></div>
+    <div class="view" id="view-filial-relatorios"></div>
+    <div class="view" id="view-sede-dashboard"></div>
+    <div class="view" id="view-sede-pedidos"></div>
+    <div class="view" id="view-sede-aprovacoes"></div>
+    <div class="view" id="view-sede-pedido"></div>
+    <div class="view" id="view-sede-filiais"></div>
+    <div class="view" id="view-sede-relatorios"></div>
+  </div>
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal" id="modalBox">
+    <div class="modal-hdr">
+      <h3 id="modalTitle">Modal</h3>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+    <div class="modal-footer" id="modalFooter"></div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<!-- PRINT AREA -->
+<div id="printArea"></div>
+
+<script>
+// ════════════════════════════════════════════
+// SEED DATA
+// ════════════════════════════════════════════
+var SEED = {
+  filiais:[
+    {id:'f1',nome:'Sombrear DF',cidade:'Brasília - DF',cnpj:'40.123.456/0001-88',email:'df@sombrear.com.br',telefone:'(61) 99999-1234',ativo:true}
+  ],
+  pedidos:[
+    {id:'p1',filial_id:'f1',filial_nome:'Sombrear DF',status:'entregue',tipo:'Sombrite',
+     cliente:'Residencial Park Sul',cnpj:'12.345.678/0001-99',endereco:'SHCS QE 40, Bloco A — Brasília/DF',
+     contato:'(61) 3333-4444',sindico:'João das Quantas',email:'park@condo.com.br',
+     vagas:120,cor_estrutura:'Estrutura Branca',cor_tela:'Tela Prata',chumbacao:'Chumbação por Chumbador',pilares:'Padrão',
+     valor:45600,criado:'2026-01-15',atualizado:'2026-02-10',
+     obs:'',itens:gerarItens(120,0,96,24,0,0,1),prazos:prazoesPadrao(),
+     log:[{status:'aguardando',data:'2026-01-15',user:'Ricardo Mendes'},{status:'aprovado',data:'2026-01-16',user:'Carlos Alberto'},{status:'em_fabricacao',data:'2026-01-17',user:'Carlos Alberto'},{status:'pronto_envio',data:'2026-02-05',user:'Carlos Alberto'},{status:'entregue',data:'2026-02-10',user:'Ricardo Mendes'}]},
+    {id:'p2',filial_id:'f1',filial_nome:'Sombrear DF',status:'em_fabricacao',tipo:'Sombrite',
+     cliente:'Condomínio Jardins do Lago',cnpj:'98.765.432/0001-11',endereco:'SHTN Trecho 1, Bloco C — Brasília/DF',
+     contato:'(61) 9988-7766',sindico:'Maria Fernanda',email:'jardins@condo.com.br',
+     vagas:200,cor_estrutura:'Estrutura Preta',cor_tela:'Tela Verde',chumbacao:'Chumbação em Laje',pilares:'Padrão',
+     valor:77760,criado:'2026-03-01',atualizado:'2026-03-15',
+     obs:'',itens:gerarItens(200,0,160,40,0,0,1),prazos:prazoesPadrao(),
+     log:[{status:'aguardando',data:'2026-03-01',user:'Ricardo Mendes'},{status:'aprovado',data:'2026-03-02',user:'Carlos Alberto'},{status:'em_fabricacao',data:'2026-03-15',user:'Carlos Alberto'}]},
+    {id:'p3',filial_id:'f1',filial_nome:'Sombrear DF',status:'aguardando',tipo:'Sombrite',
+     cliente:'Edifício Solar Premium',cnpj:'11.222.333/0001-44',endereco:'SQN 304, Bloco B — Brasília/DF',
+     contato:'(61) 9977-5500',sindico:'Pedro Alves',email:'solar@premium.com.br',
+     vagas:80,cor_estrutura:'Estrutura Branca',cor_tela:'Tela Azul',chumbacao:'Chumbação Direta em Solo',pilares:'Padrão',
+     valor:31200,criado:'2026-04-18',atualizado:'2026-04-18',
+     obs:'',itens:gerarItens(80,0,64,16,0,0,1),prazos:prazoesPadrao(),
+     log:[{status:'aguardando',data:'2026-04-18',user:'Ricardo Mendes'}]},
+    {id:'p4',filial_id:'f1',filial_nome:'Sombrear DF',status:'pronto_envio',tipo:'Sombrite',
+     cliente:'Torres Residenciais Alpha',cnpj:'55.666.777/0001-22',endereco:'SCN Q 4, Bloco B — Brasília/DF',
+     contato:'(61) 3211-4455',sindico:'Ana Beatriz',email:'alpha@torres.com.br',
+     vagas:150,cor_estrutura:'Estrutura Branca',cor_tela:'Tela Prata',chumbacao:'Chumbação por Chumbador',pilares:'Pilares com Chapa',
+     valor:58500,criado:'2026-02-20',atualizado:'2026-03-28',
+     obs:'',itens:gerarItens(150,0,120,30,0,0,1),prazos:prazoesPadrao(),
+     log:[{status:'aguardando',data:'2026-02-20',user:'Ricardo Mendes'},{status:'aprovado',data:'2026-02-21',user:'Carlos Alberto'},{status:'em_fabricacao',data:'2026-02-22',user:'Carlos Alberto'},{status:'pronto_envio',data:'2026-03-28',user:'Carlos Alberto'}]},
+    {id:'p5',filial_id:'f1',filial_nome:'Sombrear DF',status:'aprovado',tipo:'Sombrite',
+     cliente:'Park Residence Lago Norte',cnpj:'33.444.555/0001-66',endereco:'SHTN Trecho 3 — Brasília/DF',
+     contato:'(61) 9966-4433',sindico:'Roberto Lima',email:'parklago@condo.com.br',
+     vagas:100,cor_estrutura:'Estrutura Preta',cor_tela:'Tela Verde',chumbacao:'Chumbação em Laje',pilares:'Padrão',
+     valor:39000,criado:'2026-04-10',atualizado:'2026-04-12',
+     obs:'',itens:gerarItens(100,0,80,20,0,0,1),prazos:prazoesPadrao(),
+     log:[{status:'aguardando',data:'2026-04-10',user:'Ricardo Mendes'},{status:'aprovado',data:'2026-04-12',user:'Carlos Alberto'}]},
+    {id:'p6',filial_id:'f1',filial_nome:'Sombrear DF',status:'rascunho',tipo:'Sombrite',
+     cliente:'Cond. Brasília Garden',cnpj:'77.888.999/0001-00',endereco:'SQSW 302 Bloco D — Brasília/DF',
+     contato:'(61) 9955-3322',sindico:'Claudia Santos',email:'garden@brasilia.com.br',
+     vagas:60,cor_estrutura:'Estrutura Branca',cor_tela:'Tela Azul',chumbacao:'Chumbação por Chumbador',pilares:'Padrão',
+     valor:23400,criado:'2026-04-20',atualizado:'2026-04-20',
+     obs:'',itens:gerarItens(60,0,48,12,0,0,1),prazos:prazoesPadrao(),
+     log:[{status:'rascunho',data:'2026-04-20',user:'Ricardo Mendes'}]}
+  ]
+};
+
+function prazoesPadrao(){
+  return [
+    {grupo:'Conjunto de Fundação',prazo:'10 dias'},
+    {grupo:'Conjunto de Braços',prazo:'15 dias'},
+    {grupo:'Conjunto de Arcos + Estrelas',prazo:'25 dias'},
+    {grupo:'Conjunto de Telas',prazo:'30 dias'},
+    {grupo:'Conjunto de Terças',prazo:'35 dias'},
+    {grupo:'Peças Especiais',prazo:'60 dias'}
+  ];
+}
+
+function gerarItens(vagas,mod2vMA,mod3vMA,mod2vMT,mod3vMT,align,mult){
+  var modMA=mod2vMA+mod3vMA, modMT=mod2vMT+mod3vMT, modTotal=modMA+modMT;
+  if(!modTotal){modTotal=Math.round(vagas/2.5);mod3vMA=Math.round(modTotal*.8);mod2vMA=modTotal-mod3vMA;modMA=modTotal;}
+  var al=align||Math.max(1,Math.ceil(modTotal/4));
+  var pes=modTotal+al, brc=modTotal+al;
+  var m2v=mod2vMA+mod2vMT, m3v=mod3vMA+mod3vMT;
+  return [
+    {desc:'CHUMBADOR PARA PILAR MA',ma:'—',mb:'—',mc:'—',un:'PÇ',qtd:pes},
+    {desc:'PILAR SOMBRITE MA',ma:'2,40',mb:'0,00',mc:'0,00',un:'PÇ',qtd:Math.round(pes*(modMA/Math.max(modTotal,1)))},
+    {desc:'PILAR SOMBRITE MT',ma:'2,20',mb:'0,00',mc:'0,00',un:'PÇ',qtd:Math.round(pes*(modMT/Math.max(modTotal,1)))},
+    {desc:'BRAÇO SOMBRITE SIMPLES',ma:'4,30',mb:'0,00',mc:'0,00',un:'PÇ',qtd:brc},
+    {desc:'ARCOS DE 1VG',ma:'1,20',mb:'0,00',mc:'0,00',un:'PÇ',qtd:0},
+    {desc:'ARCOS DE 2VG',ma:'1,50',mb:'0,00',mc:'0,00',un:'PÇ',qtd:m2v*4},
+    {desc:'ARCOS DE 3VG',ma:'1,80',mb:'0,00',mc:'0,00',un:'PÇ',qtd:m3v*4},
+    {desc:'ESTRELA 1VG',ma:'1,20',mb:'0,00',mc:'0,00',un:'PÇ',qtd:0},
+    {desc:'ESTRELA 2VG',ma:'1,50',mb:'0,00',mc:'0,00',un:'PÇ',qtd:m2v*2},
+    {desc:'ESTRELA 3VG',ma:'1,80',mb:'0,00',mc:'0,00',un:'PÇ',qtd:m3v*2},
+    {desc:'TELA COMPLETA SOMBRITE 1 VG',ma:'2,50',mb:'5,00',mc:'0,00',un:'UNID',qtd:0},
+    {desc:'TELA COMPLETA SOMBRITE 2 VG',ma:'4,80',mb:'5,00',mc:'0,00',un:'UNID',qtd:m2v},
+    {desc:'TELA COMPLETA SOMBRITE 3 VG',ma:'7,20',mb:'5,00',mc:'0,00',un:'UNID',qtd:m3v},
+    {desc:'TELA COMPLETA SOMBRITE 4 VG',ma:'9,60',mb:'5,00',mc:'0,00',un:'UNID',qtd:0},
+    {desc:'TELA COMPLETA SOMBRITE TAM ESPECIAL',ma:'0,00',mb:'0,00',mc:'0,00',un:'M²',qtd:0},
+    {desc:'PILAR LISO',ma:'2,40',mb:'0,00',mc:'0,00',un:'PÇ',qtd:0},
+    {desc:'BRAÇO PVC',ma:'0,00',mb:'0,00',mc:'0,00',un:'PÇ',qtd:0},
+    {desc:'BRAÇO PVC PAINEL SOLAR',ma:'0,00',mb:'0,00',mc:'0,00',un:'PÇ',qtd:0},
+    {desc:'BASE PVC',ma:'0,00',mb:'0,00',mc:'0,00',un:'PÇ',qtd:0},
+    {desc:'BASE PVC PAINEL SOLAR',ma:'0,00',mb:'0,00',mc:'0,00',un:'PÇ',qtd:0},
+    {desc:'TERÇAS PARA TELHA GALVALUME',ma:'0,00',mb:'0,00',mc:'0,00',un:'PÇ',qtd:0},
+    {desc:'TERÇAS PARA TELHA ISOTÉRMICA',ma:'0,00',mb:'0,00',mc:'0,00',un:'PÇ',qtd:0},
+    {desc:'TERÇAS PARA PAINEL SOLAR',ma:'0,00',mb:'0,00',mc:'0,00',un:'PÇ',qtd:0},
+    {desc:'SUPORTE DUPLO PARA BICICLETAS',ma:'0,00',mb:'0,00',mc:'0,00',un:'UNID',qtd:0},
+    {desc:'DEIXAR EM BRANCO (EDITÁVEL)',ma:'0,00',mb:'0,00',mc:'0,00',un:'INS UNID',qtd:0}
+  ];
+}
+
+// ════════════════════════════════════════════
+// DB (localStorage)
+// ════════════════════════════════════════════
+var DB = {
+  init:function(){
+    if(!localStorage.getItem('smb_seeded')){
+      localStorage.setItem('smb_filiais',JSON.stringify(SEED.filiais));
+      localStorage.setItem('smb_pedidos',JSON.stringify(SEED.pedidos));
+      localStorage.setItem('smb_seeded','1');
+    }
+  },
+  get:function(k){try{return JSON.parse(localStorage.getItem('smb_'+k))||[];}catch(e){return[];}},
+  set:function(k,v){localStorage.setItem('smb_'+k,JSON.stringify(v));},
+  pedidos:function(){return this.get('pedidos');},
+  savePedidos:function(p){this.set('pedidos',p);},
+  filiais:function(){return this.get('filiais');},
+  saveFiliais:function(f){this.set('filiais',f);},
+  addPedido:function(p){var arr=this.pedidos();arr.unshift(p);this.savePedidos(arr);},
+  updatePedido:function(id,upd){
+    var arr=this.pedidos().map(function(p){
+      if(p.id===id){Object.assign(p,upd);p.atualizado=hoje();}
+      return p;
+    });
+    this.savePedidos(arr);
+  },
+  getPedido:function(id){return this.pedidos().find(function(p){return p.id===id;});}
+};
+
+// ════════════════════════════════════════════
+// AUTH
+// ════════════════════════════════════════════
+var USER = null;
+function initAuth(){
+  var s=localStorage.getItem('sombrear_session');
+  if(!s){window.location.href='sistema.html';return false;}
+  USER=JSON.parse(s);
+  return true;
+}
+function logout(){
+  localStorage.removeItem('sombrear_session');
+  window.location.href='sistema.html';
+}
+
+// ════════════════════════════════════════════
+// UTILS
+// ════════════════════════════════════════════
+function hoje(){return new Date().toISOString().split('T')[0];}
+function fmtDate(d){if(!d)return'—';var p=d.split('-');return p[2]+'/'+p[1]+'/'+p[0];}
+function fmtMoeda(v){return'R$ '+(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2});}
+function uid(){return 'p'+Date.now();}
+function initials(nome){return nome?nome.split(' ').map(function(n){return n[0];}).join('').substring(0,2).toUpperCase():'??';}
+
+var STATUS_LABELS={rascunho:'Rascunho',aguardando:'Aguardando Aprovação',aprovado:'Aprovado',em_fabricacao:'Em Fabricação',pronto_envio:'Pronto para Envio',em_transito:'Em Trânsito',entregue:'Entregue ✓'};
+var STATUS_NEXT={aguardando:'aprovado',aprovado:'em_fabricacao',em_fabricacao:'pronto_envio',pronto_envio:'em_transito',em_transito:'entregue'};
+
+function badge(status){
+  return '<span class="badge s-'+status+'">'+(STATUS_LABELS[status]||status)+'</span>';
+}
+
+function showToast(msg,type){
+  var t=document.getElementById('toast');
+  t.textContent=msg;t.className='';
+  setTimeout(function(){t.classList.add('show',type||'');},10);
+  setTimeout(function(){t.classList.remove('show');},3200);
+}
+
+// ════════════════════════════════════════════
+// ROUTER
+// ════════════════════════════════════════════
+var ROUTES_FILIAL=[
+  {hash:'filial-dashboard',label:'📊 Dashboard',title:'Dashboard'},
+  {hash:'filial-novo-pedido',label:'➕ Novo Pedido',title:'Novo Pedido'},
+  {hash:'filial-pedidos',label:'📋 Meus Pedidos',title:'Meus Pedidos'},
+  {hash:'filial-relatorios',label:'📈 Relatórios',title:'Relatórios'}
+];
+var ROUTES_SEDE=[
+  {hash:'sede-dashboard',label:'📊 Dashboard',title:'Dashboard'},
+  {hash:'sede-pedidos',label:'📋 Todos os Pedidos',title:'Todos os Pedidos'},
+  {hash:'sede-aprovacoes',label:'✅ Aprovações',title:'Aprovações',badge:true},
+  {hash:'sede-filiais',label:'🏢 Filiais',title:'Filiais'},
+  {hash:'sede-relatorios',label:'📈 Relatórios',title:'Relatórios'}
+];
+
+function buildSidebar(){
+  var routes=USER.role==='sede'?ROUTES_SEDE:ROUTES_FILIAL;
+  var html='<div class="sb-section">Menu</div>';
+  routes.forEach(function(r){
+    var badgeHtml='';
+    if(r.badge){
+      var cnt=DB.pedidos().filter(function(p){return p.status==='aguardando';}).length;
+      if(cnt>0)badgeHtml='<span class="nav-badge">'+cnt+'</span>';
+    }
+    html+='<a class="nav-item" href="#'+r.hash+'" data-hash="'+r.hash+'">'+r.label+badgeHtml+'</a>';
+  });
+  document.getElementById('sbNav').innerHTML=html;
+  document.getElementById('userAv').textContent=initials(USER.nome);
+  document.getElementById('userName').textContent=USER.nome;
+  document.getElementById('userRole').textContent=USER.role==='sede'?'Sede — Goiânia':'Filial: '+(USER.filial_nome||'');
+  document.getElementById('tbAv').textContent=initials(USER.nome);
+  document.getElementById('tbName').textContent=USER.nome;
+  if(USER.role==='sede'){
+    var pend=DB.pedidos().filter(function(p){return p.status==='aguardando';}).length;
+    document.getElementById('notifDot').style.display=pend>0?'block':'none';
+  }
+}
+
+function navigate(hash){
+  if(!hash)hash=USER.role==='sede'?'sede-dashboard':'filial-dashboard';
+  document.querySelectorAll('.view').forEach(function(v){v.classList.remove('active');});
+  var view=document.getElementById('view-'+hash);
+  if(!view){hash=USER.role==='sede'?'sede-dashboard':'filial-dashboard';view=document.getElementById('view-'+hash);}
+  if(view)view.classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(function(n){
+    n.classList.toggle('active',n.getAttribute('data-hash')===hash);
+  });
+  var routes=USER.role==='sede'?ROUTES_SEDE:ROUTES_FILIAL;
+  var route=routes.find(function(r){return r.hash===hash;})||{title:''};
+  document.getElementById('pageTitle').textContent=route.title;
+  renderView(hash);
+}
+
+function renderView(hash){
+  if(hash==='filial-dashboard')renderFilialDash();
+  else if(hash==='filial-novo-pedido')renderNovoPedido();
+  else if(hash==='filial-pedidos')renderMeusPedidos();
+  else if(hash==='filial-relatorios')renderRelatorios('filial');
+  else if(hash==='sede-dashboard')renderSedeDash();
+  else if(hash==='sede-pedidos')renderSedePedidos();
+  else if(hash==='sede-aprovacoes')renderAprovacoes();
+  else if(hash==='sede-filiais')renderFiliais();
+  else if(hash==='sede-relatorios')renderRelatorios('sede');
+}
+
+function toggleSidebar(){
+  document.getElementById('sidebar').classList.toggle('open');
+}
+
+// ════════════════════════════════════════════
+// VIEW: FILIAL DASHBOARD
+// ════════════════════════════════════════════
+function renderFilialDash(){
+  var peds=DB.pedidos().filter(function(p){return p.filial_id===USER.filial_id;});
+  var emFab=peds.filter(function(p){return p.status==='em_fabricacao';}).length;
+  var prontos=peds.filter(function(p){return p.status==='pronto_envio';}).length;
+  var entregues=peds.filter(function(p){return p.status==='entregue';}).length;
+  var totalVagas=peds.filter(function(p){return p.status==='entregue';}).reduce(function(s,p){return s+p.vagas;},0);
+
+  var recentRows=peds.slice(0,5).map(function(p){
+    return '<tr><td><strong>'+p.cliente+'</strong></td><td>'+p.vagas+'</td><td>'+badge(p.status)+'</td><td>'+fmtDate(p.criado)+'</td><td><button class="btn btn-sm btn-outline" onclick="verPedidoFilial(\''+p.id+'\')">Ver →</button></td></tr>';
+  }).join('');
+
+  document.getElementById('view-filial-dashboard').innerHTML=
+  '<div class="page-hdr"><div><h1>Olá, '+USER.nome.split(' ')[0]+' 👋</h1><p>Aqui está o resumo da sua filial hoje.</p></div>'+
+  '<button class="btn btn-primary" onclick="location.hash=\'filial-novo-pedido\'">➕ Novo Pedido</button></div>'+
+
+  '<div class="kpi-grid">'+
+    '<div class="kpi" data-icon="📋"><div class="kpi-label">Total de Pedidos</div><div class="kpi-val">'+peds.length+'</div><div class="kpi-sub">histórico completo</div></div>'+
+    '<div class="kpi" style="border-top-color:#7c3aed" data-icon="🏭"><div class="kpi-label">Em Fabricação</div><div class="kpi-val">'+emFab+'</div><div class="kpi-sub">na indústria</div></div>'+
+    '<div class="kpi" style="border-top-color:#0891b2" data-icon="📦"><div class="kpi-label">Prontos para Envio</div><div class="kpi-val">'+prontos+'</div><div class="kpi-sub">aguardando despacho</div></div>'+
+    '<div class="kpi" style="border-top-color:#16a34a" data-icon="✅"><div class="kpi-label">Vagas Entregues</div><div class="kpi-val">'+totalVagas+'</div><div class="kpi-sub">este ano</div></div>'+
+  '</div>'+
+
+  '<div style="display:grid;grid-template-columns:1fr 1.6fr;gap:20px;align-items:start">'+
+    '<div class="card"><div class="card-hdr"><h2>Vagas por mês</h2></div><div class="card-body"><div class="chart-wrap"><canvas id="chartFilialMes"></canvas></div></div></div>'+
+    '<div class="card"><div class="card-hdr"><h2>Pedidos recentes</h2><button class="btn btn-sm btn-ghost" onclick="location.hash=\'filial-pedidos\'">Ver todos</button></div>'+
+    '<div class="card-body" style="padding:0"><div class="tbl-wrap"><table><thead><tr><th>Condomínio</th><th>Vagas</th><th>Status</th><th>Data</th><th></th></tr></thead><tbody>'+recentRows+'</tbody></table></div></div></div>'+
+  '</div>';
+
+  // Chart
+  var meses=['Nov','Dez','Jan','Fev','Mar','Abr'];
+  var dados=[0,0,120,150,200,80];
+  setTimeout(function(){
+    var ctx=document.getElementById('chartFilialMes');
+    if(ctx){new Chart(ctx,{type:'bar',data:{labels:meses,datasets:[{label:'Vagas',data:dados,backgroundColor:'rgba(154,205,50,.7)',borderColor:'#9ACD32',borderWidth:2,borderRadius:5}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,grid:{color:'rgba(0,0,0,.04)'}},x:{grid:{display:false}}}}});}
+  },100);
+}
+
+// ════════════════════════════════════════════
+// WIZARD STATE
+// ════════════════════════════════════════════
+var WZ={step:1,cliente:{},dim:{},dir:{},itens:[],prazos:prazoesPadrao()};
+var WZ_CHARTS={};
+
+function renderNovoPedido(){
+  WZ={step:1,cliente:{},dim:{mod2vMA:0,mod3vMA:0,mod2vMT:0,mod3vMT:0,vagas:0,align:1,semParam:false},dir:{},itens:[],prazos:prazoesPadrao()};
+  renderWizard();
+}
+
+function renderWizard(){
+  var steps=['Dados do Cliente','Dimensionamento','Diretrizes','Revisão'];
+  var stepsHtml=steps.map(function(s,i){
+    var cls=i+1<WZ.step?'done':i+1===WZ.step?'active':'';
+    return '<div class="wz-step '+cls+'"><div class="wz-num">'+(i+1<WZ.step?'✓':i+1)+'</div><div class="wz-lbl">'+s+'</div></div>';
+  }).join('');
+
+  var panels='';
+
+  // Step 1
+  panels+='<div class="wz-panel'+(WZ.step===1?' active':'')+'">'+
+  '<div class="card"><div class="card-hdr"><h2>👤 Dados do Cliente / Condomínio</h2></div><div class="card-body">'+
+  '<div class="form-grid">'+
+  '<div class="fg"><label>Nome do Condomínio *</label><input type="text" id="w_cliente" value="'+esc(WZ.cliente.nome||'')+'" placeholder="Ex: Residencial das Flores"></div>'+
+  '<div class="fg"><label>CNPJ</label><input type="text" id="w_cnpj" value="'+esc(WZ.cliente.cnpj||'')+'" placeholder="00.000.000/0001-00"></div>'+
+  '<div class="fg" style="grid-column:1/-1"><label>Endereço Completo</label><input type="text" id="w_end" value="'+esc(WZ.cliente.end||'')+'" placeholder="Rua, número, bairro — Cidade/UF"></div>'+
+  '<div class="fg"><label>Telefone de Contato</label><input type="text" id="w_tel" value="'+esc(WZ.cliente.tel||'')+'" placeholder="(00) 00000-0000"></div>'+
+  '<div class="fg"><label>Síndico Responsável</label><input type="text" id="w_sindico" value="'+esc(WZ.cliente.sindico||'')+'" placeholder="Nome completo"></div>'+
+  '<div class="fg"><label>E-mail</label><input type="email" id="w_email" value="'+esc(WZ.cliente.email||'')+'" placeholder="condo@email.com.br"></div>'+
+  '<div class="fg"><label>Tipo de Cobertura *</label><select id="w_tipo"><option value="Sombrite"'+(WZ.cliente.tipo==='Sombrite'?' selected':'')+'>Sombrite</option><option value="Telha em Solo"'+(WZ.cliente.tipo==='Telha em Solo'?' selected':'')+'>Telha em Solo</option><option value="Telha em Laje"'+(WZ.cliente.tipo==='Telha em Laje'?' selected':'')+'>Telha em Laje</option></select></div>'+
+  '</div></div></div></div>';
+
+  // Step 2
+  var d=WZ.dim;
+  var calc=calcularPecas(d);
+  panels+='<div class="wz-panel'+(WZ.step===2?' active':'')+'">'+
+  '<div class="card"><div class="card-hdr"><h2>📐 Dimensionamento</h2></div><div class="card-body">'+
+  '<div class="form-grid" style="margin-bottom:16px">'+
+  '<div class="fg"><label>Qtd Total de Vagas *</label><input type="number" id="w_vagas" min="0" value="'+(d.vagas||0)+'" oninput="wzCalc()"><button class="btn btn-outline btn-sm" style="margin-top:6px" onclick="wzSugerir()">✨ Sugerir Distribuição</button></div>'+
+  '<div class="fg"><label>Alinhamentos (Sequências)</label><input type="number" id="w_align" min="1" value="'+(d.align||1)+'" oninput="wzCalc()" '+(d.semParam?'disabled':'')+'>'+
+  '<div style="display:flex;align-items:center;gap:7px;margin-top:6px"><input type="checkbox" id="w_semParam" '+(d.semParam?'checked':'')+' onchange="wzToggleAlign()" style="width:16px;height:16px;accent-color:var(--verde)"><label for="w_semParam" style="font-size:12px;cursor:pointer;text-transform:none;letter-spacing:0">Sem parâmetro (auto: 1 por 4 módulos)</label></div></div>'+
+  '</div>'+
+  '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">'+
+  '<div class="mod-group"><h4>📦 Módulos MA — Médio Apoio</h4><div class="form-grid"><div class="fg"><label>2V — MA</label><input type="number" id="w_m2ma" min="0" value="'+(d.mod2vMA||0)+'" oninput="wzCalc()"></div><div class="fg"><label>3V — MA</label><input type="number" id="w_m3ma" min="0" value="'+(d.mod3vMA||0)+'" oninput="wzCalc()"></div></div></div>'+
+  '<div class="mod-group"><h4>📦 Módulos MT — Médio Topo</h4><div class="form-grid"><div class="fg"><label>2V — MT</label><input type="number" id="w_m2mt" min="0" value="'+(d.mod2vMT||0)+'" oninput="wzCalc()"></div><div class="fg"><label>3V — MT</label><input type="number" id="w_m3mt" min="0" value="'+(d.mod3vMT||0)+'" oninput="wzCalc()"></div></div></div>'+
+  '</div>'+
+  '<div class="calc-summary" id="wzCalcBox">'+renderCalcSummary(calc)+'</div>'+
+  '</div></div></div>';
+
+  // Step 3
+  var dir=WZ.dir;
+  panels+='<div class="wz-panel'+(WZ.step===3?' active':'')+'">'+
+  '<div class="card"><div class="card-hdr"><h2>⚙️ Diretrizes Técnicas</h2></div><div class="card-body">'+
+  '<div class="dir-grid">'+
+  dirCard('Informação 1 — Cor da Estrutura','w_estrutura',['Estrutura Branca','Estrutura Preta','Estrutura Cor Especial (Descrever)'],dir.estrutura)+
+  dirCard('Informação 2 — Cor da Tela','w_tela',['Tela Verde','Tela Prata','Tela Azul','Tela Vermelha','Tela Bege','Tela Cor Especial (Descrever)'],dir.tela)+
+  dirCard('Informação 3 — Tipo de Chumbação','w_chumb',['Chumbação em Laje','Chumbação Direta em Solo','Chumbação por Chumbador'],dir.chumb)+
+  dirCard('Informação 4 — Pilares','w_pilares',['Padrão','Pilares com Chapa'],dir.pilares)+
+  '</div></div></div></div>';
+
+  // Step 4
+  var itensHtml=WZ.itens.map(function(it,i){
+    return '<tr><td>'+it.desc+'</td>'+
+      '<td><input type="text" value="'+it.ma+'" style="width:58px;padding:3px 6px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px" onchange="WZ.itens['+i+'].ma=this.value"></td>'+
+      '<td><input type="text" value="'+it.mb+'" style="width:58px;padding:3px 6px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px" onchange="WZ.itens['+i+'].mb=this.value"></td>'+
+      '<td><input type="text" value="'+it.mc+'" style="width:58px;padding:3px 6px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px" onchange="WZ.itens['+i+'].mc=this.value"></td>'+
+      '<td>'+it.un+'</td>'+
+      '<td><input type="number" class="rev-tbl" value="'+it.qtd+'" min="0" style="width:70px;padding:4px 6px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;text-align:center" onchange="WZ.itens['+i+'].qtd=parseInt(this.value)||0"></td>'+
+    '</tr>';
+  }).join('');
+
+  var prazosHtml=WZ.prazos.map(function(p,i){
+    var opts=['10 dias','15 dias','20 dias','25 dias','30 dias','35 dias','40 dias','45 dias','60 dias','75 dias','90 dias','Da data do pagamento'].map(function(o){return'<option'+(o===p.prazo?' selected':'')+'>'+o+'</option>';}).join('');
+    return '<div class="prazo-row"><span class="prazo-label">'+p.grupo+'</span><select class="prazo-select" onchange="WZ.prazos['+i+'].prazo=this.value">'+opts+'</select></div>';
+  }).join('');
+
+  panels+='<div class="wz-panel'+(WZ.step===4?' active':'')+'">'+
+  '<div class="card"><div class="card-hdr"><h2>📋 Ficha de Fabricação — Revisão Final</h2><span style="font-size:12px;color:#64748b">Todos os campos são editáveis</span></div><div class="card-body">'+
+  '<div class="tbl-wrap"><table class="rev-tbl"><thead><tr><th style="min-width:220px">Descrição do Item</th><th>Medida A</th><th>Medida B</th><th>Medida C</th><th>Unid.</th><th>Qtde</th></tr></thead><tbody>'+itensHtml+'</tbody></table></div>'+
+  '<div class="sec-title" style="margin-top:20px">Prazos Previstos para Entrega</div>'+
+  '<div class="prazo-grid">'+prazosHtml+'</div>'+
+  '</div></div></div>';
+
+  document.getElementById('view-filial-novo-pedido').innerHTML=
+  '<div class="page-hdr"><div><h1>Novo Pedido de Fabricação</h1><p>Preencha os dados para enviar à Sede.</p></div></div>'+
+  '<div class="wizard-steps">'+stepsHtml+'</div>'+
+  panels+
+  '<div style="display:flex;justify-content:space-between;margin-top:16px">'+
+    (WZ.step>1?'<button class="btn btn-ghost" onclick="wzPrev()">← Anterior</button>':'<span></span>')+
+    (WZ.step<4?'<button class="btn btn-primary" onclick="wzNext()">Próximo →</button>':
+               '<button class="btn btn-primary" style="font-size:15px;padding:12px 28px" onclick="wzEnviar()">📤 Enviar Pedido para a Sede</button>')+
+  '</div>';
+}
+
+function dirCard(label,id,opts,val){
+  var optsHtml=opts.map(function(o){return'<option'+(o===val?' selected':'')+'>'+o+'</option>';}).join('');
+  return '<div class="dir-card"><label>'+label+'</label><select id="'+id+'">'+optsHtml+'</select></div>';
+}
+
+function renderCalcSummary(c){
+  if(!c.modTotal)return'<h4 style="color:#94a3b8">Insira os módulos para ver o cálculo.</h4>';
+  return'<h4>📐 Resumo Calculado</h4><div class="calc-grid">'+
+    '<div class="calc-item"><div class="cv">'+c.modTotal+'</div><div class="cl">Módulos</div></div>'+
+    '<div class="calc-item"><div class="cv">'+c.qtdPes+'</div><div class="cl">Pés</div></div>'+
+    '<div class="calc-item"><div class="cv">'+c.qtdBracos+'</div><div class="cl">Braços</div></div>'+
+    '<div class="calc-item"><div class="cv">'+(c.mod2v*4+c.mod3v*4)+'</div><div class="cl">Arcos</div></div>'+
+    '<div class="calc-item"><div class="cv">'+(c.mod2v*2+c.mod3v*2)+'</div><div class="cl">Estrelas</div></div>'+
+    '<div class="calc-item"><div class="cv">'+(WZ.dim.vagas||0)*12.5+'</div><div class="cl">Área m²</div></div>'+
+  '</div>';
+}
+
+function calcularPecas(d){
+  var mod2vMA=d.mod2vMA||0,mod3vMA=d.mod3vMA||0,mod2vMT=d.mod2vMT||0,mod3vMT=d.mod3vMT||0;
+  var modMA=mod2vMA+mod3vMA,modMT=mod2vMT+mod3vMT,modTotal=modMA+modMT;
+  var mod2v=mod2vMA+mod2vMT,mod3v=mod3vMA+mod3vMT;
+  var align=d.semParam?Math.max(1,Math.ceil(modTotal/4)):Math.max(1,d.align||1);
+  var qtdPes=modTotal+align,qtdBracos=modTotal+align;
+  var ratioMT=modTotal>0?modMT/modTotal:0;
+  return{modTotal:modTotal,mod2v:mod2v,mod3v:mod3v,qtdPes:qtdPes,qtdBracos:qtdBracos,pesMA:Math.round(qtdPes*(1-ratioMT)),pesMT:Math.round(qtdPes*ratioMT),align:align};
+}
+
+function wzCalc(){
+  WZ.dim.vagas=parseInt(document.getElementById('w_vagas').value)||0;
+  WZ.dim.mod2vMA=parseInt(document.getElementById('w_m2ma').value)||0;
+  WZ.dim.mod3vMA=parseInt(document.getElementById('w_m3ma').value)||0;
+  WZ.dim.mod2vMT=parseInt(document.getElementById('w_m2mt').value)||0;
+  WZ.dim.mod3vMT=parseInt(document.getElementById('w_m3mt').value)||0;
+  WZ.dim.align=parseInt(document.getElementById('w_align').value)||1;
+  var calc=calcularPecas(WZ.dim);
+  document.getElementById('wzCalcBox').innerHTML=renderCalcSummary(calc);
+}
+
+function wzToggleAlign(){
+  WZ.dim.semParam=document.getElementById('w_semParam').checked;
+  var inp=document.getElementById('w_align');
+  inp.disabled=WZ.dim.semParam;inp.style.opacity=WZ.dim.semParam?'.4':'1';
+  wzCalc();
+}
+
+function wzSugerir(){
+  var vagas=parseInt(document.getElementById('w_vagas').value)||0;
+  if(!vagas){showToast('Informe a quantidade de vagas primeiro.','error');return;}
+  var tot=Math.round(vagas/2.5);
+  var m2v=Math.round(tot*.2),m3v=tot-m2v;
+  document.getElementById('w_m2ma').value=m2v;
+  document.getElementById('w_m3ma').value=m3v;
+  document.getElementById('w_m2mt').value=0;
+  document.getElementById('w_m3mt').value=0;
+  WZ.dim.mod2vMA=m2v;WZ.dim.mod3vMA=m3v;WZ.dim.mod2vMT=0;WZ.dim.mod3vMT=0;
+  wzCalc();
+}
+
+function wzNext(){
+  if(WZ.step===1){
+    var nome=document.getElementById('w_cliente').value.trim();
+    if(!nome){showToast('Informe o nome do condomínio.','error');return;}
+    WZ.cliente={nome:nome,cnpj:document.getElementById('w_cnpj').value,end:document.getElementById('w_end').value,tel:document.getElementById('w_tel').value,sindico:document.getElementById('w_sindico').value,email:document.getElementById('w_email').value,tipo:document.getElementById('w_tipo').value};
+  }
+  if(WZ.step===2){
+    wzCalc();
+    if(!WZ.dim.vagas){showToast('Informe a quantidade de vagas.','error');return;}
+    // Prepare itens for step 4
+    var d=WZ.dim,calc=calcularPecas(d);
+    WZ.itens=gerarItens(d.vagas,d.mod2vMA,d.mod3vMA,d.mod2vMT,d.mod3vMT,calc.align,1);
+  }
+  if(WZ.step===3){
+    WZ.dir={estrutura:document.getElementById('w_estrutura').value,tela:document.getElementById('w_tela').value,chumb:document.getElementById('w_chumb').value,pilares:document.getElementById('w_pilares').value};
+  }
+  WZ.step++;
+  renderWizard();
+}
+
+function wzPrev(){WZ.step--;renderWizard();}
+
+function wzEnviar(){
+  var id=uid();
+  var calc=calcularPecas(WZ.dim);
+  var pedido={
+    id:id,filial_id:USER.filial_id,filial_nome:USER.filial_nome,
+    status:'aguardando',tipo:WZ.cliente.tipo||'Sombrite',
+    cliente:WZ.cliente.nome,cnpj:WZ.cliente.cnpj,endereco:WZ.cliente.end,
+    contato:WZ.cliente.tel,sindico:WZ.cliente.sindico,email:WZ.cliente.email,
+    vagas:WZ.dim.vagas,cor_estrutura:WZ.dir.estrutura,cor_tela:WZ.dir.tela,
+    chumbacao:WZ.dir.chumb,pilares:WZ.dir.pilares,
+    valor:0,criado:hoje(),atualizado:hoje(),obs:'',
+    itens:WZ.itens,prazos:WZ.prazos,
+    log:[{status:'aguardando',data:hoje(),user:USER.nome}]
+  };
+  DB.addPedido(pedido);
+  buildSidebar();
+  showToast('Pedido enviado para a Sede com sucesso!','success');
+  setTimeout(function(){location.hash='filial-pedidos';},800);
+}
+
+// ════════════════════════════════════════════
+// VIEW: MEUS PEDIDOS (filial)
+// ════════════════════════════════════════════
+var filtroPedidos='todos';
+function renderMeusPedidos(){
+  var peds=DB.pedidos().filter(function(p){return p.filial_id===USER.filial_id;});
+  if(filtroPedidos!=='todos')peds=peds.filter(function(p){return p.status===filtroPedidos;});
+  var tabs=['todos','aguardando','aprovado','em_fabricacao','pronto_envio','em_transito','entregue'];
+  var tabsHtml=tabs.map(function(t){
+    var lbl=t==='todos'?'Todos':STATUS_LABELS[t];
+    return'<div class="ftab'+(filtroPedidos===t?' active':'')+'" onclick="filtroPedidos=\''+t+'\';renderMeusPedidos()">'+lbl+'</div>';
+  }).join('');
+  var rows=peds.map(function(p){
+    return'<tr><td style="color:#94a3b8;font-size:11px">#'+p.id+'</td>'+
+    '<td><strong>'+p.cliente+'</strong></td>'+
+    '<td>'+p.vagas+'</td>'+
+    '<td><span style="font-size:12px;color:#64748b">'+p.tipo+'</span></td>'+
+    '<td>'+badge(p.status)+'</td>'+
+    '<td>'+fmtDate(p.criado)+'</td>'+
+    '<td><button class="btn btn-sm btn-outline" onclick="verPedidoFilial(\''+p.id+'\')">Ver</button></td></tr>';
+  }).join('');
+  if(!rows)rows='<tr><td colspan="7" style="text-align:center;padding:32px;color:#94a3b8">Nenhum pedido encontrado.</td></tr>';
+  document.getElementById('view-filial-pedidos').innerHTML=
+  '<div class="page-hdr"><div><h1>Meus Pedidos</h1><p>Acompanhe todos os pedidos da sua filial.</p></div>'+
+  '<button class="btn btn-primary" onclick="location.hash=\'filial-novo-pedido\'">➕ Novo Pedido</button></div>'+
+  '<div class="filter-tabs">'+tabsHtml+'</div>'+
+  '<div class="card"><div class="card-body" style="padding:0"><div class="tbl-wrap"><table><thead><tr><th>ID</th><th>Condomínio</th><th>Vagas</th><th>Tipo</th><th>Status</th><th>Data</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div></div></div>';
+}
+
+function verPedidoFilial(id){
+  window._pedidoId=id;
+  location.hash='filial-pedido';
+}
+
+// ════════════════════════════════════════════
+// VIEW: DETALHE PEDIDO (filial)
+// ════════════════════════════════════════════
+function renderView_filialPedido(){
+  var p=DB.getPedido(window._pedidoId);
+  if(!p){document.getElementById('view-filial-pedido').innerHTML='<p>Pedido não encontrado.</p>';return;}
+  var itensHtml=(p.itens||[]).filter(function(it){return it.qtd>0;}).map(function(it){
+    return'<tr><td>'+it.desc+'</td><td style="text-align:center">'+it.ma+'</td><td style="text-align:center">'+it.mb+'</td><td style="text-align:center">'+it.mc+'</td><td style="text-align:center">'+it.un+'</td><td style="text-align:center;font-weight:700">'+it.qtd+'</td></tr>';
+  }).join('');
+  var tlHtml=(p.log||[]).map(function(l,i){
+    var isLast=i===p.log.length-1;
+    return'<div class="tl-item '+(isLast?'current':'done')+'"><div class="tl-dot">'+(isLast?'●':'✓')+'</div>'+
+    '<div class="tl-title">'+badge(l.status)+'</div>'+
+    '<div class="tl-sub">'+fmtDate(l.data)+' • '+l.user+'</div></div>';
+  }).join('');
+  var canConfirm=p.status==='pronto_envio'||p.status==='em_transito';
+  var prazosHtml=(p.prazos||[]).map(function(pr){
+    return'<div class="prazo-row"><span class="prazo-label">'+pr.grupo+'</span><strong style="font-size:13px;color:#1e293b">'+pr.prazo+'</strong></div>';
+  }).join('');
+
+  document.getElementById('view-filial-pedido').innerHTML=
+  '<div class="page-hdr">'+
+    '<div><button class="btn btn-ghost btn-sm" onclick="history.back()" style="margin-bottom:8px">← Voltar</button><h1>'+p.cliente+'</h1><p>Pedido #'+p.id+' • Criado em '+fmtDate(p.criado)+'</p></div>'+
+    '<div style="display:flex;gap:10px">'+
+      (canConfirm?'<button class="btn btn-approve" onclick="confirmarRecebimento(\''+p.id+'\')">✅ Confirmar Recebimento</button>':'')+
+      '<button class="btn btn-outline" onclick="imprimirPedido(\''+p.id+'\')">📄 Imprimir / PDF</button>'+
+    '</div>'+
+  '</div>'+
+  '<div style="display:grid;grid-template-columns:1fr 1.5fr;gap:20px;align-items:start">'+
+    '<div>'+
+    '<div class="card"><div class="card-hdr"><h2>Status do Pedido</h2></div><div class="card-body">'+
+    '<div style="margin-bottom:16px">'+badge(p.status)+'</div>'+
+    '<div class="timeline">'+tlHtml+'</div>'+
+    '</div></div>'+
+    '<div class="card" style="margin-top:0"><div class="card-hdr"><h2>Diretrizes Técnicas</h2></div><div class="card-body">'+
+    '<div class="info-row"><div class="info-key">Estrutura</div><div class="info-val">'+p.cor_estrutura+'</div></div>'+
+    '<div class="info-row"><div class="info-key">Tela</div><div class="info-val">'+p.cor_tela+'</div></div>'+
+    '<div class="info-row"><div class="info-key">Chumbação</div><div class="info-val">'+p.chumbacao+'</div></div>'+
+    '<div class="info-row"><div class="info-key">Pilares</div><div class="info-val">'+p.pilares+'</div></div>'+
+    '</div></div>'+
+    '</div>'+
+    '<div>'+
+    '<div class="card"><div class="card-hdr"><h2>Dados do Cliente</h2></div><div class="card-body">'+
+    '<div class="info-row"><div class="info-key">Condomínio</div><div class="info-val">'+p.cliente+'</div></div>'+
+    '<div class="info-row"><div class="info-key">CNPJ</div><div class="info-val">'+p.cnpj+'</div></div>'+
+    '<div class="info-row"><div class="info-key">Endereço</div><div class="info-val">'+p.endereco+'</div></div>'+
+    '<div class="info-row"><div class="info-key">Contato</div><div class="info-val">'+p.contato+'</div></div>'+
+    '<div class="info-row"><div class="info-key">Síndico</div><div class="info-val">'+p.sindico+'</div></div>'+
+    '<div class="info-row"><div class="info-key">E-mail</div><div class="info-val">'+p.email+'</div></div>'+
+    '<div class="info-row"><div class="info-key">Vagas</div><div class="info-val"><strong>'+p.vagas+'</strong></div></div>'+
+    '<div class="info-row"><div class="info-key">Tipo</div><div class="info-val">'+p.tipo+'</div></div>'+
+    '</div></div>'+
+    '<div class="card"><div class="card-hdr"><h2>Ficha de Fabricação</h2></div><div class="card-body" style="padding:0">'+
+    '<div class="tbl-wrap"><table><thead><tr><th>Descrição</th><th>Med.A</th><th>Med.B</th><th>Med.C</th><th>Unid.</th><th>Qtde</th></tr></thead><tbody>'+itensHtml+'</tbody></table></div>'+
+    '</div></div>'+
+    '<div class="card"><div class="card-hdr"><h2>Prazos de Entrega</h2></div><div class="card-body"><div class="prazo-grid">'+prazosHtml+'</div></div></div>'+
+    '</div>'+
+  '</div>';
+}
+
+function confirmarRecebimento(id){
+  var p=DB.getPedido(id);
+  p.log.push({status:'entregue',data:hoje(),user:USER.nome});
+  DB.updatePedido(id,{status:'entregue',log:p.log});
+  buildSidebar();showToast('Recebimento confirmado! Pedido encerrado. ✓','success');
+  setTimeout(function(){renderView_filialPedido();},500);
+}
+
+// ════════════════════════════════════════════
+// VIEW: SEDE DASHBOARD
+// ════════════════════════════════════════════
+function renderSedeDash(){
+  var peds=DB.pedidos();
+  var ag=peds.filter(function(p){return p.status==='aguardando';});
+  var fab=peds.filter(function(p){return p.status==='em_fabricacao';}).length;
+  var ent=peds.filter(function(p){return p.status==='entregue';}).length;
+  var totalVagas=peds.filter(function(p){return p.status==='entregue';}).reduce(function(s,p){return s+p.vagas;},0);
+  var totalVal=peds.filter(function(p){return p.status==='entregue';}).reduce(function(s,p){return s+(p.valor||0);},0);
+
+  var agRows=ag.slice(0,5).map(function(p){
+    return'<tr><td>'+p.filial_nome+'</td><td><strong>'+p.cliente+'</strong></td><td>'+p.vagas+'</td><td>'+fmtMoeda(p.valor)+'</td><td>'+fmtDate(p.criado)+'</td>'+
+    '<td><button class="btn btn-sm btn-approve" onclick="aprovarRapido(\''+p.id+'\')">✅ Aprovar</button> <button class="btn btn-sm btn-outline" onclick="verPedidoSede(\''+p.id+'\')">Ver</button></td></tr>';
+  }).join('')||'<tr><td colspan="6" style="text-align:center;padding:24px;color:#94a3b8">Nenhum pedido aguardando aprovação.</td></tr>';
+
+  document.getElementById('view-sede-dashboard').innerHTML=
+  '<div class="page-hdr"><div><h1>Dashboard — Sede</h1><p>Visão geral de todas as filiais.</p></div></div>'+
+  '<div class="kpi-grid">'+
+    '<div class="kpi" data-icon="📋"><div class="kpi-label">Total de Pedidos</div><div class="kpi-val">'+peds.length+'</div><div class="kpi-sub">histórico completo</div></div>'+
+    '<div class="kpi" style="border-top-color:#d97706" data-icon="⏳"><div class="kpi-label">Aguardando Aprovação</div><div class="kpi-val">'+ag.length+'</div><div class="kpi-sub"><a onclick="location.hash=\'sede-aprovacoes\'" style="color:var(--verde-d);cursor:pointer">Ver fila →</a></div></div>'+
+    '<div class="kpi" style="border-top-color:#7c3aed" data-icon="🏭"><div class="kpi-label">Em Fabricação</div><div class="kpi-val">'+fab+'</div><div class="kpi-sub">na produção</div></div>'+
+    '<div class="kpi" style="border-top-color:#16a34a" data-icon="✅"><div class="kpi-label">Vagas Entregues</div><div class="kpi-val">'+totalVagas+'</div><div class="kpi-sub">'+fmtMoeda(totalVal)+' em pedidos</div></div>'+
+  '</div>'+
+  '<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">'+
+    '<div class="card"><div class="card-hdr"><h2>Pedidos por Status</h2></div><div class="card-body"><div class="chart-wrap"><canvas id="chartStatus"></canvas></div></div></div>'+
+    '<div class="card"><div class="card-hdr"><h2>Vagas por Filial — 2026</h2></div><div class="card-body"><div class="chart-wrap"><canvas id="chartFiliais"></canvas></div></div></div>'+
+  '</div>'+
+  '<div class="card"><div class="card-hdr"><h2>⏳ Aguardando Aprovação</h2>'+(ag.length?'<span class="badge s-aguardando">'+ag.length+' pedido(s)</span>':'')+'</div>'+
+  '<div class="card-body" style="padding:0"><div class="tbl-wrap"><table><thead><tr><th>Filial</th><th>Condomínio</th><th>Vagas</th><th>Valor Est.</th><th>Data</th><th>Ações</th></tr></thead><tbody>'+agRows+'</tbody></table></div></div></div>';
+
+  setTimeout(function(){
+    var st=document.getElementById('chartStatus');
+    if(st){
+      var stMap={};peds.forEach(function(p){stMap[p.status]=(stMap[p.status]||0)+1;});
+      var stLabels=Object.keys(stMap).map(function(k){return STATUS_LABELS[k]||k;});
+      var stData=Object.values(stMap);
+      new Chart(st,{type:'doughnut',data:{labels:stLabels,datasets:[{data:stData,backgroundColor:['#94a3b8','#fbbf24','#60a5fa','#a78bfa','#22d3ee','#fb923c','#4ade80'],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{font:{size:11},boxWidth:12}}}}});
+    }
+    var fi=document.getElementById('chartFiliais');
+    if(fi){new Chart(fi,{type:'bar',data:{labels:['Jan','Fev','Mar','Abr','Mai','Jun'],datasets:[{label:'Sombrear DF',data:[120,150,200,80,0,0],backgroundColor:'rgba(154,205,50,.75)',borderRadius:5}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'}},scales:{y:{beginAtZero:true,grid:{color:'rgba(0,0,0,.04)'}},x:{grid:{display:false}}}}});}
+  },100);
+}
+
+function aprovarRapido(id){
+  var p=DB.getPedido(id);
+  p.log.push({status:'aprovado',data:hoje(),user:USER.nome});
+  p.log.push({status:'em_fabricacao',data:hoje(),user:USER.nome});
+  DB.updatePedido(id,{status:'em_fabricacao',log:p.log});
+  buildSidebar();showToast('Pedido aprovado! Status: Em Fabricação.','success');
+  renderSedeDash();
+}
+
+// ════════════════════════════════════════════
+// VIEW: SEDE — TODOS OS PEDIDOS
+// ════════════════════════════════════════════
+var filtroSede='todos';
+function renderSedePedidos(){
+  var peds=DB.pedidos();
+  if(filtroSede!=='todos')peds=peds.filter(function(p){return p.status===filtroSede;});
+  var tabs=['todos','aguardando','aprovado','em_fabricacao','pronto_envio','em_transito','entregue'];
+  var tabsHtml=tabs.map(function(t){return'<div class="ftab'+(filtroSede===t?' active':'')+'" onclick="filtroSede=\''+t+'\';renderSedePedidos()">'+( t==='todos'?'Todos':STATUS_LABELS[t])+'</div>';}).join('');
+  var rows=peds.map(function(p){
+    return'<tr><td style="color:#94a3b8;font-size:11px">#'+p.id+'</td><td><strong>'+p.filial_nome+'</strong></td><td>'+p.cliente+'</td><td>'+p.vagas+'</td><td>'+badge(p.status)+'</td><td>'+fmtDate(p.criado)+'</td><td><button class="btn btn-sm btn-outline" onclick="verPedidoSede(\''+p.id+'\')">Ver</button></td></tr>';
+  }).join('')||'<tr><td colspan="7" style="text-align:center;padding:32px;color:#94a3b8">Nenhum pedido encontrado.</td></tr>';
+  document.getElementById('view-sede-pedidos').innerHTML=
+  '<div class="page-hdr"><h1>Todos os Pedidos</h1></div>'+
+  '<div class="filter-tabs">'+tabsHtml+'</div>'+
+  '<div class="card"><div class="card-body" style="padding:0"><div class="tbl-wrap"><table><thead><tr><th>ID</th><th>Filial</th><th>Condomínio</th><th>Vagas</th><th>Status</th><th>Data</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div></div></div>';
+}
+
+// ════════════════════════════════════════════
+// VIEW: SEDE — APROVAÇÕES
+// ════════════════════════════════════════════
+function renderAprovacoes(){
+  var peds=DB.pedidos().filter(function(p){return p.status==='aguardando';});
+  var rows=peds.map(function(p){
+    return'<tr><td><strong>'+p.filial_nome+'</strong></td><td>'+p.cliente+'</td><td>'+p.vagas+'</td><td>'+p.tipo+'</td><td>'+fmtDate(p.criado)+'</td>'+
+    '<td style="display:flex;gap:6px"><button class="btn btn-sm btn-approve" onclick="aprovarPedido(\''+p.id+'\')">✅ Aprovar</button><button class="btn btn-sm btn-danger" onclick="devolverPedido(\''+p.id+'\')">↩ Devolver</button><button class="btn btn-sm btn-ghost" onclick="verPedidoSede(\''+p.id+'\')">Ver</button></td></tr>';
+  }).join('')||'<tr><td colspan="6" style="text-align:center;padding:40px;color:#94a3b8;font-size:14px">🎉 Nenhum pedido aguardando aprovação!</td></tr>';
+  document.getElementById('view-sede-aprovacoes').innerHTML=
+  '<div class="page-hdr"><div><h1>Fila de Aprovações</h1><p>Pedidos aguardando sua revisão e aprovação.</p></div></div>'+
+  (peds.length?'<div class="apv-box apv-pending"><strong>⚠️ '+peds.length+' pedido(s)</strong> aguardando aprovação.</div>':'')+
+  '<div class="card"><div class="card-body" style="padding:0"><div class="tbl-wrap"><table><thead><tr><th>Filial</th><th>Condomínio</th><th>Vagas</th><th>Tipo</th><th>Data</th><th>Ações</th></tr></thead><tbody>'+rows+'</tbody></table></div></div></div>';
+}
+
+function aprovarPedido(id){
+  var p=DB.getPedido(id);
+  p.log.push({status:'aprovado',data:hoje(),user:USER.nome});
+  p.log.push({status:'em_fabricacao',data:hoje(),user:USER.nome});
+  DB.updatePedido(id,{status:'em_fabricacao',log:p.log});
+  buildSidebar();showToast('Pedido aprovado! Em fabricação.','success');
+  renderAprovacoes();
+}
+
+function devolverPedido(id){
+  openModal('Devolver Pedido',
+    '<div class="fg"><label>Motivo da devolução</label><textarea id="obsDevolver" rows="4" placeholder="Descreva o motivo..."></textarea></div>',
+    '<button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>'+
+    '<button class="btn btn-danger" onclick="confirmarDevolucao(\''+id+'\')">↩ Confirmar Devolução</button>'
+  );
+}
+
+function confirmarDevolucao(id){
+  var obs=document.getElementById('obsDevolver').value||'Sem observações.';
+  var p=DB.getPedido(id);
+  p.log.push({status:'rascunho',data:hoje(),user:USER.nome,obs:obs});
+  DB.updatePedido(id,{status:'rascunho',obs:obs,log:p.log});
+  closeModal();buildSidebar();showToast('Pedido devolvido à filial.','');
+  renderAprovacoes();
+}
+
+// ════════════════════════════════════════════
+// VIEW: SEDE — DETALHE PEDIDO
+// ════════════════════════════════════════════
+function verPedidoSede(id){window._pedidoId=id;location.hash='sede-pedido';}
+
+function renderView_sedePedido(){
+  var p=DB.getPedido(window._pedidoId);
+  if(!p){document.getElementById('view-sede-pedido').innerHTML='<p>Pedido não encontrado.</p>';return;}
+  var itensHtml=(p.itens||[]).filter(function(it){return it.qtd>0;}).map(function(it){
+    return'<tr><td>'+it.desc+'</td><td style="text-align:center">'+it.ma+'</td><td style="text-align:center">'+it.mb+'</td><td style="text-align:center">'+it.mc+'</td><td style="text-align:center">'+it.un+'</td><td style="text-align:center;font-weight:700;color:var(--verde-d)">'+it.qtd+'</td></tr>';
+  }).join('');
+  var tlHtml=(p.log||[]).map(function(l,i){
+    var isLast=i===p.log.length-1;
+    return'<div class="tl-item '+(isLast?'current':'done')+'"><div class="tl-dot">'+(isLast?'●':'✓')+'</div>'+
+    '<div class="tl-title">'+badge(l.status)+'</div>'+
+    '<div class="tl-sub">'+fmtDate(l.data)+' • '+l.user+'</div></div>';
+  }).join('');
+
+  // Status update section
+  var nextStatus=STATUS_NEXT[p.status];
+  var statusSection='';
+  if(p.status==='aguardando'){
+    statusSection='<div class="apv-box apv-pending" style="margin-top:16px"><strong>⏳ Aguardando aprovação</strong><div style="display:flex;gap:8px;margin-top:10px"><button class="btn btn-approve" onclick="aprovarPedido(\''+p.id+'\');renderView_sedePedido()">✅ Aprovar e Iniciar Fabricação</button><button class="btn btn-danger" onclick="devolverPedido(\''+p.id+'\')">↩ Devolver</button></div></div>';
+  } else if(nextStatus){
+    statusSection='<div class="apv-box apv-info" style="margin-top:16px"><strong>Avançar Status</strong><p style="font-size:12px;color:#64748b;margin:4px 0 10px">Próximo: '+badge(nextStatus)+'</p><button class="btn btn-primary btn-sm" onclick="avancarStatus(\''+p.id+'\',\''+nextStatus+'\')">Atualizar → '+STATUS_LABELS[nextStatus]+'</button></div>';
+  }
+
+  var prazosHtml=(p.prazos||[]).map(function(pr){
+    return'<div class="prazo-row"><span class="prazo-label">'+pr.grupo+'</span><strong style="font-size:13px;color:#1e293b">'+pr.prazo+'</strong></div>';
+  }).join('');
+
+  document.getElementById('view-sede-pedido').innerHTML=
+  '<div class="page-hdr">'+
+    '<div><button class="btn btn-ghost btn-sm" onclick="history.back()" style="margin-bottom:8px">← Voltar</button><h1>'+p.cliente+'</h1><p>'+p.filial_nome+' • Pedido #'+p.id+' • '+fmtDate(p.criado)+'</p></div>'+
+    '<button class="btn btn-outline" onclick="imprimirPedido(\''+p.id+'\')">📄 Gerar Ordem de Serviço (PDF)</button>'+
+  '</div>'+
+  '<div style="display:grid;grid-template-columns:1fr 1.6fr;gap:20px;align-items:start">'+
+    '<div>'+
+      '<div class="card"><div class="card-hdr"><h2>Status</h2></div><div class="card-body">'+
+        '<div style="margin-bottom:16px">'+badge(p.status)+'</div>'+
+        '<div class="timeline">'+tlHtml+'</div>'+
+        statusSection+
+      '</div></div>'+
+      '<div class="card"><div class="card-hdr"><h2>Diretrizes</h2></div><div class="card-body">'+
+        '<div class="info-row"><div class="info-key">Estrutura</div><div class="info-val">'+p.cor_estrutura+'</div></div>'+
+        '<div class="info-row"><div class="info-key">Tela</div><div class="info-val">'+p.cor_tela+'</div></div>'+
+        '<div class="info-row"><div class="info-key">Chumbação</div><div class="info-val">'+p.chumbacao+'</div></div>'+
+        '<div class="info-row"><div class="info-key">Pilares</div><div class="info-val">'+p.pilares+'</div></div>'+
+      '</div></div>'+
+      '<div class="card"><div class="card-hdr"><h2>Cliente</h2></div><div class="card-body">'+
+        '<div class="info-row"><div class="info-key">Condomínio</div><div class="info-val">'+p.cliente+'</div></div>'+
+        '<div class="info-row"><div class="info-key">Endereço</div><div class="info-val">'+p.endereco+'</div></div>'+
+        '<div class="info-row"><div class="info-key">Síndico</div><div class="info-val">'+p.sindico+'</div></div>'+
+        '<div class="info-row"><div class="info-key">Vagas</div><div class="info-val"><strong>'+p.vagas+'</strong> ('+p.tipo+')</div></div>'+
+      '</div></div>'+
+    '</div>'+
+    '<div>'+
+      '<div class="card"><div class="card-hdr"><h2>Ficha de Fabricação</h2></div><div class="card-body" style="padding:0">'+
+        '<div class="tbl-wrap"><table><thead><tr><th>Descrição do Item</th><th>Med.A</th><th>Med.B</th><th>Med.C</th><th>Unid.</th><th>Qtde</th></tr></thead><tbody>'+itensHtml+'</tbody></table></div>'+
+      '</div></div>'+
+      '<div class="card"><div class="card-hdr"><h2>Prazos</h2></div><div class="card-body"><div class="prazo-grid">'+prazosHtml+'</div></div></div>'+
+    '</div>'+
+  '</div>';
+}
+
+function avancarStatus(id,novoStatus){
+  var p=DB.getPedido(id);
+  p.log.push({status:novoStatus,data:hoje(),user:USER.nome});
+  DB.updatePedido(id,{status:novoStatus,log:p.log});
+  buildSidebar();showToast('Status atualizado: '+STATUS_LABELS[novoStatus],'success');
+  renderView_sedePedido();
+}
+
+// ════════════════════════════════════════════
+// VIEW: SEDE — FILIAIS
+// ════════════════════════════════════════════
+function renderFiliais(){
+  var fils=DB.filiais();
+  var peds=DB.pedidos();
+  var rows=fils.map(function(f){
+    var cnt=peds.filter(function(p){return p.filial_id===f.id;}).length;
+    return'<tr><td><strong>'+f.nome+'</strong></td><td>'+f.cidade+'</td><td>'+f.cnpj+'</td><td>'+f.email+'</td><td>'+f.telefone+'</td><td>'+cnt+'</td><td><span style="color:'+( f.ativo?'#16a34a':'#ef4444')+'">●</span> '+(f.ativo?'Ativa':'Inativa')+'</td></tr>';
+  }).join('');
+  document.getElementById('view-sede-filiais').innerHTML=
+  '<div class="page-hdr"><div><h1>Filiais</h1><p>Gerencie as filiais cadastradas no sistema.</p></div>'+
+  '<button class="btn btn-primary" onclick="novaFilial()">＋ Nova Filial</button></div>'+
+  '<div class="card"><div class="card-body" style="padding:0"><div class="tbl-wrap"><table><thead><tr><th>Nome</th><th>Cidade</th><th>CNPJ</th><th>E-mail</th><th>Telefone</th><th>Pedidos</th><th>Status</th></tr></thead><tbody>'+rows+'</tbody></table></div></div></div>';
+}
+
+function novaFilial(){
+  openModal('Nova Filial',
+    '<div class="form-grid">'+
+    '<div class="fg"><label>Nome *</label><input id="nf_nome" placeholder="Ex: Sombrear SP"></div>'+
+    '<div class="fg"><label>Cidade *</label><input id="nf_cidade" placeholder="Ex: São Paulo - SP"></div>'+
+    '<div class="fg"><label>CNPJ</label><input id="nf_cnpj" placeholder="00.000.000/0001-00"></div>'+
+    '<div class="fg"><label>E-mail</label><input type="email" id="nf_email" placeholder="sp@sombrear.com.br"></div>'+
+    '<div class="fg"><label>Telefone</label><input id="nf_tel" placeholder="(00) 00000-0000"></div>'+
+    '</div>',
+    '<button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>'+
+    '<button class="btn btn-primary" onclick="salvarFilial()">Salvar Filial</button>'
+  );
+}
+
+function salvarFilial(){
+  var nome=document.getElementById('nf_nome').value.trim();
+  if(!nome){showToast('Informe o nome da filial.','error');return;}
+  var fils=DB.filiais();
+  fils.push({id:'f'+Date.now(),nome:nome,cidade:document.getElementById('nf_cidade').value,cnpj:document.getElementById('nf_cnpj').value,email:document.getElementById('nf_email').value,telefone:document.getElementById('nf_tel').value,ativo:true});
+  DB.saveFiliais(fils);
+  closeModal();showToast('Filial cadastrada com sucesso!','success');
+  renderFiliais();
+}
+
+// ════════════════════════════════════════════
+// VIEW: RELATÓRIOS
+// ════════════════════════════════════════════
+function renderRelatorios(role){
+  var peds=DB.pedidos();
+  if(role==='filial')peds=peds.filter(function(p){return p.filial_id===USER.filial_id;});
+  var totalVagas=peds.reduce(function(s,p){return s+p.vagas;},0);
+  var totalPeds=peds.length;
+  var entregues=peds.filter(function(p){return p.status==='entregue';});
+  var mediaVagas=totalPeds?Math.round(totalVagas/totalPeds):0;
+  var vidId='view-'+(role==='sede'?'sede':'filial')+'-relatorios';
+
+  document.getElementById(vidId).innerHTML=
+  '<div class="page-hdr"><div><h1>Relatórios</h1><p>Análise de desempenho e volumes de pedidos.</p></div></div>'+
+  '<div class="kpi-grid">'+
+    '<div class="kpi" data-icon="🏗️"><div class="kpi-label">Total de Vagas no Ano</div><div class="kpi-val">'+totalVagas+'</div><div class="kpi-sub">todos os pedidos</div></div>'+
+    '<div class="kpi" data-icon="📋"><div class="kpi-label">Total de Pedidos</div><div class="kpi-val">'+totalPeds+'</div><div class="kpi-sub">no período</div></div>'+
+    '<div class="kpi" data-icon="📊"><div class="kpi-label">Média Vagas / Pedido</div><div class="kpi-val">'+mediaVagas+'</div><div class="kpi-sub">média histórica</div></div>'+
+    '<div class="kpi" style="border-top-color:#16a34a" data-icon="✅"><div class="kpi-label">Pedidos Entregues</div><div class="kpi-val">'+entregues.length+'</div><div class="kpi-sub">ciclos encerrados</div></div>'+
+  '</div>'+
+  '<div style="display:grid;grid-template-columns:1.3fr 1fr;gap:20px;margin-bottom:20px">'+
+    '<div class="card"><div class="card-hdr"><h2>Vagas por Mês — 2026</h2></div><div class="card-body"><div class="chart-wrap"><canvas id="chartRelMes"></canvas></div></div></div>'+
+    '<div class="card"><div class="card-hdr"><h2>Sombrite vs Telha</h2></div><div class="card-body"><div class="chart-wrap"><canvas id="chartRelTipo"></canvas></div></div></div>'+
+  '</div>'+
+  '<div class="card"><div class="card-hdr"><h2>Histórico de Pedidos</h2></div><div class="card-body" style="padding:0">'+
+  '<div class="tbl-wrap"><table><thead><tr><th>Mês</th>'+(role==='sede'?'<th>Filial</th>':'')+
+  '<th>Condomínio</th><th>Vagas</th><th>Tipo</th><th>Status</th></tr></thead><tbody>'+
+  peds.map(function(p){return'<tr><td>'+fmtDate(p.criado).substring(3)+'</td>'+(role==='sede'?'<td>'+p.filial_nome+'</td>':'')+'<td>'+p.cliente+'</td><td>'+p.vagas+'</td><td>'+p.tipo+'</td><td>'+badge(p.status)+'</td></tr>';}).join('')+
+  '</tbody></table></div></div></div>';
+
+  setTimeout(function(){
+    var mes=document.getElementById('chartRelMes');
+    if(mes){new Chart(mes,{type:'bar',data:{labels:['Jan','Fev','Mar','Abr','Mai','Jun'],datasets:[{label:'Vagas',data:[120,150,200,80,0,0],backgroundColor:'rgba(154,205,50,.75)',borderColor:'#9ACD32',borderRadius:6}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,grid:{color:'rgba(0,0,0,.04)'}},x:{grid:{display:false}}}}});}
+    var tipo=document.getElementById('chartRelTipo');
+    if(tipo){
+      var sombrite=peds.filter(function(p){return p.tipo==='Sombrite';}).length;
+      var telha=peds.filter(function(p){return p.tipo!=='Sombrite';}).length;
+      new Chart(tipo,{type:'doughnut',data:{labels:['Sombrite','Telha'],datasets:[{data:[sombrite||5,telha||1],backgroundColor:['#9ACD32','#60a5fa'],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}}}});
+    }
+  },100);
+}
+
+// ════════════════════════════════════════════
+// PDF / IMPRESSÃO
+// ════════════════════════════════════════════
+function imprimirPedido(id){
+  var p=DB.getPedido(id);
+  if(!p)return;
+  var itensHtml=(p.itens||[]).map(function(it){
+    return'<tr><td>'+it.desc+'</td><td style="text-align:center">'+it.ma+'</td><td style="text-align:center">'+it.mb+'</td><td style="text-align:center">'+it.mc+'</td><td style="text-align:center">'+it.un+'</td><td style="text-align:center;font-weight:700">'+it.qtd+'</td></tr>';
+  }).join('');
+  var prazosHtml=(p.prazos||[]).map(function(pr){
+    return'<tr><td>'+pr.grupo+'</td><td style="text-align:center">'+pr.prazo+'</td><td>Da data do pedido</td></tr>';
+  }).join('');
+  document.getElementById('printArea').innerHTML=
+  '<div style="padding:0">'+
+    '<table style="width:100%;margin-bottom:8px"><tr>'+
+      '<td style="vertical-align:top"><img src="logo.png" class="pr-logo" alt="Sombrear" style="height:40px"></td>'+
+      '<td style="text-align:right;vertical-align:top"><div class="pr-main-title">Pedido de Materiais Sombrear Indústria</div><div style="font-size:9pt;color:#999">'+p.filial_nome+' — Emissão: '+new Date().toLocaleString('pt-BR')+'</div></td>'+
+    '</tr></table>'+
+    '<div class="pr-line"></div>'+
+    '<table style="width:100%;margin-bottom:14px"><tr>'+
+      '<td style="width:50%;background:#f5f5f5;padding:6px;font-weight:700;font-size:9pt">CLIENTE</td>'+
+      '<td style="width:50%;background:#f5f5f5;padding:6px;font-weight:700;font-size:9pt">ENDEREÇO</td>'+
+    '</tr><tr>'+
+      '<td style="padding:6px;font-size:9pt">'+p.cliente+'</td>'+
+      '<td style="padding:6px;font-size:9pt">'+p.endereco+'</td>'+
+    '</tr><tr>'+
+      '<td style="background:#f5f5f5;padding:6px;font-weight:700;font-size:9pt">CNPJ</td>'+
+      '<td style="background:#f5f5f5;padding:6px;font-weight:700;font-size:9pt">CONTATO</td>'+
+    '</tr><tr>'+
+      '<td style="padding:6px;font-size:9pt">'+p.cnpj+'</td>'+
+      '<td style="padding:6px;font-size:9pt">'+p.contato+'</td>'+
+    '</tr><tr>'+
+      '<td style="background:#f5f5f5;padding:6px;font-weight:700;font-size:9pt">SÍNDICO RESPONSÁVEL</td>'+
+      '<td style="background:#f5f5f5;padding:6px;font-weight:700;font-size:9pt">E-MAIL</td>'+
+    '</tr><tr>'+
+      '<td style="padding:6px;font-size:9pt">'+p.sindico+'</td>'+
+      '<td style="padding:6px;font-size:9pt">'+p.email+'</td>'+
+    '</tr></table>'+
+    '<div class="pr-sec">Ficha de Fabricação</div>'+
+    '<table><thead><tr><th style="min-width:180px">Descrição Item</th><th>Medida A</th><th>Medida B</th><th>Medida C</th><th>Unid.</th><th>Qtde</th></tr></thead><tbody>'+itensHtml+'</tbody></table>'+
+    '<div class="pr-sec" style="margin-top:16px">Ficha Técnica para Produção</div>'+
+    '<p style="font-size:8pt;color:#555;margin-bottom:10px">Declaro ter visitado o local, realizado as locações dos pilares, bem como calculado todos os insumos necessários para a execução dos serviços.</p>'+
+    '<table style="margin-bottom:8px"><tr><th style="width:160px">Informação</th><th>Detalhe</th></tr>'+
+    '<tr><td style="font-weight:700">INFORMAÇÃO 1</td><td>'+p.cor_estrutura+'</td></tr>'+
+    '<tr><td style="font-weight:700">INFORMAÇÃO 2</td><td>'+p.cor_tela+'</td></tr>'+
+    '<tr><td style="font-weight:700">INFORMAÇÃO 3</td><td>'+p.chumbacao+'</td></tr>'+
+    '<tr><td style="font-weight:700">INFORMAÇÃO 4</td><td>'+p.pilares+'</td></tr>'+
+    '</table>'+
+    '<div class="pr-sec">Prazo Previsto para Entrega das Peças</div>'+
+    '<table><thead><tr><th>Conjunto</th><th>Prazo</th><th>Referência</th></tr></thead><tbody>'+prazosHtml+'</tbody></table>'+
+    '<div class="pr-sign-wrap" style="margin-top:36px">'+
+      '<div class="pr-sign"><div style="font-size:9pt;font-weight:700">SOMBREAR INDÚSTRIA</div><div style="font-size:8pt;color:#666">Goiânia — GO</div></div>'+
+      '<div class="pr-sign"><div style="font-size:9pt;font-weight:700">'+p.filial_nome.toUpperCase()+'</div><div style="font-size:8pt;color:#666">'+p.filial_nome+'</div></div>'+
+    '</div>'+
+  '</div>';
+  window.print();
+}
+
+// ════════════════════════════════════════════
+// MODAL
+// ════════════════════════════════════════════
+function openModal(title,body,footer){
+  document.getElementById('modalTitle').textContent=title;
+  document.getElementById('modalBody').innerHTML=body;
+  document.getElementById('modalFooter').innerHTML=footer||'';
+  document.getElementById('modalOverlay').classList.add('open');
+}
+function closeModal(){document.getElementById('modalOverlay').classList.remove('open');}
+
+// ════════════════════════════════════════════
+// HELPERS
+// ════════════════════════════════════════════
+function esc(s){return String(s||'').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+// ════════════════════════════════════════════
+// BOOT
+// ════════════════════════════════════════════
+if(!initAuth()){throw new Error('Not authenticated');}
+DB.init();
+buildSidebar();
+
+// Extend renderView for detail pages
+var _origRender=renderView;
+renderView=function(hash){
+  if(hash==='filial-pedido')renderView_filialPedido();
+  else if(hash==='sede-pedido')renderView_sedePedido();
+  else _origRender(hash);
+};
+
+window.addEventListener('hashchange',function(){
+  navigate(location.hash.replace('#',''));
+});
+
+var startHash=location.hash.replace('#','')||'';
+navigate(startHash);
+</script>
+</body>
+</html>

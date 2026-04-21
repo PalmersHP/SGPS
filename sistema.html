@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sombrear — Sistema de Pedidos</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Poppins',sans-serif;height:100vh;display:flex;overflow:hidden}
+
+/* ─── BRAND SIDE ─── */
+.brand{width:44%;background:linear-gradient(155deg,#071a03 0%,#0f2d06 40%,#163a08 100%);display:flex;flex-direction:column;justify-content:center;align-items:center;padding:48px;position:relative;overflow:hidden}
+.brand::before{content:'';position:absolute;width:500px;height:500px;background:radial-gradient(circle,rgba(154,205,50,.18) 0%,transparent 65%);top:-120px;right:-120px;pointer-events:none}
+.brand::after{content:'';position:absolute;width:350px;height:350px;background:radial-gradient(circle,rgba(154,205,50,.1) 0%,transparent 65%);bottom:-80px;left:-80px;pointer-events:none}
+.brand-inner{position:relative;z-index:1;width:100%;max-width:340px}
+.brand-logo{width:160px;margin-bottom:28px;filter:brightness(0) invert(1);display:block}
+.brand-badge{display:inline-block;background:rgba(154,205,50,.2);color:#9ACD32;font-size:11px;font-weight:600;letter-spacing:2.5px;text-transform:uppercase;padding:5px 14px;border-radius:20px;margin-bottom:16px;border:1px solid rgba(154,205,50,.3)}
+.brand-title{color:#fff;font-size:26px;font-weight:700;line-height:1.35;margin-bottom:36px}
+.brand-title span{color:#9ACD32}
+.feat-list{list-style:none;display:flex;flex-direction:column;gap:4px}
+.feat-item{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:10px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);transition:background .2s}
+.feat-item:hover{background:rgba(255,255,255,.07)}
+.feat-icon{width:38px;height:38px;background:rgba(154,205,50,.15);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0}
+.feat-text{font-size:13px;color:rgba(255,255,255,.75);line-height:1.4}
+.brand-footer{position:absolute;bottom:20px;left:0;right:0;text-align:center;font-size:11px;color:rgba(255,255,255,.25)}
+
+/* ─── FORM SIDE ─── */
+.form-side{width:56%;background:#fff;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:48px;overflow-y:auto}
+.form-box{width:100%;max-width:400px}
+.form-head{margin-bottom:32px}
+.form-head h2{font-size:24px;font-weight:700;color:#1e293b;margin-bottom:6px}
+.form-head p{color:#64748b;font-size:13px}
+
+/* Role selector */
+.role-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:24px}
+.role-card{padding:14px 10px;border:2px solid #e2e8f0;border-radius:10px;cursor:pointer;text-align:center;transition:all .2s;background:#fff;user-select:none}
+.role-card:hover{border-color:#9ACD32;background:#f7fdf0}
+.role-card.active{border-color:#9ACD32;background:#f0fae0;box-shadow:0 0 0 3px rgba(154,205,50,.15)}
+.role-card .rc-icon{font-size:26px;display:block;margin-bottom:6px}
+.role-card .rc-label{font-size:12px;font-weight:600;color:#475569}
+.role-card .rc-sub{font-size:11px;color:#94a3b8;margin-top:2px}
+.role-card.active .rc-label{color:#6FAE2E}
+
+/* Form fields */
+.fg{margin-bottom:16px}
+.fg label{display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:6px;text-transform:uppercase;letter-spacing:.4px}
+.fg input{width:100%;padding:11px 14px;border:2px solid #e2e8f0;border-radius:8px;font-size:14px;font-family:'Poppins',sans-serif;color:#1e293b;transition:border-color .2s;background:#fff}
+.fg input:focus{outline:none;border-color:#9ACD32;box-shadow:0 0 0 3px rgba(154,205,50,.12)}
+
+/* Buttons */
+.btn-login{width:100%;padding:13px;background:linear-gradient(135deg,#9ACD32,#6FAE2E);color:#fff;border:none;border-radius:9px;font-size:15px;font-weight:600;font-family:'Poppins',sans-serif;cursor:pointer;transition:all .2s;letter-spacing:.3px;margin-top:4px}
+.btn-login:hover{transform:translateY(-1px);box-shadow:0 8px 24px rgba(154,205,50,.35)}
+.btn-login:active{transform:translateY(0)}
+
+/* Error */
+.err-box{background:#fef2f2;border:1px solid #fecaca;color:#dc2626;padding:10px 14px;border-radius:7px;font-size:13px;margin-bottom:14px;display:none}
+
+/* Demo credentials */
+.demo-box{margin-top:24px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 16px}
+.demo-title{font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px}
+.demo-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;cursor:pointer;border-bottom:1px solid #f1f5f9}
+.demo-row:last-child{border-bottom:none;padding-bottom:0}
+.demo-row:hover .use-btn{opacity:1}
+.demo-row:hover .demo-email{color:#6FAE2E}
+.demo-info{display:flex;flex-direction:column;gap:1px}
+.demo-role{font-size:12px;font-weight:600;color:#334155}
+.demo-email{font-size:11px;color:#94a3b8;font-family:monospace;transition:color .2s}
+.use-btn{font-size:11px;color:#9ACD32;font-weight:700;opacity:0;transition:opacity .2s;white-space:nowrap}
+
+/* Divider */
+.divider{display:flex;align-items:center;gap:10px;margin:20px 0}
+.divider::before,.divider::after{content:'';flex:1;height:1px;background:#e2e8f0}
+.divider span{font-size:11px;color:#94a3b8;white-space:nowrap}
+
+@media(max-width:768px){.brand{display:none}.form-side{width:100%;padding:24px}}
+</style>
+</head>
+<body>
+
+<!-- ═══ BRAND ═══ -->
+<div class="brand">
+  <div class="brand-inner">
+    <img src="logo.png" class="brand-logo" alt="Sombrear" onerror="this.style.display='none'">
+    <div class="brand-badge">Sistema Integrado</div>
+    <h1 class="brand-title">Gestão de Pedidos<br>de <span>Fabricação</span></h1>
+    <ul class="feat-list">
+      <li class="feat-item">
+        <div class="feat-icon">📋</div>
+        <div class="feat-text">Cálculo automático de peças por projeto</div>
+      </li>
+      <li class="feat-item">
+        <div class="feat-icon">🏭</div>
+        <div class="feat-text">Integração Filial → Sede → Indústria</div>
+      </li>
+      <li class="feat-item">
+        <div class="feat-icon">📦</div>
+        <div class="feat-text">Rastreamento de status em tempo real</div>
+      </li>
+      <li class="feat-item">
+        <div class="feat-icon">📊</div>
+        <div class="feat-text">Dashboard com KPIs e relatórios gerenciais</div>
+      </li>
+    </ul>
+  </div>
+  <div class="brand-footer">Sombrear Estruturas Inteligentes • Goiânia / Brasília</div>
+</div>
+
+<!-- ═══ FORM ═══ -->
+<div class="form-side">
+  <div class="form-box">
+    <div class="form-head">
+      <h2>Bem-vindo de volta 👋</h2>
+      <p>Acesse o sistema de pedidos Sombrear</p>
+    </div>
+
+    <!-- Role selector -->
+    <div class="role-grid">
+      <div class="role-card active" id="rc-sede" onclick="selectRole('sede')">
+        <span class="rc-icon">🏭</span>
+        <div class="rc-label">Sede / Indústria</div>
+        <div class="rc-sub">Goiânia — GO</div>
+      </div>
+      <div class="role-card" id="rc-filial" onclick="selectRole('filial')">
+        <span class="rc-icon">🏢</span>
+        <div class="rc-label">Filial</div>
+        <div class="rc-sub">Sombrear DF / Outros</div>
+      </div>
+    </div>
+
+    <div class="err-box" id="errBox">E-mail ou senha incorretos. Verifique e tente novamente.</div>
+
+    <div class="fg">
+      <label>E-mail</label>
+      <input type="email" id="inpEmail" placeholder="seu@sombrear.com.br" autocomplete="email">
+    </div>
+    <div class="fg">
+      <label>Senha</label>
+      <input type="password" id="inpSenha" placeholder="••••••••" autocomplete="current-password">
+    </div>
+
+    <button class="btn-login" onclick="fazerLogin()">Entrar no Sistema →</button>
+
+    <div class="divider"><span>acessos de demonstração</span></div>
+
+    <div class="demo-box">
+      <div class="demo-title">🔑 Clique para preencher automaticamente</div>
+      <div class="demo-row" onclick="demo('sede@sombrear.com.br','sombrear2024','sede')">
+        <div class="demo-info">
+          <span class="demo-role">🏭 Sede — Goiânia</span>
+          <span class="demo-email">sede@sombrear.com.br</span>
+        </div>
+        <span class="use-btn">Usar →</span>
+      </div>
+      <div class="demo-row" onclick="demo('df@sombrear.com.br','sombrear2024','filial')">
+        <div class="demo-info">
+          <span class="demo-role">🏢 Filial DF — Brasília</span>
+          <span class="demo-email">df@sombrear.com.br</span>
+        </div>
+        <span class="use-btn">Usar →</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+var role = 'sede';
+var USERS = [
+  {id:'u1',email:'sede@sombrear.com.br',senha:'sombrear2024',role:'sede',nome:'Carlos Alberto',cargo:'Gerente Industrial'},
+  {id:'u2',email:'df@sombrear.com.br',senha:'sombrear2024',role:'filial',nome:'Ricardo Mendes',cargo:'Engenheiro de Campo',filial_id:'f1',filial_nome:'Sombrear DF'}
+];
+
+function selectRole(r){
+  role=r;
+  document.getElementById('rc-sede').classList.toggle('active',r==='sede');
+  document.getElementById('rc-filial').classList.toggle('active',r==='filial');
+}
+
+function demo(e,s,r){
+  document.getElementById('inpEmail').value=e;
+  document.getElementById('inpSenha').value=s;
+  selectRole(r);
+}
+
+function fazerLogin(){
+  var email=document.getElementById('inpEmail').value.trim().toLowerCase();
+  var senha=document.getElementById('inpSenha').value;
+  var err=document.getElementById('errBox');
+  var user=USERS.find(function(u){return u.email===email&&u.senha===senha&&u.role===role;});
+  if(user){
+    err.style.display='none';
+    localStorage.setItem('sombrear_session',JSON.stringify(user));
+    window.location.href='app.html';
+  } else {
+    err.style.display='block';
+  }
+}
+
+document.addEventListener('keydown',function(e){if(e.key==='Enter')fazerLogin();});
+
+// Auto-redirect if already logged in
+if(localStorage.getItem('sombrear_session')) window.location.href='app.html';
+</script>
+</body>
+</html>
