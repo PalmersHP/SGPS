@@ -86,6 +86,8 @@ body{font-family:'Poppins',sans-serif;background:var(--bg);color:var(--cinza);di
 .s-pronto_envio{background:#ecfeff;color:#0891b2}
 .s-em_transito{background:#fff7ed;color:#ea580c}
 .s-entregue{background:#f0fdf4;color:#16a34a}
+.s-concluido{background:#052e16;color:#86efac}
+.s-inativo{background:#f1f5f9;color:#94a3b8;text-decoration:line-through}
 
 /* TABLES */
 .tbl-wrap{overflow-x:auto}
@@ -554,8 +556,8 @@ function fmtMoeda(v){return'R$ '+(v||0).toLocaleString('pt-BR',{minimumFractionD
 function uid(){return 'p'+Date.now();}
 function initials(nome){return nome?nome.split(' ').map(function(n){return n[0];}).join('').substring(0,2).toUpperCase():'??';}
 
-var STATUS_LABELS={rascunho:'Rascunho',aguardando:'Aguardando Aprovação',aprovado:'Aprovado',em_fabricacao:'Em Fabricação',pronto_envio:'Pronto para Envio',em_transito:'Em Trânsito',entregue:'Entregue ✓'};
-var STATUS_NEXT={aguardando:'aprovado',aprovado:'em_fabricacao',em_fabricacao:'pronto_envio',pronto_envio:'em_transito',em_transito:'entregue'};
+var STATUS_LABELS={rascunho:'Rascunho',aguardando:'Aguardando Aprovação',aprovado:'Aprovado',em_fabricacao:'Em Fabricação',pronto_envio:'Pronto para Envio',em_transito:'Em Trânsito',entregue:'Entregue ✓',concluido:'Concluído ✅',inativo:'Inativo'};
+var STATUS_NEXT={aguardando:'aprovado',aprovado:'em_fabricacao',em_fabricacao:'pronto_envio',pronto_envio:'em_transito',em_transito:'entregue',entregue:'concluido'};
 
 function badge(status){
   return '<span class="badge s-'+status+'">'+(STATUS_LABELS[status]||status)+'</span>';
@@ -962,28 +964,39 @@ function wzEnviar(){
 // VIEW: MEUS PEDIDOS (filial)
 // ════════════════════════════════════════════
 var filtroPedidos='todos';
+var mostrarInativos=false;
 function renderMeusPedidos(){
-  var peds=DB.pedidos().filter(function(p){return p.filial_id===USER.filial_id;});
-  if(filtroPedidos!=='todos')peds=peds.filter(function(p){return p.status===filtroPedidos;});
-  var tabs=['todos','aguardando','aprovado','em_fabricacao','pronto_envio','em_transito','entregue'];
-  var tabsHtml=tabs.map(function(t){
+  var todos=DB.pedidos().filter(function(p){return p.filial_id===USER.filial_id;});
+  var inativos=todos.filter(function(p){return p.inativo;});
+  var ativos=todos.filter(function(p){return !p.inativo;});
+  var peds=mostrarInativos?inativos:ativos;
+  if(!mostrarInativos&&filtroPedidos!=='todos')peds=peds.filter(function(p){return p.status===filtroPedidos;});
+  var tabs=['todos','aguardando','aprovado','em_fabricacao','pronto_envio','em_transito','entregue','concluido'];
+  var tabsHtml=!mostrarInativos?tabs.map(function(t){
     var lbl=t==='todos'?'Todos':STATUS_LABELS[t];
     return'<div class="ftab'+(filtroPedidos===t?' active':'')+'" onclick="filtroPedidos=\''+t+'\';renderMeusPedidos()">'+lbl+'</div>';
-  }).join('');
+  }).join(''):'';
   var rows=peds.map(function(p){
-    return'<tr><td style="color:#94a3b8;font-size:11px">#'+p.id+'</td>'+
+    return'<tr style="opacity:'+(p.inativo?.6:1)+'"><td style="color:#94a3b8;font-size:11px">#'+p.id+'</td>'+
     '<td><strong>'+p.cliente+'</strong></td>'+
     '<td>'+p.vagas+'</td>'+
     '<td><span style="font-size:12px;color:#64748b">'+p.tipo+'</span></td>'+
-    '<td>'+badge(p.status)+'</td>'+
+    '<td>'+badge(p.inativo?'inativo':p.status)+'</td>'+
     '<td>'+fmtDate(p.criado)+'</td>'+
-    '<td><button class="btn btn-sm btn-outline" onclick="verPedidoFilial(\''+p.id+'\')">Ver</button></td></tr>';
+    '<td style="white-space:nowrap">'+
+      '<button class="btn btn-sm btn-outline" onclick="verPedidoFilial(\''+p.id+'\')">Ver</button> '+
+      (p.status==='rascunho'&&!p.inativo?'<button class="btn btn-sm" style="background:#fff7ed;color:#ea580c;border:1px solid #fed7aa" onclick="inativarPedido(\''+p.id+'\',\'filial\')">Inativar</button>':'')+
+      (p.inativo?'<button class="btn btn-sm" style="background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0" onclick="reativarPedido(\''+p.id+'\',\'filial\')">Reativar</button>':'')+
+    '</td></tr>';
   }).join('');
-  if(!rows)rows='<tr><td colspan="7" style="text-align:center;padding:32px;color:#94a3b8">Nenhum pedido encontrado.</td></tr>';
+  if(!rows)rows='<tr><td colspan="7" style="text-align:center;padding:32px;color:#94a3b8">'+(mostrarInativos?'Nenhum pedido inativo.':'Nenhum pedido encontrado.')+'</td></tr>';
   document.getElementById('view-filial-pedidos').innerHTML=
   '<div class="page-hdr"><div><h1>Meus Pedidos</h1><p>Acompanhe todos os pedidos da sua filial.</p></div>'+
   '<button class="btn btn-primary" onclick="location.hash=\'filial-novo-pedido\'">➕ Novo Pedido</button></div>'+
+  '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'+
   '<div class="filter-tabs">'+tabsHtml+'</div>'+
+  '<button class="btn btn-sm '+(mostrarInativos?'btn-outline':'')+'" style="font-size:12px;'+(mostrarInativos?'':'background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0')+'" onclick="mostrarInativos=!mostrarInativos;renderMeusPedidos()">'+(mostrarInativos?'← Ativos':'🗄 Inativos ('+(inativos.length)+')')+'</button>'+
+  '</div>'+
   '<div class="card"><div class="card-body" style="padding:0"><div class="tbl-wrap"><table><thead><tr><th>ID</th><th>Condomínio</th><th>Vagas</th><th>Tipo</th><th>Status</th><th>Data</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div></div></div>';
 }
 
@@ -1126,17 +1139,28 @@ function aprovarRapido(id){
 // VIEW: SEDE — TODOS OS PEDIDOS
 // ════════════════════════════════════════════
 var filtroSede='todos';
+var mostrarInativosSede=false;
 function renderSedePedidos(){
-  var peds=DB.pedidos();
-  if(filtroSede!=='todos')peds=peds.filter(function(p){return p.status===filtroSede;});
-  var tabs=['todos','aguardando','aprovado','em_fabricacao','pronto_envio','em_transito','entregue'];
-  var tabsHtml=tabs.map(function(t){return'<div class="ftab'+(filtroSede===t?' active':'')+'" onclick="filtroSede=\''+t+'\';renderSedePedidos()">'+( t==='todos'?'Todos':STATUS_LABELS[t])+'</div>';}).join('');
+  var todos=DB.pedidos();
+  var inativos=todos.filter(function(p){return p.inativo;});
+  var ativos=todos.filter(function(p){return !p.inativo;});
+  var peds=mostrarInativosSede?inativos:ativos;
+  if(!mostrarInativosSede&&filtroSede!=='todos')peds=peds.filter(function(p){return p.status===filtroSede;});
+  var tabs=['todos','aguardando','aprovado','em_fabricacao','pronto_envio','em_transito','entregue','concluido'];
+  var tabsHtml=!mostrarInativosSede?tabs.map(function(t){return'<div class="ftab'+(filtroSede===t?' active':'')+'" onclick="filtroSede=\''+t+'\';renderSedePedidos()">'+( t==='todos'?'Todos':STATUS_LABELS[t])+'</div>';}).join(''):'';
   var rows=peds.map(function(p){
-    return'<tr><td style="color:#94a3b8;font-size:11px">#'+p.id+'</td><td><strong>'+p.filial_nome+'</strong></td><td>'+p.cliente+'</td><td>'+p.vagas+'</td><td>'+badge(p.status)+'</td><td>'+fmtDate(p.criado)+'</td><td><button class="btn btn-sm btn-outline" onclick="verPedidoSede(\''+p.id+'\')">Ver</button></td></tr>';
-  }).join('')||'<tr><td colspan="7" style="text-align:center;padding:32px;color:#94a3b8">Nenhum pedido encontrado.</td></tr>';
+    return'<tr style="opacity:'+(p.inativo?.6:1)+'"><td style="color:#94a3b8;font-size:11px">#'+p.id+'</td><td><strong>'+p.filial_nome+'</strong></td><td>'+p.cliente+'</td><td>'+p.vagas+'</td><td>'+badge(p.inativo?'inativo':p.status)+'</td><td>'+fmtDate(p.criado)+'</td>'+
+    '<td style="white-space:nowrap">'+
+    '<button class="btn btn-sm btn-outline" onclick="verPedidoSede(\''+p.id+'\')">Ver</button> '+
+    (!p.inativo&&p.status==='rascunho'?'<button class="btn btn-sm" style="background:#fff7ed;color:#ea580c;border:1px solid #fed7aa" onclick="inativarPedido(\''+p.id+'\',\'sede\')">Inativar</button>':'')+
+    (p.inativo?'<button class="btn btn-sm" style="background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0" onclick="reativarPedido(\''+p.id+'\',\'sede\')">Reativar</button>':'')+
+    '</td></tr>';
+  }).join('')||'<tr><td colspan="7" style="text-align:center;padding:32px;color:#94a3b8">'+(mostrarInativosSede?'Nenhum pedido inativo.':'Nenhum pedido encontrado.')+'</td></tr>';
   document.getElementById('view-sede-pedidos').innerHTML=
-  '<div class="page-hdr"><h1>Todos os Pedidos</h1></div>'+
-  '<div class="filter-tabs">'+tabsHtml+'</div>'+
+  '<div class="page-hdr"><div><h1>Todos os Pedidos</h1><p>Acompanhe todos os pedidos das filiais.</p></div>'+
+  '<button class="btn btn-sm" style="font-size:12px;background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0" onclick="mostrarInativosSede=!mostrarInativosSede;renderSedePedidos()">'+(mostrarInativosSede?'← Ativos':'🗄 Inativos ('+(inativos.length)+')')+'</button>'+
+  '</div>'+
+  '<div style="margin-bottom:8px"><div class="filter-tabs">'+tabsHtml+'</div></div>'+
   '<div class="card"><div class="card-body" style="padding:0"><div class="tbl-wrap"><table><thead><tr><th>ID</th><th>Filial</th><th>Condomínio</th><th>Vagas</th><th>Status</th><th>Data</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div></div></div>';
 }
 
@@ -1166,19 +1190,26 @@ function aprovarPedido(id){
 
 function devolverPedido(id){
   openModal('Devolver Pedido',
-    '<div class="fg"><label>Motivo da devolução</label><textarea id="obsDevolver" rows="4" placeholder="Descreva o motivo..."></textarea></div>',
+    '<div class="fg"><label>Motivo da devolução <span style="color:#ef4444">*</span></label>'+
+    '<textarea id="obsDevolver" rows="4" placeholder="Descreva o motivo da devolução (obrigatório)..." style="border:2px solid #e2e8f0"></textarea>'+
+    '<div id="obsErr" style="color:#ef4444;font-size:12px;margin-top:4px;display:none">⚠️ Informe o motivo antes de devolver.</div></div>',
     '<button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>'+
     '<button class="btn btn-danger" onclick="confirmarDevolucao(\''+id+'\')">↩ Confirmar Devolução</button>'
   );
 }
 
 function confirmarDevolucao(id){
-  var obs=document.getElementById('obsDevolver').value||'Sem observações.';
+  var obs=(document.getElementById('obsDevolver').value||'').trim();
+  if(!obs){
+    document.getElementById('obsErr').style.display='block';
+    document.getElementById('obsDevolver').style.borderColor='#ef4444';
+    return;
+  }
   var p=DB.getPedido(id);
   p.log.push({status:'rascunho',data:hoje(),user:USER.nome,obs:obs});
   DB.updatePedido(id,{status:'rascunho',obs:obs,log:p.log});
   closeModal();buildSidebar();showToast('Pedido devolvido à filial.','');
-  renderAprovacoes();
+  if(location.hash==='#sede-aprovacoes')renderAprovacoes();else renderView_sedePedido();
 }
 
 // ════════════════════════════════════════════
@@ -1209,7 +1240,7 @@ function renderView_sedePedido(){
   var nextStatus=STATUS_NEXT[p.status];
   var statusSection='';
   if(p.status==='aguardando'){
-    statusSection='<div class="apv-box apv-pending" style="margin-top:16px"><strong>⏳ Aguardando aprovação</strong><div style="display:flex;gap:8px;margin-top:10px"><button class="btn btn-approve" onclick="aprovarPedido(\''+p.id+'\');renderView_sedePedido()">✅ Aprovar e Iniciar Fabricação</button><button class="btn btn-danger" onclick="devolverPedido(\''+p.id+'\')">↩ Devolver</button></div></div>';
+    statusSection='<div class="apv-box apv-pending" style="margin-top:16px"><strong>⏳ Aguardando aprovação</strong><div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap"><button class="btn btn-approve" onclick="aprovarPedido(\''+p.id+'\');renderView_sedePedido()">✅ Aprovar e Iniciar Fabricação</button><button class="btn btn-danger" onclick="devolverPedido(\''+p.id+'\')">↩ Devolver</button><button class="btn btn-outline" onclick="editarPedidoNaAprovacao(\''+p.id+'\')">✏️ Editar Pedido</button></div></div>';
   } else if(nextStatus){
     statusSection='<div class="apv-box apv-info" style="margin-top:16px"><strong>Avançar Status</strong><p style="font-size:12px;color:#64748b;margin:4px 0 10px">Próximo: '+badge(nextStatus)+'</p><button class="btn btn-primary btn-sm" onclick="avancarStatus(\''+p.id+'\',\''+nextStatus+'\')">Atualizar → '+STATUS_LABELS[nextStatus]+'</button></div>';
   }
@@ -1255,12 +1286,74 @@ function renderView_sedePedido(){
   '</div>';
 }
 
+function editarPedidoNaAprovacao(id){
+  var p=DB.getPedido(id);
+  if(!p)return;
+  var itensHtml=(p.itens||[]).map(function(it,i){
+    return'<tr>'+
+      '<td><input style="width:100%;padding:4px 6px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;font-family:Poppins,sans-serif" id="ei_desc_'+i+'" value="'+esc(it.desc)+'"></td>'+
+      '<td><input style="width:68px;padding:4px 6px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;text-align:center;font-family:Poppins,sans-serif" id="ei_ma_'+i+'" value="'+esc(it.ma||'')+'"></td>'+
+      '<td><input style="width:68px;padding:4px 6px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;text-align:center;font-family:Poppins,sans-serif" id="ei_mb_'+i+'" value="'+esc(it.mb||'')+'"></td>'+
+      '<td><input style="width:68px;padding:4px 6px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;text-align:center;font-family:Poppins,sans-serif" id="ei_mc_'+i+'" value="'+esc(it.mc||'')+'"></td>'+
+      '<td><input style="width:48px;padding:4px 6px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;text-align:center;font-family:Poppins,sans-serif" id="ei_un_'+i+'" value="'+esc(it.un||'')+'"></td>'+
+      '<td><input type="number" min="0" style="width:58px;padding:4px 6px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;text-align:center;font-family:Poppins,sans-serif" id="ei_qtd_'+i+'" value="'+(it.qtd||0)+'"></td>'+
+    '</tr>';
+  }).join('');
+  var n=(p.itens||[]).length;
+  openModal('Editar Pedido — '+esc(p.cliente),
+    '<div style="overflow-x:auto;max-height:55vh;overflow-y:auto">'+
+    '<table style="width:100%;font-size:12px;border-collapse:collapse">'+
+    '<thead><tr style="background:#f8fafc"><th style="padding:6px 8px;text-align:left;font-size:11px;color:#64748b;border-bottom:1px solid #e2e8f0">Descrição</th><th style="padding:6px 8px;font-size:11px;color:#64748b;border-bottom:1px solid #e2e8f0">Med.A</th><th style="padding:6px 8px;font-size:11px;color:#64748b;border-bottom:1px solid #e2e8f0">Med.B</th><th style="padding:6px 8px;font-size:11px;color:#64748b;border-bottom:1px solid #e2e8f0">Med.C</th><th style="padding:6px 8px;font-size:11px;color:#64748b;border-bottom:1px solid #e2e8f0">Un.</th><th style="padding:6px 8px;font-size:11px;color:#64748b;border-bottom:1px solid #e2e8f0">Qtde</th></tr></thead>'+
+    '<tbody>'+itensHtml+'</tbody></table></div>'+
+    '<p style="font-size:11px;color:#64748b;margin-top:10px">ℹ️ O pedido mantém status "Aguardando" após edição — você pode então Aprovar ou Devolver.</p>',
+    '<button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>'+
+    '<button class="btn btn-primary" onclick="salvarEdicaoAprovacao(\''+id+'\','+n+')">💾 Salvar Alterações</button>'
+  );
+}
+
+function salvarEdicaoAprovacao(id,n){
+  var p=DB.getPedido(id);
+  if(!p)return;
+  var novosItens=[];
+  for(var i=0;i<n;i++){
+    var desc=document.getElementById('ei_desc_'+i);
+    var qtd=document.getElementById('ei_qtd_'+i);
+    if(!desc||!qtd)continue;
+    novosItens.push({
+      desc:desc.value.trim(),
+      ma:(document.getElementById('ei_ma_'+i)||{}).value||'',
+      mb:(document.getElementById('ei_mb_'+i)||{}).value||'',
+      mc:(document.getElementById('ei_mc_'+i)||{}).value||'',
+      un:(document.getElementById('ei_un_'+i)||{}).value||'',
+      qtd:parseInt(qtd.value)||0
+    });
+  }
+  p.log.push({status:'aguardando',data:hoje(),user:USER.nome,obs:'Editado pela Sede antes da aprovação'});
+  DB.updatePedido(id,{itens:novosItens,log:p.log});
+  closeModal();
+  showToast('Pedido atualizado. Pronto para aprovar ou devolver.','success');
+  renderView_sedePedido();
+}
+
 function avancarStatus(id,novoStatus){
   var p=DB.getPedido(id);
   p.log.push({status:novoStatus,data:hoje(),user:USER.nome});
   DB.updatePedido(id,{status:novoStatus,log:p.log});
   buildSidebar();showToast('Status atualizado: '+STATUS_LABELS[novoStatus],'success');
   renderView_sedePedido();
+}
+
+function inativarPedido(id,role){
+  if(!confirm('Inativar este pedido? Ele ficará na área de inativos e poderá ser reativado.'))return;
+  DB.updatePedido(id,{inativo:true});
+  showToast('Pedido inativado.','');
+  if(role==='filial')renderMeusPedidos();else renderSedePedidos();
+}
+
+function reativarPedido(id,role){
+  DB.updatePedido(id,{inativo:false});
+  showToast('Pedido reativado.','success');
+  if(role==='filial')renderMeusPedidos();else renderSedePedidos();
 }
 
 // ════════════════════════════════════════════
@@ -1425,7 +1518,8 @@ function renderCatalogo(role){
       var precoCell=editable
         ? '<input type="number" class="preco-input" data-id="'+c.id+'" value="'+c.preco.toFixed(2)+'" min="0" step="0.01" onchange="salvarPreco(\''+c.id+'\',this.value)" style="width:110px;padding:5px 8px;border:2px solid #e2e8f0;border-radius:6px;font-size:13px;text-align:right;font-family:Poppins,sans-serif">'
         : '<strong>'+fmtMoeda(c.preco)+'</strong>';
-      return '<tr><td>'+esc(c.desc)+'</td><td style="text-align:center;color:#64748b">'+c.un+'</td><td style="text-align:right">'+precoCell+'</td></tr>';
+      var editBtn=editable?'<button class="btn btn-sm" style="padding:2px 8px;background:none;border:1px solid #e2e8f0;color:#64748b;font-size:11px;margin-left:6px" onclick="editarItemCatalogo(\''+c.id+'\')">✏️</button>':'';
+      return '<tr><td>'+esc(c.desc)+editBtn+'</td><td style="text-align:center;color:#64748b">'+c.un+'</td><td style="text-align:right">'+precoCell+'</td></tr>';
     }).join('');
     return '<div class="card" style="margin-bottom:14px">'+
       '<div class="card-hdr"><h2>'+catNome+'</h2></div>'+
@@ -1476,6 +1570,41 @@ function salvarFrete(filialId,val){
   var fils=DB.filiais().map(function(f){return f.id===filialId?Object.assign({},f,{frete:v}):f;});
   DB.saveFiliais(fils);
   showToast('Frete atualizado.','success');
+}
+
+function editarItemCatalogo(id){
+  var cat=DB.catalogo();
+  var c=cat.find(function(x){return x.id===id;});
+  if(!c)return;
+  var cats=cat.map(function(x){return x.cat;}).filter(function(v,i,a){return a.indexOf(v)===i;});
+  var catOpts=cats.map(function(ct){return'<option'+(ct===c.cat?' selected':'')+'>'+esc(ct)+'</option>';}).join('');
+  openModal('Editar Item — '+esc(c.desc),
+    '<div class="form-grid">'+
+    '<div class="fg" style="grid-column:1/-1"><label>Descrição *</label><input id="ec_desc" value="'+esc(c.desc)+'"></div>'+
+    '<div class="fg"><label>Unidade</label><input id="ec_un" value="'+esc(c.un)+'"></div>'+
+    '<div class="fg"><label>Preço Unit. (R$)</label><input type="number" id="ec_preco" min="0" step="0.01" value="'+c.preco.toFixed(2)+'"></div>'+
+    '<div class="fg" style="grid-column:1/-1"><label>Categoria</label><input id="ec_cat" list="ec_cat_list" value="'+esc(c.cat)+'"><datalist id="ec_cat_list">'+catOpts+'</datalist></div>'+
+    '</div>',
+    '<button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>'+
+    '<button class="btn btn-primary" onclick="salvarEdicaoItemCatalogo(\''+id+'\')">Salvar Alterações</button>'
+  );
+}
+
+function salvarEdicaoItemCatalogo(id){
+  var desc=(document.getElementById('ec_desc').value||'').trim();
+  if(!desc){showToast('Informe a descrição.','error');return;}
+  var cat=DB.catalogo().map(function(c){
+    if(c.id!==id)return c;
+    return Object.assign({},c,{
+      desc:desc,
+      un:(document.getElementById('ec_un').value||'').trim(),
+      preco:parseFloat(document.getElementById('ec_preco').value)||0,
+      cat:(document.getElementById('ec_cat').value||'').trim()||c.cat
+    });
+  });
+  DB.saveCatalogo(cat);
+  closeModal();showToast('Item atualizado.','success');
+  renderCatalogo('sede');
 }
 
 // ════════════════════════════════════════════
