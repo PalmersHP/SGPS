@@ -1152,8 +1152,9 @@ function renderSedePedidos(){
     return'<tr style="opacity:'+(p.inativo?.6:1)+'"><td style="color:#94a3b8;font-size:11px">#'+p.id+'</td><td><strong>'+p.filial_nome+'</strong></td><td>'+p.cliente+'</td><td>'+p.vagas+'</td><td>'+badge(p.inativo?'inativo':p.status)+'</td><td>'+fmtDate(p.criado)+'</td>'+
     '<td style="white-space:nowrap">'+
     '<button class="btn btn-sm btn-outline" onclick="verPedidoSede(\''+p.id+'\')">Ver</button> '+
-    (!p.inativo&&p.status==='rascunho'?'<button class="btn btn-sm" style="background:#fff7ed;color:#ea580c;border:1px solid #fed7aa" onclick="inativarPedido(\''+p.id+'\',\'sede\')">Inativar</button>':'')+
-    (p.inativo?'<button class="btn btn-sm" style="background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0" onclick="reativarPedido(\''+p.id+'\',\'sede\')">Reativar</button>':'')+
+    (!p.inativo&&p.status==='rascunho'?'<button class="btn btn-sm" style="background:#fff7ed;color:#ea580c;border:1px solid #fed7aa" onclick="inativarPedido(\''+p.id+'\',\'sede\')">Inativar</button> ':'')+
+    (p.inativo?'<button class="btn btn-sm" style="background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0" onclick="reativarPedido(\''+p.id+'\',\'sede\')">Reativar</button> ':'')+
+    '<button class="btn btn-sm" style="background:#fef2f2;border:1px solid #fecaca;color:#dc2626" onclick="excluirPedido(\''+p.id+'\',\''+esc(p.cliente)+'\')">🗑️</button>'+
     '</td></tr>';
   }).join('')||'<tr><td colspan="7" style="text-align:center;padding:32px;color:#94a3b8">'+(mostrarInativosSede?'Nenhum pedido inativo.':'Nenhum pedido encontrado.')+'</td></tr>';
   document.getElementById('view-sede-pedidos').innerHTML=
@@ -1252,7 +1253,10 @@ function renderView_sedePedido(){
   document.getElementById('view-sede-pedido').innerHTML=
   '<div class="page-hdr">'+
     '<div><button class="btn btn-ghost btn-sm" onclick="history.back()" style="margin-bottom:8px">← Voltar</button><h1>'+p.cliente+'</h1><p>'+p.filial_nome+' • Pedido #'+p.id+' • '+fmtDate(p.criado)+'</p></div>'+
-    '<button class="btn btn-outline" onclick="imprimirPedido(\''+p.id+'\')">📄 Gerar Ordem de Serviço (PDF)</button>'+
+    '<div style="display:flex;gap:8px">'+
+      '<button class="btn btn-outline" onclick="imprimirPedido(\''+p.id+'\')">📄 Gerar Ordem de Serviço (PDF)</button>'+
+      '<button class="btn btn-sm" style="background:#fef2f2;border:1px solid #fecaca;color:#dc2626;font-weight:600" onclick="excluirPedido(\''+p.id+'\',\''+esc(p.cliente)+'\')">🗑️ Excluir Pedido</button>'+
+    '</div>'+
   '</div>'+
   '<div style="display:grid;grid-template-columns:1fr 1.6fr;gap:20px;align-items:start">'+
     '<div>'+
@@ -1953,6 +1957,42 @@ function imprimirPedido(id){
     '</div>'+
   '</div>';
   window.print();
+}
+
+// ════════════════════════════════════════════
+// EXCLUIR PEDIDO (admin sede + senha)
+// ════════════════════════════════════════════
+function excluirPedido(id,cliente){
+  openModal('🗑️ Excluir Pedido',
+    '<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:14px 16px;margin-bottom:16px">'+
+    '<p style="font-weight:700;color:#dc2626;margin-bottom:4px">⚠️ Ação irreversível</p>'+
+    '<p style="font-size:13px;color:#7f1d1d">O pedido <strong>"'+esc(cliente)+'"</strong> será permanentemente excluído do sistema. Esta ação não pode ser desfeita.</p>'+
+    '</div>'+
+    '<div class="fg"><label>Confirme sua senha de administrador *</label>'+
+    '<input type="password" id="del_senha" placeholder="Digite sua senha..." autocomplete="off">'+
+    '<div id="del_err" style="color:#ef4444;font-size:12px;margin-top:4px;display:none">⚠️ Senha incorreta.</div></div>',
+    '<button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>'+
+    '<button class="btn btn-danger" onclick="confirmarExclusaoPedido(\''+id+'\')">Excluir definitivamente</button>'
+  );
+  setTimeout(function(){var el=document.getElementById('del_senha');if(el)el.focus();},100);
+}
+
+function confirmarExclusaoPedido(id){
+  var senha=(document.getElementById('del_senha').value||'');
+  var userDB=DB.usuarios().find(function(u){return u.id===USER.id;});
+  var senhaCorreta=userDB?userDB.senha:'';
+  if(!senha||senha!==senhaCorreta){
+    document.getElementById('del_err').style.display='block';
+    document.getElementById('del_senha').style.borderColor='#ef4444';
+    document.getElementById('del_senha').focus();
+    return;
+  }
+  DB.savePedidos(DB.pedidos().filter(function(p){return p.id!==id;}));
+  closeModal();
+  buildSidebar();
+  showToast('Pedido excluído definitivamente.','');
+  location.hash='sede-pedidos';
+  renderSedePedidos();
 }
 
 // ════════════════════════════════════════════
