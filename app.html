@@ -1518,13 +1518,26 @@ function renderCatalogo(role){
       var precoCell=editable
         ? '<input type="number" class="preco-input" data-id="'+c.id+'" value="'+c.preco.toFixed(2)+'" min="0" step="0.01" onchange="salvarPreco(\''+c.id+'\',this.value)" style="width:110px;padding:5px 8px;border:2px solid #e2e8f0;border-radius:6px;font-size:13px;text-align:right;font-family:Poppins,sans-serif">'
         : '<strong>'+fmtMoeda(c.preco)+'</strong>';
-      var editBtn=editable?'<button class="btn btn-sm" style="padding:2px 8px;background:none;border:1px solid #e2e8f0;color:#64748b;font-size:11px;margin-left:6px" onclick="editarItemCatalogo(\''+c.id+'\')">✏️</button>':'';
-      return '<tr><td>'+esc(c.desc)+editBtn+'</td><td style="text-align:center;color:#64748b">'+c.un+'</td><td style="text-align:right">'+precoCell+'</td></tr>';
+      var acoes=editable
+        ?'<td style="text-align:right;white-space:nowrap">'+
+          '<button class="btn btn-sm" style="padding:2px 7px;background:none;border:1px solid #e2e8f0;color:#64748b;font-size:11px;margin-right:4px" onclick="editarItemCatalogo(\''+c.id+'\')">✏️</button>'+
+          '<button class="btn btn-sm" style="padding:2px 7px;background:#fef2f2;border:1px solid #fecaca;color:#dc2626;font-size:11px" onclick="excluirItemCatalogo(\''+c.id+'\',\''+esc(c.desc)+'\')">🗑️</button>'+
+          '</td>'
+        :'';
+      var colspan=editable?'':'';
+      return '<tr><td>'+esc(c.desc)+'</td><td style="text-align:center;color:#64748b">'+c.un+'</td><td style="text-align:right">'+precoCell+'</td>'+acoes+'</tr>';
     }).join('');
+    var thAcoes=editable?'<th style="width:90px"></th>':'';
+    var hdrBtns=editable
+      ?'<div style="display:flex;gap:6px">'+
+        '<button class="btn btn-sm" style="font-size:11px;background:#f8fafc;border:1px solid #e2e8f0;color:#64748b" onclick="editarCategoria(\''+esc(catNome)+'\')">✏️ Renomear</button>'+
+        '<button class="btn btn-sm btn-primary" style="font-size:11px" onclick="novoItemCategoria(\''+esc(catNome)+'\')">＋ Item</button>'+
+        '</div>'
+      :'';
     return '<div class="card" style="margin-bottom:14px">'+
-      '<div class="card-hdr"><h2>'+catNome+'</h2></div>'+
+      '<div class="card-hdr"><h2>'+esc(catNome)+'</h2>'+hdrBtns+'</div>'+
       '<div class="card-body" style="padding:0"><div class="tbl-wrap">'+
-      '<table><thead><tr><th>Peça / Produto</th><th style="text-align:center;width:80px">Unid.</th><th style="text-align:right;width:140px">Preço Unit. (R$)</th></tr></thead>'+
+      '<table><thead><tr><th>Peça / Produto</th><th style="text-align:center;width:80px">Unid.</th><th style="text-align:right;width:140px">Preço Unit. (R$)</th>'+thAcoes+'</tr></thead>'+
       '<tbody>'+rows+'</tbody></table></div></div></div>';
   }).join('');
 
@@ -1552,8 +1565,12 @@ function renderCatalogo(role){
 
   document.getElementById(viewId).innerHTML=
     '<div class="page-hdr"><div><h1>'+titulo+'</h1><p>'+sub+'</p></div>'+
-    (editable?'<div style="display:flex;align-items:center;gap:8px;padding:8px 14px;background:#f0fae0;border:1px solid #c6e870;border-radius:8px;font-size:12px;color:#6FAE2E"><strong>✏️ Modo Edição</strong> — clique nos valores para alterar</div>':
-    '<div style="display:flex;align-items:center;gap:8px;padding:8px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;font-size:12px;color:#64748b">🔒 Somente visualização</div>')+
+    (editable
+      ?'<div style="display:flex;gap:10px;align-items:center">'+
+        '<div style="display:flex;align-items:center;gap:8px;padding:8px 14px;background:#f0fae0;border:1px solid #c6e870;border-radius:8px;font-size:12px;color:#6FAE2E"><strong>✏️ Modo Edição</strong></div>'+
+        '<button class="btn btn-primary" onclick="novaCategoria()">＋ Nova Categoria</button>'+
+        '</div>'
+      :'<div style="display:flex;align-items:center;gap:8px;padding:8px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;font-size:12px;color:#64748b">🔒 Somente visualização</div>')+
     '</div>'+
     tabelas+freteSection;
 }
@@ -1604,6 +1621,87 @@ function salvarEdicaoItemCatalogo(id){
   });
   DB.saveCatalogo(cat);
   closeModal();showToast('Item atualizado.','success');
+  renderCatalogo('sede');
+}
+
+function excluirItemCatalogo(id,desc){
+  if(!confirm('Excluir "'+desc+'" do catálogo?'))return;
+  DB.saveCatalogo(DB.catalogo().filter(function(c){return c.id!==id;}));
+  showToast('Item excluído.','success');
+  renderCatalogo('sede');
+}
+
+function novoItemCategoria(catNome){
+  var cat=DB.catalogo();
+  var cats=cat.map(function(x){return x.cat;}).filter(function(v,i,a){return a.indexOf(v)===i;});
+  var catOpts=cats.map(function(ct){return'<option'+(ct===catNome?' selected':'')+'>'+esc(ct)+'</option>';}).join('');
+  openModal('Novo Item — '+esc(catNome),
+    '<div class="form-grid">'+
+    '<div class="fg" style="grid-column:1/-1"><label>Descrição *</label><input id="ni_desc" placeholder="Ex: PILAR SOMBRITE 5VG"></div>'+
+    '<div class="fg"><label>Unidade *</label><input id="ni_un" placeholder="PÇ, UNID, M²..." value="PÇ"></div>'+
+    '<div class="fg"><label>Preço Unit. (R$)</label><input type="number" id="ni_preco" min="0" step="0.01" value="0.00"></div>'+
+    '<div class="fg" style="grid-column:1/-1"><label>Categoria</label><input id="ni_cat" list="ni_cat_list" value="'+esc(catNome)+'"><datalist id="ni_cat_list">'+catOpts+'</datalist></div>'+
+    '</div>',
+    '<button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>'+
+    '<button class="btn btn-primary" onclick="salvarNovoItemCatalogo()">Adicionar Item</button>'
+  );
+}
+
+function salvarNovoItemCatalogo(){
+  var desc=(document.getElementById('ni_desc').value||'').trim();
+  if(!desc){showToast('Informe a descrição.','error');return;}
+  var un=(document.getElementById('ni_un').value||'').trim()||'PÇ';
+  var preco=parseFloat(document.getElementById('ni_preco').value)||0;
+  var catVal=(document.getElementById('ni_cat').value||'').trim();
+  if(!catVal){showToast('Informe a categoria.','error');return;}
+  var cat=DB.catalogo();
+  cat.push({id:'c'+Date.now(),desc:desc,un:un,preco:preco,cat:catVal});
+  DB.saveCatalogo(cat);
+  closeModal();showToast('Item adicionado.','success');
+  renderCatalogo('sede');
+}
+
+function novaCategoria(){
+  openModal('Nova Categoria',
+    '<div class="form-grid">'+
+    '<div class="fg" style="grid-column:1/-1"><label>Nome da Categoria *</label><input id="nc_nome" placeholder="Ex: Parafusos, Tintas, Acessórios..."></div>'+
+    '<div class="fg" style="grid-column:1/-1"><p style="font-size:12px;color:#64748b;margin-top:-4px">Após criar a categoria, você pode adicionar itens nela pelo botão "+ Item".</p></div>'+
+    '</div>',
+    '<button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>'+
+    '<button class="btn btn-primary" onclick="salvarNovaCategoria()">Criar e Adicionar Primeiro Item</button>'
+  );
+}
+
+function salvarNovaCategoria(){
+  var nome=(document.getElementById('nc_nome').value||'').trim();
+  if(!nome){showToast('Informe o nome da categoria.','error');return;}
+  var cat=DB.catalogo();
+  var existe=cat.find(function(c){return c.cat.toLowerCase()===nome.toLowerCase();});
+  if(existe){showToast('Categoria já existe.','error');return;}
+  closeModal();
+  novoItemCategoria(nome);
+}
+
+function editarCategoria(catNome){
+  openModal('Renomear Categoria',
+    '<div class="form-grid">'+
+    '<div class="fg" style="grid-column:1/-1"><label>Nome atual</label><input disabled value="'+esc(catNome)+'" style="background:#f8fafc;color:#94a3b8"></div>'+
+    '<div class="fg" style="grid-column:1/-1"><label>Novo nome *</label><input id="ren_nome" value="'+esc(catNome)+'"></div>'+
+    '</div>',
+    '<button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>'+
+    '<button class="btn btn-primary" onclick="salvarEdicaoCategoria(\''+esc(catNome)+'\')">Salvar Nome</button>'
+  );
+}
+
+function salvarEdicaoCategoria(catNomeAtual){
+  var novo=(document.getElementById('ren_nome').value||'').trim();
+  if(!novo){showToast('Informe o novo nome.','error');return;}
+  if(novo===catNomeAtual){closeModal();return;}
+  var cat=DB.catalogo().map(function(c){
+    return c.cat===catNomeAtual?Object.assign({},c,{cat:novo}):c;
+  });
+  DB.saveCatalogo(cat);
+  closeModal();showToast('Categoria renomeada para "'+novo+'".','success');
   renderCatalogo('sede');
 }
 
