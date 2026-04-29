@@ -1863,40 +1863,157 @@ function excluirUsuario(id,nome){
 // VIEW: RELATÓRIOS
 // ════════════════════════════════════════════
 function renderRelatorios(role){
-  var peds=DB.pedidos();
-  if(role==='filial')peds=peds.filter(function(p){return p.filial_id===USER.filial_id;});
+  var todosRaw=DB.pedidos().filter(function(p){return !p.inativo;});
+  var peds=role==='filial'?todosRaw.filter(function(p){return p.filial_id===USER.filial_id;}):todosRaw;
+  var filiais=DB.filiais();
+
+  function valorPedido(p){
+    var filObj=filiais.find(function(f){return f.id===p.filial_id;})||{};
+    return calcTotalPedido(p.itens||[],filObj.frete||0).total;
+  }
+
+  var entregues=peds.filter(function(p){return p.status==='entregue'||p.status==='concluido';});
+  var pipeline=peds.filter(function(p){return['aprovado','em_fabricacao','pronto_envio','em_transito'].indexOf(p.status)>=0;});
+  var emAprov=peds.filter(function(p){return p.status==='aguardando';});
+
+  var totalFaturado=entregues.reduce(function(s,p){return s+valorPedido(p);},0);
+  var totalPipeline=pipeline.reduce(function(s,p){return s+valorPedido(p);},0);
+  var totalAprov=emAprov.reduce(function(s,p){return s+valorPedido(p);},0);
+  var ticketMedio=entregues.length?totalFaturado/entregues.length:0;
+
   var totalVagas=peds.reduce(function(s,p){return s+p.vagas;},0);
   var totalPeds=peds.length;
-  var entregues=peds.filter(function(p){return p.status==='entregue';});
   var mediaVagas=totalPeds?Math.round(totalVagas/totalPeds):0;
+
+  var anoAtual=new Date().getFullYear();
+  var mesesNomes=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  var receitaMes=mesesNomes.map(function(_,i){
+    return entregues.filter(function(p){
+      var d=p.criado?new Date(p.criado):null;
+      return d&&d.getFullYear()===anoAtual&&d.getMonth()===i;
+    }).reduce(function(s,p){return s+valorPedido(p);},0);
+  });
+
+  var rankFiliais=role==='sede'?filiais.map(function(f){
+    var fps=peds.filter(function(p){return p.filial_id===f.id;});
+    var ent=fps.filter(function(p){return p.status==='entregue'||p.status==='concluido';});
+    var val=ent.reduce(function(s,p){return s+valorPedido(p);},0);
+    return{nome:f.nome,cidade:f.cidade,pedidos:fps.length,vagas:fps.reduce(function(s,p){return s+p.vagas;},0),valor:val};
+  }).sort(function(a,b){return b.valor-a.valor;}):[];
+
   var vidId='view-'+(role==='sede'?'sede':'filial')+'-relatorios';
 
+  var rankRows=rankFiliais.map(function(f,i){
+    var pct=totalFaturado?((f.valor/totalFaturado)*100).toFixed(1):'0.0';
+    return'<tr>'+
+      '<td><span style="font-size:11px;font-weight:700;color:#94a3b8;margin-right:6px">#'+(i+1)+'</span><strong>'+esc(f.nome)+'</strong></td>'+
+      '<td style="color:#64748b">'+esc(f.cidade)+'</td>'+
+      '<td style="text-align:center">'+f.pedidos+'</td>'+
+      '<td style="text-align:center">'+f.vagas+'</td>'+
+      '<td style="text-align:right;font-weight:700;color:var(--verde-d)">'+fmtMoeda(f.valor)+'</td>'+
+      '<td style="text-align:right">'+
+        '<div style="display:flex;align-items:center;gap:8px;justify-content:flex-end">'+
+        '<div style="width:80px;height:6px;background:#f1f5f9;border-radius:4px;overflow:hidden"><div style="height:100%;background:var(--verde);border-radius:4px;width:'+pct+'%"></div></div>'+
+        '<span style="font-size:12px;color:#64748b;min-width:36px">'+pct+'%</span>'+
+        '</div>'+
+      '</td>'+
+    '</tr>';
+  }).join('');
+
+  var histRows=peds.slice(0,50).map(function(p){
+    var val=valorPedido(p);
+    return'<tr>'+
+      '<td style="font-size:11px;color:#94a3b8">'+fmtDate(p.criado).substring(3)+'</td>'+
+      (role==='sede'?'<td><strong>'+esc(p.filial_nome)+'</strong></td>':'')+
+      '<td>'+esc(p.cliente)+'</td>'+
+      '<td style="text-align:center">'+p.vagas+'</td>'+
+      '<td>'+badge(p.status)+'</td>'+
+      '<td style="text-align:right;font-weight:'+(val>0?'700':'400')+';color:'+(val>0?'var(--verde-d)':'#94a3b8')+'">'+
+        (val>0?fmtMoeda(val):'—')+
+      '</td>'+
+    '</tr>';
+  }).join('');
+
   document.getElementById(vidId).innerHTML=
-  '<div class="page-hdr"><div><h1>Relatórios</h1><p>Análise de desempenho e volumes de pedidos.</p></div></div>'+
-  '<div class="kpi-grid">'+
-    '<div class="kpi" data-icon="🏗️"><div class="kpi-label">Total de Vagas no Ano</div><div class="kpi-val">'+totalVagas+'</div><div class="kpi-sub">todos os pedidos</div></div>'+
-    '<div class="kpi" data-icon="📋"><div class="kpi-label">Total de Pedidos</div><div class="kpi-val">'+totalPeds+'</div><div class="kpi-sub">no período</div></div>'+
-    '<div class="kpi" data-icon="📊"><div class="kpi-label">Média Vagas / Pedido</div><div class="kpi-val">'+mediaVagas+'</div><div class="kpi-sub">média histórica</div></div>'+
-    '<div class="kpi" style="border-top-color:#16a34a" data-icon="✅"><div class="kpi-label">Pedidos Entregues</div><div class="kpi-val">'+entregues.length+'</div><div class="kpi-sub">ciclos encerrados</div></div>'+
+  '<div class="page-hdr"><div><h1>Relatórios</h1><p>Análise financeira e operacional dos pedidos.</p></div></div>'+
+
+  '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">'+
+    '<div style="width:3px;height:18px;background:var(--verde);border-radius:2px"></div>'+
+    '<span style="font-size:13px;font-weight:700;color:#1e293b">Financeiro</span>'+
   '</div>'+
-  '<div style="display:grid;grid-template-columns:1.3fr 1fr;gap:20px;margin-bottom:20px">'+
-    '<div class="card"><div class="card-hdr"><h2>Vagas por Mês — 2026</h2></div><div class="card-body"><div class="chart-wrap"><canvas id="chartRelMes"></canvas></div></div></div>'+
-    '<div class="card"><div class="card-hdr"><h2>Sombrite vs Telha</h2></div><div class="card-body"><div class="chart-wrap"><canvas id="chartRelTipo"></canvas></div></div></div>'+
+  '<div class="kpi-grid" style="margin-bottom:24px">'+
+    '<div class="kpi" style="border-top-color:#16a34a" data-icon="💰"><div class="kpi-label">Total Faturado</div><div class="kpi-val" style="font-size:20px">'+fmtMoeda(totalFaturado)+'</div><div class="kpi-sub">pedidos entregues / concluídos</div></div>'+
+    '<div class="kpi" style="border-top-color:#2563eb" data-icon="⚙️"><div class="kpi-label">Pipeline — A Faturar</div><div class="kpi-val" style="font-size:20px">'+fmtMoeda(totalPipeline)+'</div><div class="kpi-sub">em produção ou transporte</div></div>'+
+    '<div class="kpi" style="border-top-color:#d97706" data-icon="⏳"><div class="kpi-label">Em Aprovação</div><div class="kpi-val" style="font-size:20px">'+fmtMoeda(totalAprov)+'</div><div class="kpi-sub">aguardando revisão da sede</div></div>'+
+    '<div class="kpi" style="border-top-color:#7c3aed" data-icon="🎯"><div class="kpi-label">Ticket Médio</div><div class="kpi-val" style="font-size:20px">'+fmtMoeda(ticketMedio)+'</div><div class="kpi-sub">por pedido entregue</div></div>'+
   '</div>'+
-  '<div class="card"><div class="card-hdr"><h2>Histórico de Pedidos</h2></div><div class="card-body" style="padding:0">'+
+
+  '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">'+
+    '<div style="width:3px;height:18px;background:#60a5fa;border-radius:2px"></div>'+
+    '<span style="font-size:13px;font-weight:700;color:#1e293b">Operacional</span>'+
+  '</div>'+
+  '<div class="kpi-grid" style="margin-bottom:24px">'+
+    '<div class="kpi" data-icon="🏗️"><div class="kpi-label">Total de Vagas</div><div class="kpi-val">'+totalVagas+'</div><div class="kpi-sub">todos os pedidos ativos</div></div>'+
+    '<div class="kpi" data-icon="📋"><div class="kpi-label">Total de Pedidos</div><div class="kpi-val">'+totalPeds+'</div><div class="kpi-sub">no sistema</div></div>'+
+    '<div class="kpi" data-icon="📊"><div class="kpi-label">Média de Vagas</div><div class="kpi-val">'+mediaVagas+'</div><div class="kpi-sub">por pedido</div></div>'+
+    '<div class="kpi" style="border-top-color:#16a34a" data-icon="✅"><div class="kpi-label">Pedidos Encerrados</div><div class="kpi-val">'+entregues.length+'</div><div class="kpi-sub">entregues + concluídos</div></div>'+
+  '</div>'+
+
+  '<div style="display:grid;grid-template-columns:'+(role==='sede'?'1.5fr 1fr':'1fr')+';gap:20px;margin-bottom:20px">'+
+    '<div class="card"><div class="card-hdr"><h2>Receita Faturada — '+anoAtual+'</h2><span style="font-size:12px;color:#64748b">pedidos entregues e concluídos</span></div><div class="card-body"><div class="chart-wrap"><canvas id="chartFinMes"></canvas></div></div></div>'+
+    (role==='sede'?'<div class="card"><div class="card-hdr"><h2>Receita por Filial</h2></div><div class="card-body"><div class="chart-wrap"><canvas id="chartFinFilial"></canvas></div></div></div>':'')+
+  '</div>'+
+
+  (role==='sede'?
+    '<div class="card" style="margin-bottom:20px"><div class="card-hdr"><h2>🏆 Ranking de Filiais</h2><span style="font-size:12px;color:#64748b">por receita gerada</span></div>'+
+    '<div class="card-body" style="padding:0"><div class="tbl-wrap"><table><thead><tr><th>Filial</th><th>Cidade</th><th style="text-align:center">Pedidos</th><th style="text-align:center">Vagas</th><th style="text-align:right">Faturado</th><th style="text-align:right">% do Total</th></tr></thead><tbody>'+
+    (rankRows||'<tr><td colspan="6" style="text-align:center;padding:24px;color:#94a3b8">Nenhum pedido entregue ainda.</td></tr>')+
+    '</tbody></table></div></div></div>':'')+
+
+  '<div class="card"><div class="card-hdr"><h2>Histórico de Pedidos</h2><span style="font-size:12px;color:#64748b">últimos 50</span></div><div class="card-body" style="padding:0">'+
   '<div class="tbl-wrap"><table><thead><tr><th>Mês</th>'+(role==='sede'?'<th>Filial</th>':'')+
-  '<th>Condomínio</th><th>Vagas</th><th>Tipo</th><th>Status</th></tr></thead><tbody>'+
-  peds.map(function(p){return'<tr><td>'+fmtDate(p.criado).substring(3)+'</td>'+(role==='sede'?'<td>'+p.filial_nome+'</td>':'')+'<td>'+p.cliente+'</td><td>'+p.vagas+'</td><td>'+p.tipo+'</td><td>'+badge(p.status)+'</td></tr>';}).join('')+
+  '<th>Condomínio</th><th style="text-align:center">Vagas</th><th>Status</th><th style="text-align:right">Valor</th></tr></thead><tbody>'+
+  (histRows||'<tr><td colspan="'+(role==='sede'?6:5)+'" style="text-align:center;padding:32px;color:#94a3b8">Nenhum pedido encontrado.</td></tr>')+
   '</tbody></table></div></div></div>';
 
   setTimeout(function(){
-    var mes=document.getElementById('chartRelMes');
-    if(mes){new Chart(mes,{type:'bar',data:{labels:['Jan','Fev','Mar','Abr','Mai','Jun'],datasets:[{label:'Vagas',data:[120,150,200,80,0,0],backgroundColor:'rgba(154,205,50,.75)',borderColor:'#9ACD32',borderRadius:6}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,grid:{color:'rgba(0,0,0,.04)'}},x:{grid:{display:false}}}}});}
-    var tipo=document.getElementById('chartRelTipo');
-    if(tipo){
-      var sombrite=peds.filter(function(p){return p.tipo==='Sombrite';}).length;
-      var telha=peds.filter(function(p){return p.tipo!=='Sombrite';}).length;
-      new Chart(tipo,{type:'doughnut',data:{labels:['Sombrite','Telha'],datasets:[{data:[sombrite||5,telha||1],backgroundColor:['#9ACD32','#60a5fa'],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}}}});
+    var chartMes=document.getElementById('chartFinMes');
+    if(chartMes){
+      new Chart(chartMes,{
+        type:'bar',
+        data:{
+          labels:mesesNomes,
+          datasets:[{label:'Receita',data:receitaMes,backgroundColor:'rgba(154,205,50,.75)',borderColor:'#9ACD32',borderRadius:6}]
+        },
+        options:{
+          responsive:true,maintainAspectRatio:false,
+          plugins:{legend:{display:false},tooltip:{callbacks:{label:function(ctx){return' '+fmtMoeda(ctx.parsed.y);}}}},
+          scales:{
+            y:{beginAtZero:true,grid:{color:'rgba(0,0,0,.04)'},ticks:{callback:function(v){return'R$'+(v>=1000?(v/1000).toFixed(0)+'k':v);}}},
+            x:{grid:{display:false}}
+          }
+        }
+      });
+    }
+    if(role==='sede'){
+      var chartFil=document.getElementById('chartFinFilial');
+      if(chartFil&&rankFiliais.length){
+        var cores=['#9ACD32','#60a5fa','#f59e0b','#ec4899','#8b5cf6','#14b8a6','#f97316','#ef4444'];
+        new Chart(chartFil,{
+          type:'doughnut',
+          data:{
+            labels:rankFiliais.map(function(f){return f.nome;}),
+            datasets:[{data:rankFiliais.map(function(f){return f.valor||0;}),backgroundColor:cores.slice(0,rankFiliais.length),borderWidth:2,borderColor:'#fff'}]
+          },
+          options:{
+            responsive:true,maintainAspectRatio:false,
+            plugins:{
+              legend:{position:'bottom',labels:{font:{size:11},padding:12}},
+              tooltip:{callbacks:{label:function(ctx){return' '+fmtMoeda(ctx.parsed);}}}
+            }
+          }
+        });
+      }
     }
   },100);
 }
