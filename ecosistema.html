@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Sombrear — Ecosistema</title>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root{
   --verde:#9ACD32;--verde-d:#6FAE2E;--verde-dark:#4a7a1e;
@@ -432,13 +431,60 @@ tbody tr:last-child td{border-bottom:none;}
 
 <script>
 // ════════════════════════════════════════════
-// SUPABASE
+// SUPABASE — fetch direto (sem SDK)
 // ════════════════════════════════════════════
-const { createClient } = supabase;
-const SUPA_URL = 'https://gwcgcvgowoqyhthdbear.supabase.co';
-const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd3Y2djdmdvd29xeWh0aGRiZWFyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyMjQ1NzUsImV4cCI6MjA5MTgwMDU3NX0.lBB4o9J6DPr5MNQUP9p2lCWzhUBBS7Hvu0JETmH7hjc';
-const sb  = createClient(SUPA_URL, SUPA_KEY);
-const sbR = createClient(SUPA_URL, SUPA_KEY); // cliente separado para criação de usuários
+var SUPA_URL  = 'https://gwcgcvgowoqyhthdbear.supabase.co';
+var SUPA_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd3Y2djdmdvd29xeWh0aGRiZWFyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyMjQ1NzUsImV4cCI6MjA5MTgwMDU3NX0.lBB4o9J6DPr5MNQUP9p2lCWzhUBBS7Hvu0JETmH7hjc';
+var SUPA_TOKEN = null;
+
+function _hdr(){
+  return { 'apikey':SUPA_ANON, 'Authorization':'Bearer '+(SUPA_TOKEN||SUPA_ANON), 'Content-Type':'application/json' };
+}
+async function supaAuth(email, password){
+  var r = await fetch(SUPA_URL+'/auth/v1/token?grant_type=password',{ method:'POST', headers:_hdr(), body:JSON.stringify({email,password}) });
+  var d = await r.json();
+  if(!r.ok) return { error: d.error_description||d.msg||'Credenciais inválidas' };
+  return { data: d };
+}
+async function supaSignUp(email, password){
+  var r = await fetch(SUPA_URL+'/auth/v1/signup',{ method:'POST', headers:_hdr(), body:JSON.stringify({email,password}) });
+  var d = await r.json();
+  if(!r.ok||d.error) return { error: d.error_description||d.error||'Erro ao criar conta' };
+  return { data: d };
+}
+async function supaSignOut(){
+  if(SUPA_TOKEN) fetch(SUPA_URL+'/auth/v1/logout',{ method:'POST', headers:_hdr() }).catch(()=>{});
+  SUPA_TOKEN = null;
+}
+async function supaUpdatePassword(password){
+  var r = await fetch(SUPA_URL+'/auth/v1/user',{ method:'PUT', headers:_hdr(), body:JSON.stringify({password}) });
+  var d = await r.json();
+  return r.ok ? { data:d } : { error:d.msg||d.message||'Erro ao alterar senha' };
+}
+async function supaGet(table, params, cols){
+  var url = SUPA_URL+'/rest/v1/'+table+'?select='+(cols||'*')+(params?'&'+params:'');
+  var r = await fetch(url,{ headers:_hdr() });
+  if(!r.ok){ var e=await r.json(); return { data:[], error:e }; }
+  return { data: await r.json() };
+}
+async function supaGetOne(table, params, cols){
+  var { data, error } = await supaGet(table, (params||'')+'&limit=1', cols);
+  return { data:(Array.isArray(data)&&data.length)?data[0]:null, error };
+}
+async function supaPost(table, body){
+  var r = await fetch(SUPA_URL+'/rest/v1/'+table,{ method:'POST', headers:Object.assign({},_hdr(),{'Prefer':'return=representation'}), body:JSON.stringify(body) });
+  if(!r.ok){ var e=await r.json(); return { error:e.message||JSON.stringify(e) }; }
+  var d = await r.json(); return { data:Array.isArray(d)?d[0]:d };
+}
+async function supaPatch(table, params, body){
+  var r = await fetch(SUPA_URL+'/rest/v1/'+table+'?'+params,{ method:'PATCH', headers:Object.assign({},_hdr(),{'Prefer':'return=minimal'}), body:JSON.stringify(body) });
+  if(!r.ok){ var e=await r.json(); return { error:e.message||JSON.stringify(e) }; }
+  return { data:true };
+}
+async function supaDelete(table, params){
+  var r = await fetch(SUPA_URL+'/rest/v1/'+table+'?'+params,{ method:'DELETE', headers:_hdr() });
+  return { ok:r.ok };
+}
 
 // ════════════════════════════════════════════
 // STATE
@@ -486,9 +532,10 @@ async function doLogin(){
   if(!email||!senha){ mostrarErroLogin('Preencha e-mail e senha.'); return; }
   btn.textContent = 'Entrando...'; btn.disabled = true;
   try {
-    var { data, error } = await sb.auth.signInWithPassword({ email, password:senha });
-    if(error){ mostrarErroLogin('E-mail ou senha incorretos. Verifique suas credenciais.'); return; }
-    await iniciarSessao(data.session, data.user);
+    var result = await supaAuth(email, senha);
+    if(result.error){ mostrarErroLogin(result.error); return; }
+    SUPA_TOKEN = result.data.access_token;
+    await iniciarSessao(result.data, result.data.user);
   } catch(e) {
     mostrarErroLogin('Erro de conexão: '+e.message);
   } finally {
@@ -504,31 +551,26 @@ function mostrarErroLogin(msg){
 async function iniciarSessao(session, user){
   ECO.user = user;
   try {
-    // Busca perfil
-    var { data:perfil, error:ep } = await sb.from('ecm_perfis').select('*').eq('id', user.id).single();
-    if(!perfil || ep){
-      // Primeiro login: cria perfil como proprietario
+    var { data:perfil } = await supaGetOne('ecm_perfis', 'id=eq.'+user.id);
+    if(!perfil){
       var novoPerfil = { id:user.id, email:user.email, nome:user.email.split('@')[0], perfil:'proprietario', ativo:true };
-      var { error:ei } = await sb.from('ecm_perfis').insert(novoPerfil);
-      if(ei) throw new Error('Erro ao criar perfil: '+ei.message);
-      perfil = novoPerfil;
+      var { error:ei, data:pd } = await supaPost('ecm_perfis', novoPerfil);
+      if(ei) throw new Error('Erro ao criar perfil: '+ei);
+      perfil = pd || novoPerfil;
     }
     ECO.perfil = perfil;
-    // Busca unidade
     if(perfil.unidade_id){
-      var { data:un } = await sb.from('ecm_unidades').select('*').eq('id', perfil.unidade_id).single();
+      var { data:un } = await supaGetOne('ecm_unidades', 'id=eq.'+perfil.unidade_id);
       ECO.unidade = un || null;
     }
-    // SSO — salva sessão compartilhada para outros módulos
     salvarSSOLocal(user, perfil, session.access_token);
-    // Inicia UI
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('appShell').style.display = 'block';
     buildSidebar();
     navigate('dashboard');
   } catch(e) {
     mostrarErroLogin('Erro ao carregar perfil: '+e.message);
-    await sb.auth.signOut();
+    SUPA_TOKEN = null;
   }
 }
 
@@ -546,16 +588,17 @@ function salvarSSOLocal(user, perfil, token){
 
 async function conectarSGPS(email){
   try{
-    var { data } = await sb.from('sgps_store').select('value').eq('key','usuarios').single();
-    if(data?.value){
-      var u = data.value.find(u => u.email === email && u.ativo);
+    var r = await fetch(SUPA_URL+'/rest/v1/sgps_store?key=eq.usuarios&select=value',{headers:_hdr()});
+    var rows = await r.json();
+    if(rows&&rows.length&&rows[0].value){
+      var u = rows[0].value.find(function(u){ return u.email===email&&u.ativo; });
       if(u) localStorage.setItem('sombrear_session', JSON.stringify(u));
     }
   }catch(e){}
 }
 
 async function doLogout(){
-  await sb.auth.signOut();
+  await supaSignOut();
   localStorage.removeItem('ecm_session');
   localStorage.removeItem('sombrear_session');
   ECO = { user:null, perfil:null, unidade:null };
@@ -622,8 +665,8 @@ async function renderDashboard(){
   el.innerHTML = '<div class="page-hdr"><div class="skeleton" style="width:200px;height:28px;margin-bottom:8px"></div><div class="skeleton" style="width:300px;height:16px"></div></div>';
 
   var [ {data:leads}, {data:obras} ] = await Promise.all([
-    sb.from('ecm_leads').select('id,etapa,valor_estimado,perdido').eq('perdido',false),
-    sb.from('ecm_obras').select('id,status')
+    supaGet('ecm_leads','perdido=eq.false','id,etapa,valor_estimado,perdido'),
+    supaGet('ecm_obras','','id,status')
   ]);
   leads = leads||[]; obras = obras||[];
 
@@ -705,8 +748,8 @@ async function renderUsuarios(){
   el.innerHTML = '<div class="page-hdr"><h1>Usuários</h1></div><div style="color:var(--text-3);font-size:13px">Carregando...</div>';
 
   var [{ data:users },{ data:unidades }] = await Promise.all([
-    sb.from('ecm_perfis').select('*').order('nome'),
-    sb.from('ecm_unidades').select('id,nome')
+    supaGet('ecm_perfis','order=nome'),
+    supaGet('ecm_unidades','order=nome','id,nome')
   ]);
   users = users||[]; unidades = unidades||[];
   var unMap = Object.fromEntries(unidades.map(u=>[u.id, u.nome]));
@@ -746,7 +789,7 @@ async function renderUsuarios(){
 }
 
 async function novoUsuario(){
-  var { data:uns } = await sb.from('ecm_unidades').select('*').eq('ativo',true).order('nome');
+  var { data:uns } = await supaGet('ecm_unidades','ativo=eq.true&order=nome');
   uns = uns||[];
   var unOpts = '<option value="">Sede Sombrear</option>'+uns.map(u=>'<option value="'+u.id+'">'+esc(u.nome)+'</option>').join('');
   var pOpts  = Object.entries(PERFIL_LABELS).map(([k,v])=>'<option value="'+k+'">'+v+'</option>').join('');
@@ -778,13 +821,13 @@ async function salvarNovoUsuario(){
   if(senha.length<6){ showToast('Senha deve ter ao menos 6 caracteres.','error'); return; }
   if(senha!==senha2){ showToast('As senhas não conferem.','error'); return; }
 
-  var { data, error } = await sbR.auth.signUp({ email, password:senha });
-  if(error){ showToast('Erro: '+error.message,'error'); return; }
-  var uid = data?.user?.id;
-  if(!uid){ showToast('Erro ao criar conta.','error'); return; }
+  var { data:authData, error:authErr } = await supaSignUp(email, senha);
+  if(authErr){ showToast('Erro: '+authErr,'error'); return; }
+  var uid = authData?.user?.id || authData?.id;
+  if(!uid){ showToast('Erro: ative "Auto Confirm" no Supabase e tente novamente.','error'); return; }
 
-  var { error:pe } = await sb.from('ecm_perfis').insert({ id:uid, nome, email, cargo, perfil, unidade_id:unid, ativo:true });
-  if(pe){ showToast('Conta criada mas perfil falhou: '+pe.message,'error'); return; }
+  var { error:pe } = await supaPost('ecm_perfis', { id:uid, nome, email, cargo, perfil, unidade_id:unid, ativo:true });
+  if(pe){ showToast('Conta criada mas perfil falhou: '+pe,'error'); return; }
 
   closeModal();
   showToast('Usuário '+nome+' criado!','success');
@@ -793,8 +836,8 @@ async function salvarNovoUsuario(){
 
 async function editarUsuario(id){
   var [{ data:u },{ data:uns }] = await Promise.all([
-    sb.from('ecm_perfis').select('*').eq('id',id).single(),
-    sb.from('ecm_unidades').select('*').eq('ativo',true).order('nome')
+    supaGetOne('ecm_perfis','id=eq.'+id),
+    supaGet('ecm_unidades','ativo=eq.true&order=nome')
   ]);
   if(!u) return; uns=uns||[];
   var unOpts = '<option value="">Sede Sombrear</option>'+uns.map(un=>'<option value="'+un.id+'"'+(un.id===u.unidade_id?' selected':'')+'>'+esc(un.nome)+'</option>').join('');
@@ -816,14 +859,14 @@ async function editarUsuario(id){
 async function salvarEdicaoUsuario(id){
   var nome  = (document.getElementById('eu_nome').value||'').trim();
   if(!nome){ showToast('Informe o nome.','error'); return; }
-  var { error } = await sb.from('ecm_perfis').update({
+  var { error } = await supaPatch('ecm_perfis','id=eq.'+id,{
     nome, cargo:(document.getElementById('eu_cargo').value||'').trim(),
     perfil:document.getElementById('eu_perfil').value,
     unidade_id:document.getElementById('eu_unidade').value||null
-  }).eq('id',id);
-  if(error){ showToast('Erro: '+error.message,'error'); return; }
+  });
+  if(error){ showToast('Erro: '+error,'error'); return; }
   if(id===ECO.user.id){
-    var { data:p } = await sb.from('ecm_perfis').select('*').eq('id',id).single();
+    var { data:p } = await supaGetOne('ecm_perfis','id=eq.'+id);
     ECO.perfil = p; buildSidebar();
     var s = JSON.parse(localStorage.getItem('ecm_session')||'{}');
     s.nome = nome; localStorage.setItem('ecm_session', JSON.stringify(s));
@@ -832,7 +875,7 @@ async function salvarEdicaoUsuario(id){
 }
 
 async function toggleUsuario(id, ativo){
-  await sb.from('ecm_perfis').update({ ativo:!ativo }).eq('id',id);
+  await supaPatch('ecm_perfis','id=eq.'+id,{ ativo:!ativo });
   showToast(ativo?'Usuário inativado.':'Usuário reativado.', 'success');
   renderUsuarios();
 }
@@ -843,8 +886,8 @@ async function toggleUsuario(id, ativo){
 async function renderUnidades(){
   var el = document.getElementById('view-unidades');
   var [{ data:uns },{ data:perfis }] = await Promise.all([
-    sb.from('ecm_unidades').select('*').order('nome'),
-    sb.from('ecm_perfis').select('unidade_id')
+    supaGet('ecm_unidades','order=nome'),
+    supaGet('ecm_perfis','','unidade_id')
   ]);
   uns=uns||[]; perfis=perfis||[];
   var contMap = {};
@@ -895,7 +938,7 @@ function novaUnidade(){
 async function salvarNovaUnidade(){
   var nome = (document.getElementById('nu2_nome').value||'').trim();
   if(!nome){ showToast('Informe o nome.','error'); return; }
-  var { error } = await sb.from('ecm_unidades').insert({
+  var { error } = await supaPost('ecm_unidades',{
     nome, ativo:true,
     cidade:(document.getElementById('nu2_cidade').value||'').trim(),
     estado:(document.getElementById('nu2_estado').value||'').trim().toUpperCase(),
@@ -909,7 +952,7 @@ async function salvarNovaUnidade(){
 }
 
 async function editarUnidade(id){
-  var { data:u } = await sb.from('ecm_unidades').select('*').eq('id',id).single();
+  var { data:u } = await supaGetOne('ecm_unidades','id=eq.'+id);
   if(!u) return;
   openModal('Editar — '+esc(u.nome),
     '<div class="form-grid">'+
@@ -930,7 +973,7 @@ async function editarUnidade(id){
 async function salvarEdicaoUnidade(id){
   var nome = (document.getElementById('eu2_nome').value||'').trim();
   if(!nome){ showToast('Informe o nome.','error'); return; }
-  var { error } = await sb.from('ecm_unidades').update({
+  var { error } = await supaPatch('ecm_unidades','id=eq.'+id,{
     nome,
     cidade:(document.getElementById('eu2_cidade').value||'').trim(),
     estado:(document.getElementById('eu2_estado').value||'').trim().toUpperCase(),
@@ -939,10 +982,10 @@ async function salvarEdicaoUnidade(id){
     telefone:(document.getElementById('eu2_tel').value||'').trim(),
     email:(document.getElementById('eu2_email').value||'').trim(),
     ativo:document.getElementById('eu2_ativo').value==='1'
-  }).eq('id',id);
-  if(error){ showToast('Erro: '+error.message,'error'); return; }
-  if(ECO.perfil?.unidade_id===id){
-    var { data:un } = await sb.from('ecm_unidades').select('*').eq('id',id).single();
+  });
+  if(error){ showToast('Erro: '+error,'error'); return; }
+  if(ECO.perfil&&ECO.perfil.unidade_id===id){
+    var { data:un } = await supaGetOne('ecm_unidades','id=eq.'+id);
     ECO.unidade = un; buildSidebar();
   }
   closeModal(); showToast('Unidade atualizada.','success'); renderUnidades();
@@ -950,7 +993,7 @@ async function salvarEdicaoUnidade(id){
 
 async function excluirUnidade(id, nome){
   if(!confirm('Excluir a unidade "'+nome+'"? Usuários vinculados perderão a referência.')) return;
-  await sb.from('ecm_unidades').delete().eq('id',id);
+  await supaDelete('ecm_unidades','id=eq.'+id);
   showToast('Unidade excluída.','success'); renderUnidades();
 }
 
@@ -989,11 +1032,11 @@ async function salvarPerfil(){
   var cargo = (document.getElementById('mp_cargo').value||'').trim();
   var senha = document.getElementById('mp_senha').value;
   if(!nome){ showToast('Informe o nome.','error'); return; }
-  var { error } = await sb.from('ecm_perfis').update({ nome, cargo }).eq('id', ECO.user.id);
+  var { error } = await supaPatch('ecm_perfis','id=eq.'+ECO.user.id,{ nome, cargo });
   if(error){ showToast('Erro ao salvar.','error'); return; }
   if(senha){
-    var { error:se } = await sb.auth.updateUser({ password:senha });
-    if(se){ showToast('Dados salvos mas erro na senha: '+se.message,'error'); return; }
+    var { error:se } = await supaUpdatePassword(senha);
+    if(se){ showToast('Dados salvos mas erro na senha: '+se,'error'); return; }
   }
   ECO.perfil.nome = nome; ECO.perfil.cargo = cargo;
   var s = JSON.parse(localStorage.getItem('ecm_session')||'{}');
@@ -1039,15 +1082,27 @@ document.getElementById('loginEmail').addEventListener('keydown', e=>{ if(e.key=
 // ════════════════════════════════════════════
 (async function boot(){
   try {
-    var { data } = await sb.auth.getSession();
-    if(data?.session?.user) await iniciarSessao(data.session, data.session.user);
-  } catch(e) { console.error('Boot error:', e); }
-  sb.auth.onAuthStateChange(async (event, session)=>{
-    if(event==='SIGNED_OUT'){
-      document.getElementById('appShell').style.display='none';
-      document.getElementById('loginScreen').style.display='flex';
+    var sess = JSON.parse(localStorage.getItem('ecm_session')||'null');
+    if(sess&&sess.access_token&&sess.id){
+      SUPA_TOKEN = sess.access_token;
+      // verifica se token ainda é válido
+      var { data:perfil } = await supaGetOne('ecm_perfis','id=eq.'+sess.id);
+      if(perfil){
+        ECO.user = { id:sess.id, email:sess.email };
+        ECO.perfil = perfil;
+        if(perfil.unidade_id){
+          var { data:un } = await supaGetOne('ecm_unidades','id=eq.'+perfil.unidade_id);
+          ECO.unidade = un||null;
+        }
+        document.getElementById('loginScreen').style.display='none';
+        document.getElementById('appShell').style.display='block';
+        buildSidebar(); navigate('dashboard');
+        return;
+      }
+      localStorage.removeItem('ecm_session');
+      SUPA_TOKEN = null;
     }
-  });
+  } catch(e){ console.error('Boot:', e); }
 })();
 </script>
 </body>
