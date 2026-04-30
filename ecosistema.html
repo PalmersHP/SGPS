@@ -481,14 +481,19 @@ function isAdmin(){ return ['proprietario','gestor','admin'].includes(ECO.perfil
 async function doLogin(){
   var email = document.getElementById('loginEmail').value.trim();
   var senha = document.getElementById('loginSenha').value;
-  var err   = document.getElementById('loginErr');
   var btn   = document.getElementById('loginBtn');
-  err.style.display = 'none';
+  document.getElementById('loginErr').style.display = 'none';
   if(!email||!senha){ mostrarErroLogin('Preencha e-mail e senha.'); return; }
   btn.textContent = 'Entrando...'; btn.disabled = true;
-  var { data, error } = await sb.auth.signInWithPassword({ email, password:senha });
-  if(error){ mostrarErroLogin('E-mail ou senha incorretos.'); btn.textContent='Entrar no Ecosistema'; btn.disabled=false; return; }
-  await iniciarSessao(data.session, data.user);
+  try {
+    var { data, error } = await sb.auth.signInWithPassword({ email, password:senha });
+    if(error){ mostrarErroLogin('E-mail ou senha incorretos. Verifique suas credenciais.'); return; }
+    await iniciarSessao(data.session, data.user);
+  } catch(e) {
+    mostrarErroLogin('Erro de conexão: '+e.message);
+  } finally {
+    btn.textContent = 'Entrar no Ecosistema'; btn.disabled = false;
+  }
 }
 
 function mostrarErroLogin(msg){
@@ -498,27 +503,33 @@ function mostrarErroLogin(msg){
 
 async function iniciarSessao(session, user){
   ECO.user = user;
-  // Busca perfil
-  var { data:perfil } = await sb.from('ecm_perfis').select('*').eq('id', user.id).single();
-  if(!perfil){
-    // Primeiro admin: cria perfil automaticamente
-    var novoPerfil = { id:user.id, email:user.email, nome:user.email.split('@')[0], perfil:'admin', ativo:true };
-    await sb.from('ecm_perfis').insert(novoPerfil);
-    perfil = novoPerfil;
+  try {
+    // Busca perfil
+    var { data:perfil, error:ep } = await sb.from('ecm_perfis').select('*').eq('id', user.id).single();
+    if(!perfil || ep){
+      // Primeiro login: cria perfil como proprietario
+      var novoPerfil = { id:user.id, email:user.email, nome:user.email.split('@')[0], perfil:'proprietario', ativo:true };
+      var { error:ei } = await sb.from('ecm_perfis').insert(novoPerfil);
+      if(ei) throw new Error('Erro ao criar perfil: '+ei.message);
+      perfil = novoPerfil;
+    }
+    ECO.perfil = perfil;
+    // Busca unidade
+    if(perfil.unidade_id){
+      var { data:un } = await sb.from('ecm_unidades').select('*').eq('id', perfil.unidade_id).single();
+      ECO.unidade = un || null;
+    }
+    // SSO — salva sessão compartilhada para outros módulos
+    salvarSSOLocal(user, perfil, session.access_token);
+    // Inicia UI
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('appShell').style.display = 'block';
+    buildSidebar();
+    navigate('dashboard');
+  } catch(e) {
+    mostrarErroLogin('Erro ao carregar perfil: '+e.message);
+    await sb.auth.signOut();
   }
-  ECO.perfil = perfil;
-  // Busca unidade
-  if(perfil.unidade_id){
-    var { data:un } = await sb.from('ecm_unidades').select('*').eq('id', perfil.unidade_id).single();
-    ECO.unidade = un || null;
-  }
-  // SSO — salva sessão compartilhada para outros módulos
-  salvarSSOLocal(user, perfil, session.access_token);
-  // Inicia UI
-  document.getElementById('loginScreen').style.display = 'none';
-  document.getElementById('appShell').style.display = 'block';
-  buildSidebar();
-  navigate('dashboard');
 }
 
 function salvarSSOLocal(user, perfil, token){
@@ -1027,8 +1038,10 @@ document.getElementById('loginEmail').addEventListener('keydown', e=>{ if(e.key=
 // BOOT
 // ════════════════════════════════════════════
 (async function boot(){
-  var { data:{ session } } = await sb.auth.getSession();
-  if(session?.user) await iniciarSessao(session, session.user);
+  try {
+    var { data } = await sb.auth.getSession();
+    if(data?.session?.user) await iniciarSessao(data.session, data.session.user);
+  } catch(e) { console.error('Boot error:', e); }
   sb.auth.onAuthStateChange(async (event, session)=>{
     if(event==='SIGNED_OUT'){
       document.getElementById('appShell').style.display='none';
