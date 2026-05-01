@@ -710,8 +710,7 @@ async function renderDashboard(){
   }).join('');
 
   var hora = new Date().getHours();
-  var saudacao = hora<12?'Bom dia':'hora<18?Boa tarde':'Boa noite';
-  saudacao = hora<12?'Bom dia':hora<18?'Boa tarde':'Boa noite';
+  var saudacao = hora<12?'Bom dia':hora<18?'Boa tarde':'Boa noite';
 
   el.innerHTML =
   '<div class="page-hdr">'+
