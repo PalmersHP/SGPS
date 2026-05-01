@@ -1,0 +1,990 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sombrear — Engenharia</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+<style>
+:root{
+  --verde:#8DC63F;--verde-d:#6FAE2E;
+  --sb:#0d1117;--sb-border:rgba(255,255,255,.06);
+  --bg:#f5f6fa;--card:#fff;--border:#e8eaed;
+  --text:#111827;--text-2:#6b7280;--text-3:#9ca3af;
+  --radius:12px;--shadow:0 1px 3px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.04);
+  --shadow-md:0 4px 20px rgba(0,0,0,.09);--sb-width:220px;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Poppins',sans-serif;background:var(--bg);color:var(--text);}
+
+/* ══ LOGIN ══ */
+#loginScreen{min-height:100vh;background:linear-gradient(145deg,#0a0e17 0%,#111827 60%,#0a0e17 100%);display:flex;align-items:center;justify-content:center;}
+.login-box{width:100%;max-width:440px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:20px;padding:44px 40px;}
+.login-brand{display:flex;align-items:center;gap:12px;margin-bottom:32px;}
+.login-brand-icon{width:44px;height:44px;background:var(--verde);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;}
+.login-brand-name{font-size:18px;font-weight:700;color:#fff;}
+.login-brand-sub{font-size:11px;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:2px;}
+.login-title{font-size:26px;font-weight:700;color:#fff;margin-bottom:6px;}
+.login-sub{font-size:13px;color:rgba(255,255,255,.5);margin-bottom:32px;}
+.lf{margin-bottom:18px;}
+.lf label{display:block;font-size:11px;font-weight:600;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;}
+.lf input{width:100%;padding:13px 16px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:10px;font-family:'Poppins',sans-serif;font-size:14px;color:#fff;outline:none;transition:border-color .2s;}
+.lf input:focus{border-color:var(--verde);}
+.login-btn{width:100%;padding:14px;background:var(--verde);color:#fff;border:none;border-radius:10px;font-family:'Poppins',sans-serif;font-size:15px;font-weight:600;cursor:pointer;transition:background .2s;margin-top:6px;}
+.login-btn:hover{background:var(--verde-d);}
+.login-btn:disabled{opacity:.6;cursor:not-allowed;}
+.login-err{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:8px;padding:10px 14px;font-size:12px;color:#fca5a5;margin-top:14px;display:none;}
+
+/* ══ APP ══ */
+#appShell{display:none;height:100vh;overflow:hidden;}
+.app-layout{display:flex;height:100vh;}
+
+/* ── SIDEBAR ── */
+#sidebar{width:var(--sb-width);background:var(--sb);display:flex;flex-direction:column;flex-shrink:0;border-right:1px solid var(--sb-border);}
+.sb-top{padding:20px 16px 16px;border-bottom:1px solid var(--sb-border);}
+.sb-brand{display:flex;align-items:center;gap:10px;}
+.sb-brand-icon{width:36px;height:36px;background:var(--verde);border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;}
+.sb-brand-name{font-size:14px;font-weight:700;color:#fff;}
+.sb-brand-sub{font-size:10px;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:1.5px;}
+.sb-nav{flex:1;padding:12px 8px;overflow-y:auto;}
+.sb-section{font-size:10px;font-weight:700;color:rgba(255,255,255,.25);text-transform:uppercase;letter-spacing:1.5px;padding:8px 10px 4px;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:9px;cursor:pointer;font-size:13px;color:rgba(255,255,255,.55);transition:all .15s;margin-bottom:2px;}
+.nav-item:hover{background:rgba(255,255,255,.05);color:rgba(255,255,255,.85);}
+.nav-item.active{background:rgba(141,198,63,.15);color:var(--verde);}
+.ni-icon{font-size:16px;width:20px;text-align:center;flex-shrink:0;}
+.sb-bottom{padding:12px 8px;border-top:1px solid var(--sb-border);}
+.sb-user{display:flex;align-items:center;gap:10px;padding:10px 10px;border-radius:9px;cursor:pointer;transition:background .15s;}
+.sb-user:hover{background:rgba(255,255,255,.05);}
+.sb-av{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--verde),var(--verde-d));display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;flex-shrink:0;}
+.sb-nome{font-size:12px;font-weight:600;color:rgba(255,255,255,.8);}
+.sb-role{font-size:10px;color:rgba(255,255,255,.35);}
+
+/* ── TOPBAR ── */
+.app-main{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+#topbar{height:56px;background:var(--card);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 24px;gap:16px;flex-shrink:0;}
+.tb-title{font-size:15px;font-weight:700;color:var(--text);flex:1;}
+.tb-badge{background:rgba(141,198,63,.12);color:#5a8f1a;font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;border:1px solid rgba(141,198,63,.25);}
+.tb-btn{padding:8px 16px;border-radius:8px;font-family:'Poppins',sans-serif;font-size:12px;font-weight:600;cursor:pointer;border:none;transition:all .15s;}
+.tb-btn-primary{background:var(--verde);color:#fff;}
+.tb-btn-primary:hover{background:var(--verde-d);}
+
+/* ── VIEWS ── */
+.view{display:none;flex:1;overflow:hidden;flex-direction:column;}
+.view.active{display:flex;}
+
+/* ── DASHBOARD ── */
+.dash-content{flex:1;overflow-y:auto;padding:24px;}
+.kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:24px;}
+.kpi{background:var(--card);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow);border-left:4px solid var(--verde);}
+.kpi-val{font-size:28px;font-weight:700;color:var(--text);}
+.kpi-label{font-size:12px;color:var(--text-2);margin-top:4px;}
+.kpi-sub{font-size:11px;color:var(--text-3);margin-top:2px;}
+.kpi.azul{border-left-color:#3b82f6;}
+.kpi.amarelo{border-left-color:#f59e0b;}
+.kpi.vermelho{border-left-color:#ef4444;}
+.funil-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px;}
+.card{background:var(--card);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow);}
+.card-title{font-size:13px;font-weight:700;color:var(--text);margin-bottom:16px;}
+.funil-item{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);}
+.funil-item:last-child{border-bottom:none;}
+.funil-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.funil-col-name{flex:1;font-size:12px;color:var(--text-2);}
+.funil-count{font-size:13px;font-weight:700;color:var(--text);min-width:24px;text-align:right;}
+.pend-item{padding:10px 0;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;gap:10px;}
+.pend-item:last-child{border-bottom:none;}
+.pend-obra{font-size:12px;font-weight:600;color:var(--text);}
+.pend-etapa{font-size:11px;color:var(--text-2);}
+.pend-badge{font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;flex-shrink:0;}
+.pend-badge.atrasada{background:#fee2e2;color:#dc2626;}
+
+/* ── KANBAN ── */
+.kanban-wrap{flex:1;overflow-x:auto;padding:16px 24px;display:flex;gap:14px;align-items:flex-start;}
+.kanban-col{min-width:270px;max-width:270px;background:rgba(0,0,0,.04);border-radius:var(--radius);display:flex;flex-direction:column;max-height:calc(100vh - 100px);}
+.col-header{padding:12px 14px 10px;display:flex;align-items:center;gap:8px;flex-shrink:0;}
+.col-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.col-name{font-size:12px;font-weight:700;color:var(--text);flex:1;}
+.col-count{font-size:11px;font-weight:600;color:var(--text-3);background:rgba(0,0,0,.06);border-radius:10px;padding:1px 7px;}
+.col-cards{flex:1;overflow-y:auto;padding:0 8px 8px;min-height:80px;}
+.obra-card{background:var(--card);border-radius:10px;padding:12px 14px;margin-bottom:8px;cursor:pointer;box-shadow:var(--shadow);border:1px solid var(--border);transition:box-shadow .15s,transform .1s;}
+.obra-card:hover{box-shadow:var(--shadow-md);transform:translateY(-1px);}
+.obra-card.sortable-ghost{opacity:.35;}
+.obra-card.sortable-drag{box-shadow:0 8px 30px rgba(0,0,0,.2);}
+.card-nome{font-size:12px;font-weight:700;color:var(--text);margin-bottom:3px;}
+.card-cliente{font-size:11px;color:var(--text-2);margin-bottom:8px;}
+.card-meta{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;}
+.card-tag{font-size:10px;font-weight:600;padding:2px 7px;border-radius:6px;background:rgba(141,198,63,.1);color:#5a8f1a;}
+.card-tag.warn{background:rgba(239,68,68,.1);color:#dc2626;}
+.card-progress{height:3px;background:#e5e7eb;border-radius:2px;overflow:hidden;}
+.card-progress-bar{height:100%;background:var(--verde);border-radius:2px;transition:width .3s;}
+.card-footer{display:flex;justify-content:space-between;align-items:center;margin-top:8px;}
+.card-data{font-size:10px;color:var(--text-3);}
+.card-vagas{font-size:10px;font-weight:600;color:var(--text-2);}
+.col-add{margin:0 8px 8px;padding:9px;border:1.5px dashed rgba(0,0,0,.12);border-radius:8px;text-align:center;font-size:11px;color:var(--text-3);cursor:pointer;transition:all .15s;flex-shrink:0;}
+.col-add:hover{border-color:var(--verde);color:var(--verde);}
+
+/* ── MODAL ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);backdrop-filter:blur(4px);z-index:1000;display:none;align-items:center;justify-content:center;padding:20px;}
+.modal-overlay.open{display:flex;}
+.modal{background:var(--card);border-radius:18px;width:100%;max-width:760px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.25);}
+.modal-hdr{padding:20px 24px 0;display:flex;align-items:flex-start;gap:12px;flex-shrink:0;}
+.modal-hdr-info{flex:1;}
+.modal-hdr-title{font-size:18px;font-weight:700;color:var(--text);}
+.modal-hdr-sub{font-size:12px;color:var(--text-2);margin-top:2px;}
+.modal-close{width:32px;height:32px;border:none;background:var(--bg);border-radius:8px;cursor:pointer;font-size:16px;color:var(--text-2);flex-shrink:0;display:flex;align-items:center;justify-content:center;}
+.modal-tabs{display:flex;gap:0;padding:0 24px;border-bottom:1px solid var(--border);flex-shrink:0;margin-top:16px;overflow-x:auto;}
+.modal-tab{padding:10px 16px;font-size:12px;font-weight:600;color:var(--text-2);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;transition:all .15s;}
+.modal-tab.active{color:var(--verde);border-bottom-color:var(--verde);}
+.modal-body{flex:1;overflow-y:auto;padding:20px 24px;}
+.modal-footer{padding:14px 24px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px;flex-shrink:0;}
+
+/* ── FORM ── */
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.fg{display:flex;flex-direction:column;gap:6px;}
+.fg.full{grid-column:1/-1;}
+.fg label{font-size:11px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px;}
+.fg input,.fg select,.fg textarea{padding:10px 12px;border:1.5px solid var(--border);border-radius:9px;font-family:'Poppins',sans-serif;font-size:13px;color:var(--text);outline:none;transition:border-color .2s;background:#fff;}
+.fg input:focus,.fg select:focus,.fg textarea:focus{border-color:var(--verde);}
+.fg textarea{resize:vertical;min-height:80px;}
+
+/* ── CHECKLIST ══ */
+.etapa-group{margin-bottom:20px;}
+.etapa-group-title{font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border);}
+.etapa-item{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:9px;border:1px solid var(--border);margin-bottom:6px;transition:background .15s;cursor:pointer;}
+.etapa-item:hover{background:var(--bg);}
+.etapa-item.done{background:#f0fdf4;border-color:#bbf7d0;}
+.etapa-cb{width:18px;height:18px;border-radius:5px;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s;}
+.etapa-item.done .etapa-cb{background:var(--verde);border-color:var(--verde);}
+.etapa-cb::after{content:'✓';font-size:11px;font-weight:700;color:#fff;display:none;}
+.etapa-item.done .etapa-cb::after{display:block;}
+.etapa-label{flex:1;font-size:13px;color:var(--text);}
+.etapa-item.done .etapa-label{text-decoration:line-through;color:var(--text-3);}
+.etapa-data{font-size:10px;color:var(--text-3);}
+
+/* ── DIÁRIO ── */
+.diario-entry{background:var(--bg);border-radius:10px;padding:14px;margin-bottom:12px;border:1px solid var(--border);}
+.diario-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+.diario-data{font-size:12px;font-weight:700;color:var(--text);}
+.diario-clima{font-size:11px;color:var(--text-2);}
+.diario-ativ{font-size:13px;color:var(--text);margin-bottom:6px;}
+.diario-pend{font-size:12px;color:#dc2626;}
+
+/* ── HISTÓRICO ── */
+.hist-item{display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);}
+.hist-item:last-child{border-bottom:none;}
+.hist-dot{width:8px;height:8px;border-radius:50%;background:var(--verde);flex-shrink:0;margin-top:5px;}
+.hist-txt{font-size:12px;color:var(--text);flex:1;}
+.hist-data{font-size:11px;color:var(--text-3);}
+
+/* ── BUTTONS ── */
+.btn{padding:9px 18px;border-radius:8px;font-family:'Poppins',sans-serif;font-size:13px;font-weight:600;cursor:pointer;border:none;transition:all .15s;}
+.btn-primary{background:var(--verde);color:#fff;}
+.btn-primary:hover{background:var(--verde-d);}
+.btn-ghost{background:var(--bg);color:var(--text-2);border:1px solid var(--border);}
+.btn-ghost:hover{background:var(--border);}
+.btn-danger{background:#fef2f2;color:#dc2626;border:1px solid #fca5a5;}
+.btn-sm{padding:6px 12px;font-size:11px;}
+
+/* ── BADGES ── */
+.badge{font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px;display:inline-block;}
+.bg-green{background:#dcfce7;color:#166534;}
+.bg-gray{background:#f1f5f9;color:#475569;}
+.bg-blue{background:#dbeafe;color:#1d4ed8;}
+.bg-orange{background:#fff7ed;color:#c2410c;}
+.bg-yellow{background:#fef9c3;color:#854d0e;}
+
+/* ── TOAST ── */
+#toast{position:fixed;bottom:24px;right:24px;background:#1f2937;color:#fff;padding:12px 18px;border-radius:10px;font-size:13px;font-weight:500;opacity:0;transform:translateY(8px);transition:all .3s;pointer-events:none;z-index:9999;max-width:320px;}
+#toast.show{opacity:1;transform:translateY(0);}
+#toast.success{background:#166534;}
+#toast.error{background:#991b1b;}
+
+/* ── EMPTY ── */
+.empty{padding:32px;text-align:center;color:var(--text-3);font-size:13px;}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar{width:4px;height:4px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:rgba(0,0,0,.15);border-radius:4px;}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginScreen">
+  <div class="login-box">
+    <div class="login-brand">
+      <div class="login-brand-icon">🔧</div>
+      <div>
+        <div class="login-brand-name">Sombrear</div>
+        <div class="login-brand-sub">Engenharia</div>
+      </div>
+    </div>
+    <div class="login-title">Controle de Obras</div>
+    <div class="login-sub">Acesse com sua conta do Ecosistema Sombrear</div>
+    <div class="lf"><label>E-mail</label><input type="email" id="loginEmail" placeholder="seu@email.com"></div>
+    <div class="lf"><label>Senha</label><input type="password" id="loginSenha" placeholder="••••••••"></div>
+    <button class="login-btn" id="loginBtn" onclick="doLogin()">Entrar</button>
+    <div class="login-err" id="loginErr"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="appShell">
+  <div class="app-layout">
+    <!-- SIDEBAR -->
+    <div id="sidebar">
+      <div class="sb-top">
+        <div class="sb-brand">
+          <div class="sb-brand-icon">🔧</div>
+          <div>
+            <div class="sb-brand-name">Engenharia</div>
+            <div class="sb-brand-sub">Sombrear</div>
+          </div>
+        </div>
+      </div>
+      <div class="sb-nav">
+        <div class="sb-section">Menu</div>
+        <div class="nav-item active" id="nav-dashboard" onclick="navigate('dashboard')"><span class="ni-icon">⊞</span>Dashboard</div>
+        <div class="nav-item" id="nav-kanban" onclick="navigate('kanban')"><span class="ni-icon">🗂️</span>Kanban de Obras</div>
+        <div class="sb-section">Sistema</div>
+        <div class="nav-item" id="nav-ecosistema" onclick="window.location.href='ecosistema.html'"><span class="ni-icon">🏠</span>Ecosistema</div>
+      </div>
+      <div class="sb-bottom">
+        <div class="sb-user" onclick="doLogout()">
+          <div class="sb-av" id="sbAv">?</div>
+          <div>
+            <div class="sb-nome" id="sbNome">—</div>
+            <div class="sb-role" id="sbRole">—</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MAIN -->
+    <div class="app-main">
+      <div id="topbar">
+        <div class="tb-title" id="tbTitle">Dashboard</div>
+        <div class="tb-badge" id="tbBadge">🔧 Engenharia</div>
+        <button class="tb-btn tb-btn-primary" id="tbNovaObra" onclick="novaObra()" style="display:none">＋ Nova Obra</button>
+      </div>
+
+      <!-- DASHBOARD -->
+      <div class="view active" id="view-dashboard">
+        <div class="dash-content" id="dashContent">
+          <div class="empty">Carregando...</div>
+        </div>
+      </div>
+
+      <!-- KANBAN -->
+      <div class="view" id="view-kanban">
+        <div class="kanban-wrap" id="kanbanWrap"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL OBRA -->
+<div class="modal-overlay" id="obraModal">
+  <div class="modal">
+    <div class="modal-hdr">
+      <div class="modal-hdr-info">
+        <div class="modal-hdr-title" id="obraModalTitle">Obra</div>
+        <div class="modal-hdr-sub" id="obraModalSub"></div>
+      </div>
+      <button class="modal-close" onclick="closeObraModal()">✕</button>
+    </div>
+    <div class="modal-tabs" id="obraTabs"></div>
+    <div class="modal-body" id="obraBody"></div>
+    <div class="modal-footer" id="obraFooter"></div>
+  </div>
+</div>
+
+<!-- MODAL GENÉRICO -->
+<div class="modal-overlay" id="genericModal">
+  <div class="modal" style="max-width:520px;">
+    <div class="modal-hdr">
+      <div class="modal-hdr-info"><div class="modal-hdr-title" id="gmTitle"></div></div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body" id="gmBody" style="padding-top:20px;"></div>
+    <div class="modal-footer" id="gmFooter"></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ════════════════════════════════════════════
+// SUPABASE — fetch direto
+// ════════════════════════════════════════════
+var SUPA_URL  = 'https://gwcgcvgowoqyhthdbear.supabase.co';
+var SUPA_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd3Y2djdmdvd29xeWh0aGRiZWFyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyMjQ1NzUsImV4cCI6MjA5MTgwMDU3NX0.lBB4o9J6DPr5MNQUP9p2lCWzhUBBS7Hvu0JETmH7hjc';
+var SUPA_TOKEN = null;
+
+function _hdr(){
+  return {'apikey':SUPA_ANON,'Authorization':'Bearer '+(SUPA_TOKEN||SUPA_ANON),'Content-Type':'application/json'};
+}
+async function supaAuth(email,pw){
+  var r=await fetch(SUPA_URL+'/auth/v1/token?grant_type=password',{method:'POST',headers:_hdr(),body:JSON.stringify({email,password:pw})});
+  var d=await r.json(); if(!r.ok) return{error:d.error_description||'Credenciais inválidas'}; return{data:d};
+}
+async function supaSignOut(){
+  if(SUPA_TOKEN) fetch(SUPA_URL+'/auth/v1/logout',{method:'POST',headers:_hdr()}).catch(()=>{});
+  SUPA_TOKEN=null;
+}
+async function supaGet(table,params,cols){
+  var url=SUPA_URL+'/rest/v1/'+table+'?select='+(cols||'*')+(params?'&'+params:'');
+  var r=await fetch(url,{headers:_hdr()}); if(!r.ok) return{data:[]}; return{data:await r.json()};
+}
+async function supaGetOne(table,params,cols){
+  var{data}=await supaGet(table,(params||'')+'&limit=1',cols);
+  return{data:(Array.isArray(data)&&data.length)?data[0]:null};
+}
+async function supaPost(table,body){
+  var r=await fetch(SUPA_URL+'/rest/v1/'+table,{method:'POST',headers:Object.assign({},_hdr(),{'Prefer':'return=representation'}),body:JSON.stringify(body)});
+  if(!r.ok){var e=await r.json();return{error:e.message||JSON.stringify(e)};} var d=await r.json(); return{data:Array.isArray(d)?d[0]:d};
+}
+async function supaPatch(table,params,body){
+  var r=await fetch(SUPA_URL+'/rest/v1/'+table+'?'+params,{method:'PATCH',headers:Object.assign({},_hdr(),{'Prefer':'return=minimal'}),body:JSON.stringify(body)});
+  if(!r.ok){var e=await r.json();return{error:e.message||JSON.stringify(e)};} return{data:true};
+}
+async function supaDelete(table,params){
+  var r=await fetch(SUPA_URL+'/rest/v1/'+table+'?'+params,{method:'DELETE',headers:_hdr()}); return{ok:r.ok};
+}
+
+// ════════════════════════════════════════════
+// STATE
+// ════════════════════════════════════════════
+var ENG = { user:null, perfil:null, obras:[], etapasMap:{} };
+var _obraAtualId = null;
+
+// ════════════════════════════════════════════
+// COLUNAS KANBAN
+// ════════════════════════════════════════════
+var COLUNAS = [
+  {id:'contrato',   label:'Contrato',        cor:'#64748b'},
+  {id:'plantao',    label:'Plantão / Financ.',cor:'#8b5cf6'},
+  {id:'fabricacao', label:'Fabricação',       cor:'#f59e0b'},
+  {id:'canteiro',   label:'Canteiro',         cor:'#f97316'},
+  {id:'fundacoes',  label:'Fundações',        cor:'#ef4444'},
+  {id:'instalacao', label:'Instalação',       cor:'#3b82f6'},
+  {id:'retoques',   label:'Retoques',         cor:'#06b6d4'},
+  {id:'entrega',    label:'Entrega',          cor:'#10b981'},
+  {id:'finalizada', label:'Finalizada',       cor:'#22c55e'},
+];
+
+// ════════════════════════════════════════════
+// ETAPAS (15 itens com grupos)
+// ════════════════════════════════════════════
+var ETAPAS_DEF = [
+  {id:'e1', label:'Em fase de contrato',                grupo:'Contrato',    coluna:'contrato'},
+  {id:'e2', label:'Em fase de plantão',                 grupo:'Contrato',    coluna:'contrato'},
+  {id:'e3', label:'Docs finais de financiamento',       grupo:'Financiamento',coluna:'plantao'},
+  {id:'e4', label:'Fase de desembolso',                 grupo:'Financiamento',coluna:'plantao'},
+  {id:'e5', label:'Docs análise de financiamento',      grupo:'Financiamento',coluna:'plantao'},
+  {id:'e6', label:'Fechamento do aditivo',              grupo:'Financiamento',coluna:'plantao'},
+  {id:'e7', label:'Contrato da financeira',             grupo:'Financiamento',coluna:'plantao'},
+  {id:'e8', label:'Finalização da etapa de contrato',   grupo:'Financiamento',coluna:'plantao'},
+  {id:'e9', label:'Fabricação das bases / pés / chumbadores', grupo:'Fabricação', coluna:'fabricacao'},
+  {id:'e10',label:'Início do canteiro de obras',        grupo:'Execução',    coluna:'canteiro'},
+  {id:'e11',label:'Execução das fundações e chumbação', grupo:'Execução',    coluna:'fundacoes'},
+  {id:'e12',label:'Fabricação dos braços / arcos / telas',grupo:'Fabricação',coluna:'fabricacao'},
+  {id:'e13',label:'Instalação dos braços / arcos / telas',grupo:'Execução',  coluna:'instalacao'},
+  {id:'e14',label:'Retoques de pintura',                grupo:'Finalização', coluna:'retoques'},
+  {id:'e15',label:'Entrega do termo de entrega e garantia',grupo:'Finalização',coluna:'entrega'},
+];
+
+// Bloqueio: ao mover para uma coluna, quais etapas devem estar concluídas
+var BLOQUEIOS = {
+  plantao:    ['e1'],
+  fabricacao: ['e8'],
+  canteiro:   ['e9'],
+  fundacoes:  ['e10'],
+  instalacao: ['e11'],
+  retoques:   ['e13'],
+  entrega:    ['e14'],
+  finalizada: ['e15'],
+};
+
+var PRODUTOS = ['Sombrite Garagem','Sombrite Parquinho','Sombrite Piscina','Telha Galvalume','Telha Termoacústica','Carport Solar','Manutenção','Produto Personalizado'];
+
+// ════════════════════════════════════════════
+// AUTH
+// ════════════════════════════════════════════
+async function doLogin(){
+  var email=document.getElementById('loginEmail').value.trim();
+  var senha=document.getElementById('loginSenha').value;
+  var btn=document.getElementById('loginBtn');
+  document.getElementById('loginErr').style.display='none';
+  if(!email||!senha){mostrarErro('Preencha e-mail e senha.');return;}
+  btn.textContent='Entrando...';btn.disabled=true;
+  try{
+    var r=await supaAuth(email,senha);
+    if(r.error){mostrarErro(r.error);return;}
+    SUPA_TOKEN=r.data.access_token;
+    await iniciarSessao(r.data,r.data.user);
+  }catch(e){mostrarErro('Erro: '+e.message);}
+  finally{btn.textContent='Entrar';btn.disabled=false;}
+}
+function mostrarErro(msg){
+  var el=document.getElementById('loginErr');
+  el.textContent=msg;el.style.display='block';
+}
+async function iniciarSessao(session,user){
+  ENG.user=user;
+  try{
+    var{data:perfil}=await supaGetOne('ecm_perfis','id=eq.'+user.id);
+    if(!perfil) throw new Error('Perfil não encontrado. Crie seu usuário no Ecosistema primeiro.');
+    ENG.perfil=perfil;
+    document.getElementById('sbAv').textContent=(perfil.nome||'?')[0].toUpperCase();
+    document.getElementById('sbNome').textContent=perfil.nome||'—';
+    document.getElementById('sbRole').textContent=perfil.cargo||perfil.perfil||'—';
+    localStorage.setItem('ecm_session',JSON.stringify({id:user.id,email:user.email,nome:perfil.nome,perfil:perfil.perfil,access_token:session.access_token}));
+    document.getElementById('loginScreen').style.display='none';
+    document.getElementById('appShell').style.display='block';
+    navigate('dashboard');
+  }catch(e){mostrarErro(e.message);SUPA_TOKEN=null;}
+}
+async function doLogout(){
+  await supaSignOut();
+  localStorage.removeItem('ecm_session');
+  ENG={user:null,perfil:null,obras:[],etapasMap:{}};
+  document.getElementById('appShell').style.display='none';
+  document.getElementById('loginScreen').style.display='flex';
+  document.getElementById('loginSenha').value='';
+}
+
+// ════════════════════════════════════════════
+// NAVEGAÇÃO
+// ════════════════════════════════════════════
+function navigate(view){
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  var el=document.getElementById('view-'+view);
+  if(el) el.classList.add('active');
+  var ni=document.getElementById('nav-'+view);
+  if(ni) ni.classList.add('active');
+  var titles={dashboard:'Dashboard',kanban:'Kanban de Obras'};
+  document.getElementById('tbTitle').textContent=titles[view]||view;
+  document.getElementById('tbNovaObra').style.display=(view==='kanban')?'block':'none';
+  if(view==='dashboard') renderDashboard();
+  else if(view==='kanban') renderKanban();
+}
+
+// ════════════════════════════════════════════
+// CARREGAR DADOS
+// ════════════════════════════════════════════
+async function loadObras(){
+  var{data}=await supaGet('ecm_obras','order=created_at.desc');
+  ENG.obras=data||[];
+  // Carregar etapas de todas as obras
+  if(ENG.obras.length){
+    var{data:ets}=await supaGet('ecm_obra_etapas','order=obra_id');
+    ENG.etapasMap={};
+    (ets||[]).forEach(function(e){ if(!ENG.etapasMap[e.obra_id]) ENG.etapasMap[e.obra_id]={}; ENG.etapasMap[e.obra_id][e.etapa_id]=e; });
+  }
+}
+function getEtapasConcluidas(obraId){
+  var map=ENG.etapasMap[obraId]||{};
+  return ETAPAS_DEF.filter(function(e){return map[e.id]&&map[e.id].concluida;}).length;
+}
+
+// ════════════════════════════════════════════
+// DASHBOARD
+// ════════════════════════════════════════════
+async function renderDashboard(){
+  var el=document.getElementById('dashContent');
+  el.innerHTML='<div class="empty">Carregando...</div>';
+  await loadObras();
+  var obras=ENG.obras;
+  var ativas=obras.filter(function(o){return o.status!=='finalizada';});
+  var totalValor=ativas.reduce(function(s,o){return s+(o.valor_contrato||0);},0);
+  var totalVagas=ativas.reduce(function(s,o){return s+(o.vagas||0);},0);
+  var pendencias=[];
+  ativas.forEach(function(o){
+    var col=COLUNAS.find(function(c){return c.id===o.status;});
+    var prox=COLUNAS[COLUNAS.findIndex(function(c){return c.id===o.status;})+1];
+    if(prox&&BLOQUEIOS[prox.id]){
+      var map=ENG.etapasMap[o.id]||{};
+      var faltam=BLOQUEIOS[prox.id].filter(function(eid){return !map[eid]||!map[eid].concluida;});
+      if(faltam.length){
+        faltam.forEach(function(eid){
+          var et=ETAPAS_DEF.find(function(e){return e.id===eid;});
+          pendencias.push({obra:o.nome,etapa:et?et.label:eid,atrasada:o.data_entrega_prevista&&new Date(o.data_entrega_prevista)<new Date()});
+        });
+      }
+    }
+  });
+  var funnelHtml=COLUNAS.map(function(c){
+    var n=obras.filter(function(o){return o.status===c.id;}).length;
+    return '<div class="funil-item"><div class="funil-dot" style="background:'+c.cor+'"></div><span class="funil-col-name">'+c.label+'</span><span class="funil-count">'+n+'</span></div>';
+  }).join('');
+  var pendHtml=pendencias.slice(0,6).map(function(p){
+    return '<div class="pend-item"><span class="pend-badge '+(p.atrasada?'atrasada':'')+'">'+( p.atrasada?'Atrasada':'Pendente')+'</span><div><div class="pend-obra">'+esc(p.obra)+'</div><div class="pend-etapa">'+esc(p.etapa)+'</div></div></div>';
+  }).join('')||'<div class="empty" style="padding:16px">Nenhuma pendência crítica</div>';
+
+  el.innerHTML=
+  '<div class="kpi-row">'+
+    kpiCard('Obras Ativas',ativas.length,'em andamento','','verde')+
+    kpiCard('Valor em Execução','R$ '+fmtMoeda(totalValor),'total das obras ativas','azul','azul')+
+    kpiCard('Vagas Contratadas',totalVagas,'total das obras ativas','amarelo','amarelo')+
+    kpiCard('Pendências Críticas',pendencias.length,'etapas bloqueando avanço','vermelho','vermelho')+
+  '</div>'+
+  '<div class="funil-row">'+
+    '<div class="card"><div class="card-title">Funil de Obras por Etapa</div>'+funnelHtml+'</div>'+
+    '<div class="card"><div class="card-title">Pendências Críticas</div>'+pendHtml+'</div>'+
+  '</div>';
+}
+function kpiCard(label,val,sub,cls){
+  return '<div class="kpi '+(cls||'')+'"><div class="kpi-val">'+val+'</div><div class="kpi-label">'+label+'</div><div class="kpi-sub">'+sub+'</div></div>';
+}
+
+// ════════════════════════════════════════════
+// KANBAN
+// ════════════════════════════════════════════
+async function renderKanban(){
+  var el=document.getElementById('kanbanWrap');
+  el.innerHTML='<div class="empty">Carregando...</div>';
+  await loadObras();
+  var html='';
+  COLUNAS.forEach(function(col){
+    var obras=ENG.obras.filter(function(o){return o.status===col.id;});
+    var cardsHtml=obras.map(function(o){ return buildCard(o); }).join('');
+    html+='<div class="kanban-col" id="col-'+col.id+'">'+
+      '<div class="col-header">'+
+        '<div class="col-dot" style="background:'+col.cor+'"></div>'+
+        '<span class="col-name">'+col.label+'</span>'+
+        '<span class="col-count">'+obras.length+'</span>'+
+      '</div>'+
+      '<div class="col-cards" id="cards-'+col.id+'" data-col="'+col.id+'">'+cardsHtml+'</div>'+
+      '<div class="col-add" onclick="novaObraNaColuna(\''+col.id+'\')">+ Nova obra</div>'+
+    '</div>';
+  });
+  el.innerHTML=html;
+  // Init Sortable em cada coluna
+  COLUNAS.forEach(function(col){
+    var container=document.getElementById('cards-'+col.id);
+    if(container) Sortable.create(container,{
+      group:'obras', animation:150, ghostClass:'sortable-ghost', dragClass:'sortable-drag',
+      onEnd:function(evt){
+        var obraId=evt.item.dataset.id;
+        var novoStatus=evt.to.dataset.col;
+        var oldStatus=evt.from.dataset.col;
+        if(novoStatus!==oldStatus) moverObra(obraId,novoStatus,oldStatus,evt);
+      }
+    });
+  });
+}
+function buildCard(o){
+  var total=ETAPAS_DEF.length;
+  var conc=getEtapasConcluidas(o.id);
+  var pct=Math.round(conc/total*100);
+  var dataStr=o.data_entrega_prevista?'📅 '+fmtData(o.data_entrega_prevista):'';
+  var atrasada=o.data_entrega_prevista&&new Date(o.data_entrega_prevista)<new Date()&&o.status!=='finalizada';
+  return '<div class="obra-card" data-id="'+o.id+'" onclick="abrirObra(\''+o.id+'\')">'+
+    '<div class="card-nome">'+esc(o.nome)+'</div>'+
+    '<div class="card-cliente">'+esc(o.cliente||'—')+'</div>'+
+    '<div class="card-meta">'+
+      (o.produto?'<span class="card-tag">'+esc(o.produto)+'</span>':'')+
+      (atrasada?'<span class="card-tag warn">⚠ Atrasada</span>':'')+
+    '</div>'+
+    '<div class="card-progress"><div class="card-progress-bar" style="width:'+pct+'%"></div></div>'+
+    '<div class="card-footer">'+
+      '<span class="card-data">'+dataStr+'</span>'+
+      '<span class="card-vagas">'+(o.vagas?o.vagas+' vagas':'')+'</span>'+
+    '</div>'+
+  '</div>';
+}
+async function moverObra(obraId,novoStatus,oldStatus,evt){
+  // Verifica bloqueios
+  var bloqueio=BLOQUEIOS[novoStatus];
+  if(bloqueio){
+    var map=ENG.etapasMap[obraId]||{};
+    var faltam=bloqueio.filter(function(eid){return !map[eid]||!map[eid].concluida;});
+    if(faltam.length){
+      // Reverter drag visualmente
+      var fromContainer=document.getElementById('cards-'+oldStatus);
+      var toContainer=evt.to;
+      fromContainer.insertBefore(evt.item, fromContainer.children[evt.oldIndex]||null);
+      var labels=faltam.map(function(eid){var e=ETAPAS_DEF.find(function(x){return x.id===eid;}); return e?e.label:eid;});
+      showToast('⚠ Pendente: '+labels.join(', '),'error');
+      return;
+    }
+  }
+  // Salva no banco
+  var{error}=await supaPatch('ecm_obras','id=eq.'+obraId,{status:novoStatus});
+  if(error){showToast('Erro ao mover obra.','error');return;}
+  // Atualiza local
+  var o=ENG.obras.find(function(x){return x.id===obraId;});
+  if(o) o.status=novoStatus;
+  // Histórico
+  var col=COLUNAS.find(function(c){return c.id===novoStatus;});
+  await supaPost('ecm_obra_historico',{obra_id:obraId,tipo:'status',descricao:(ENG.perfil.nome||'Usuário')+' moveu para '+( col?col.label:novoStatus),usuario_nome:ENG.perfil.nome});
+  // Atualiza contadores
+  COLUNAS.forEach(function(c){
+    var cnt=document.querySelector('#cards-'+c.id+' .obra-card');
+    var el=document.querySelector('#col-'+c.id+' .col-count');
+    if(el) el.textContent=document.getElementById('cards-'+c.id).querySelectorAll('.obra-card').length;
+  });
+  showToast('Obra movida para '+( col?col.label:novoStatus),'success');
+}
+
+// ════════════════════════════════════════════
+// NOVA OBRA
+// ════════════════════════════════════════════
+function novaObra(statusInicial){
+  var prodOpts=PRODUTOS.map(function(p){return '<option value="'+p+'">'+p+'</option>';}).join('');
+  var colOpts=COLUNAS.map(function(c){return '<option value="'+c.id+'"'+(c.id===(statusInicial||'contrato')?' selected':'')+'>'+c.label+'</option>';}).join('');
+  openModal('Nova Obra',
+    '<div class="form-grid">'+
+    '<div class="fg full"><label>Nome da Obra *</label><input id="no_nome" placeholder="Ex: Residencial Rio Negro"></div>'+
+    '<div class="fg"><label>Cliente *</label><input id="no_cliente" placeholder="Nome do condomínio/cliente"></div>'+
+    '<div class="fg"><label>Produto *</label><select id="no_produto"><option value="">Selecione...</option>'+prodOpts+'</select></div>'+
+    '<div class="fg"><label>Vagas</label><input type="number" id="no_vagas" placeholder="Ex: 120" min="0"></div>'+
+    '<div class="fg"><label>Valor do Contrato (R$)</label><input type="number" id="no_valor" placeholder="0,00" min="0" step="0.01"></div>'+
+    '<div class="fg"><label>Etapa Inicial</label><select id="no_status">'+colOpts+'</select></div>'+
+    '<div class="fg"><label>Líder de Obra</label><input id="no_lider" placeholder="Nome do líder"></div>'+
+    '<div class="fg"><label>Responsável Engenharia</label><input id="no_resp" placeholder="Nome do engenheiro"></div>'+
+    '<div class="fg"><label>Data Prevista de Início</label><input type="date" id="no_inicio"></div>'+
+    '<div class="fg"><label>Data Prevista de Entrega</label><input type="date" id="no_entrega"></div>'+
+    '<div class="fg full"><label>Observações</label><textarea id="no_obs" placeholder="Informações adicionais..."></textarea></div>'+
+    '</div>',
+    '<button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>'+
+    '<button class="btn btn-primary" onclick="salvarNovaObra()">Criar Obra</button>'
+  );
+}
+function novaObraNaColuna(status){ novaObra(status); }
+
+async function salvarNovaObra(){
+  var nome=(document.getElementById('no_nome').value||'').trim();
+  var cliente=(document.getElementById('no_cliente').value||'').trim();
+  var produto=document.getElementById('no_produto').value;
+  if(!nome){showToast('Informe o nome da obra.','error');return;}
+  if(!cliente){showToast('Informe o cliente.','error');return;}
+  var vagas=parseInt(document.getElementById('no_vagas').value)||0;
+  var valor=parseFloat(document.getElementById('no_valor').value)||0;
+  var status=document.getElementById('no_status').value||'contrato';
+  var lider=(document.getElementById('no_lider').value||'').trim();
+  var resp=(document.getElementById('no_resp').value||'').trim();
+  var inicio=document.getElementById('no_inicio').value||null;
+  var entrega=document.getElementById('no_entrega').value||null;
+  var obs=(document.getElementById('no_obs').value||'').trim();
+  var{data,error}=await supaPost('ecm_obras',{nome,cliente,produto,vagas,valor_contrato:valor,status,lider_obra:lider,responsavel_eng:resp,data_inicio:inicio,data_entrega_prevista:entrega,observacoes:obs,ativo:true});
+  if(error){showToast('Erro: '+error,'error');return;}
+  // Histórico
+  if(data&&data.id) await supaPost('ecm_obra_historico',{obra_id:data.id,tipo:'criacao',descricao:'Obra criada por '+(ENG.perfil.nome||'usuário'),usuario_nome:ENG.perfil.nome});
+  closeModal();
+  showToast('Obra criada!','success');
+  await renderKanban();
+}
+
+// ════════════════════════════════════════════
+// MODAL OBRA (detalhe)
+// ════════════════════════════════════════════
+var _obraTab='resumo';
+async function abrirObra(id){
+  _obraAtualId=id;
+  _obraTab='resumo';
+  document.getElementById('obraModal').classList.add('open');
+  await renderObraModal(id,'resumo');
+}
+function closeObraModal(){
+  document.getElementById('obraModal').classList.remove('open');
+  _obraAtualId=null;
+}
+async function renderObraModal(id,tab){
+  _obraTab=tab;
+  var o=ENG.obras.find(function(x){return x.id===id;});
+  if(!o) return;
+  var col=COLUNAS.find(function(c){return c.id===o.status;})||{};
+  document.getElementById('obraModalTitle').textContent=o.nome;
+  document.getElementById('obraModalSub').innerHTML='<span class="badge bg-blue">'+esc(o.cliente||'—')+'</span>&nbsp;<span class="badge bg-gray">'+(col.label||o.status)+'</span>';
+  var tabs=[
+    {id:'resumo',label:'Resumo'},
+    {id:'etapas',label:'Etapas / Checklist'},
+    {id:'diario',label:'Diário de Obra'},
+    {id:'historico',label:'Histórico'},
+  ];
+  document.getElementById('obraTabs').innerHTML=tabs.map(function(t){
+    return '<div class="modal-tab'+(t.id===tab?' active':'')+'" onclick="renderObraModal(\''+id+'\',\''+t.id+'\')">'+t.label+'</div>';
+  }).join('');
+  var body=document.getElementById('obraBody');
+  var footer=document.getElementById('obraFooter');
+  if(tab==='resumo') renderResumoTab(o,body,footer);
+  else if(tab==='etapas') await renderEtapasTab(o,body,footer);
+  else if(tab==='diario') await renderDiarioTab(o,body,footer);
+  else if(tab==='historico') await renderHistoricoTab(o,body,footer);
+}
+
+function renderResumoTab(o,body,footer){
+  var col=COLUNAS.find(function(c){return c.id===o.status;})||{};
+  var conc=getEtapasConcluidas(o.id);
+  var pct=Math.round(conc/ETAPAS_DEF.length*100);
+  body.innerHTML=
+  '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">'+
+    infoBox('Nome da Obra',o.nome)+
+    infoBox('Cliente',o.cliente||'—')+
+    infoBox('Produto',o.produto||'—')+
+    infoBox('Etapa Atual',col.label||o.status)+
+    infoBox('Vagas',(o.vagas||0)+' vagas')+
+    infoBox('Valor do Contrato','R$ '+fmtMoeda(o.valor_contrato||0))+
+    infoBox('Líder de Obra',o.lider_obra||'—')+
+    infoBox('Resp. Engenharia',o.responsavel_eng||'—')+
+    infoBox('Data de Início',o.data_inicio?fmtData(o.data_inicio):'—')+
+    infoBox('Previsão de Entrega',o.data_entrega_prevista?fmtData(o.data_entrega_prevista):'—')+
+  '</div>'+
+  '<div style="margin-bottom:16px">'+
+    '<div style="font-size:12px;font-weight:600;color:var(--text-2);margin-bottom:8px;">Progresso das Etapas — '+pct+'% ('+conc+'/'+ETAPAS_DEF.length+')</div>'+
+    '<div style="height:8px;background:#e5e7eb;border-radius:4px;overflow:hidden">'+
+      '<div style="height:100%;width:'+pct+'%;background:var(--verde);border-radius:4px;transition:width .3s"></div>'+
+    '</div>'+
+  '</div>'+
+  (o.observacoes?'<div style="background:var(--bg);border-radius:10px;padding:14px"><div style="font-size:11px;font-weight:600;color:var(--text-3);margin-bottom:6px">OBSERVAÇÕES</div><div style="font-size:13px;color:var(--text)">'+esc(o.observacoes)+'</div></div>':'');
+  footer.innerHTML=
+    '<button class="btn btn-ghost" onclick="editarObra(\''+o.id+'\')">✏️ Editar</button>'+
+    '<button class="btn btn-ghost btn-sm" style="color:#dc2626;border-color:#fca5a5" onclick="confirmarExcluirObra(\''+o.id+'\',\''+esc(o.nome)+'\')">🗑️</button>'+
+    '<button class="btn btn-primary" onclick="closeObraModal()">Fechar</button>';
+}
+
+async function renderEtapasTab(o,body,footer){
+  var{data:ets}=await supaGet('ecm_obra_etapas','obra_id=eq.'+o.id);
+  var etMap={};
+  (ets||[]).forEach(function(e){etMap[e.etapa_id]=e;});
+  ENG.etapasMap[o.id]=etMap;
+
+  var grupos={};
+  ETAPAS_DEF.forEach(function(e){
+    if(!grupos[e.grupo]) grupos[e.grupo]=[];
+    grupos[e.grupo].push(e);
+  });
+  var html='';
+  Object.keys(grupos).forEach(function(g){
+    html+='<div class="etapa-group"><div class="etapa-group-title">'+g+'</div>';
+    grupos[g].forEach(function(e){
+      var reg=etMap[e.id];
+      var done=reg&&reg.concluida;
+      var dataStr=done&&reg.concluida_em?'✓ '+fmtDataHora(reg.concluida_em):'';
+      html+='<div class="etapa-item'+(done?' done':'')+'" onclick="toggleEtapa(\''+o.id+'\',\''+e.id+'\','+done+')">'+
+        '<div class="etapa-cb"></div>'+
+        '<div class="etapa-label">'+esc(e.label)+'</div>'+
+        '<div class="etapa-data">'+dataStr+'</div>'+
+      '</div>';
+    });
+    html+='</div>';
+  });
+  body.innerHTML=html;
+  var conc=Object.values(etMap).filter(function(e){return e.concluida;}).length;
+  var pct=Math.round(conc/ETAPAS_DEF.length*100);
+  footer.innerHTML='<div style="flex:1;font-size:12px;color:var(--text-2)">'+conc+'/'+ETAPAS_DEF.length+' etapas concluídas ('+pct+'%)</div><button class="btn btn-primary" onclick="closeObraModal()">Fechar</button>';
+}
+
+async function toggleEtapa(obraId,etapaId,jaDone){
+  var novo=!jaDone;
+  var{data:existente}=await supaGetOne('ecm_obra_etapas','obra_id=eq.'+obraId+'&etapa_id=eq.'+etapaId);
+  if(existente){
+    await supaPatch('ecm_obra_etapas','id=eq.'+existente.id,{concluida:novo,concluida_em:novo?new Date().toISOString():null});
+  } else {
+    await supaPost('ecm_obra_etapas',{obra_id:obraId,etapa_id:etapaId,concluida:novo,concluida_em:novo?new Date().toISOString():null});
+  }
+  // Histórico
+  var et=ETAPAS_DEF.find(function(e){return e.id===etapaId;});
+  if(et) await supaPost('ecm_obra_historico',{obra_id:obraId,tipo:'etapa',descricao:(novo?'✓ Concluiu: ':'○ Desconclui: ')+(et.label),usuario_nome:ENG.perfil.nome});
+  showToast(novo?'Etapa concluída!':'Etapa desmarcada.','success');
+  var o=ENG.obras.find(function(x){return x.id===obraId;});
+  if(o) await renderObraModal(obraId,'etapas');
+}
+
+async function renderDiarioTab(o,body,footer){
+  var{data:entradas}=await supaGet('ecm_obra_diario','obra_id=eq.'+o.id+'&order=data.desc');
+  entradas=entradas||[];
+  var html=entradas.length?entradas.map(function(d){
+    return '<div class="diario-entry">'+
+      '<div class="diario-header">'+
+        '<span class="diario-data">'+fmtData(d.data)+'</span>'+
+        '<span class="diario-clima">'+esc(d.clima||'')+'</span>'+
+      '</div>'+
+      (d.atividades?'<div class="diario-ativ">'+esc(d.atividades)+'</div>':'')+
+      (d.pendencias?'<div class="diario-pend">⚠ '+esc(d.pendencias)+'</div>':'')+
+      (d.proximos_passos?'<div style="font-size:12px;color:var(--text-2);margin-top:6px">Próximos passos: '+esc(d.proximos_passos)+'</div>':'')+
+    '</div>';
+  }).join(''):'<div class="empty">Nenhuma entrada no diário ainda.</div>';
+  body.innerHTML=html;
+  footer.innerHTML='<button class="btn btn-ghost" onclick="novaEntradaDiario(\''+o.id+'\')">＋ Adicionar Entrada</button><button class="btn btn-primary" onclick="closeObraModal()">Fechar</button>';
+}
+
+function novaEntradaDiario(obraId){
+  var hoje=new Date().toISOString().split('T')[0];
+  var climas=['☀️ Ensolarado','⛅ Nublado','🌧️ Chuvoso','🌪️ Ventoso'];
+  var climaOpts=climas.map(function(c){return '<option value="'+c+'">'+c+'</option>';}).join('');
+  openModal('Novo Registro no Diário',
+    '<div class="form-grid">'+
+    '<div class="fg"><label>Data *</label><input type="date" id="d_data" value="'+hoje+'"></div>'+
+    '<div class="fg"><label>Clima</label><select id="d_clima"><option value="">Selecione...</option>'+climaOpts+'</select></div>'+
+    '<div class="fg full"><label>Equipe Presente</label><input id="d_equipe" placeholder="Nomes ou quantidade de pessoas"></div>'+
+    '<div class="fg full"><label>Atividades Realizadas *</label><textarea id="d_ativ" placeholder="Descreva o que foi feito hoje..."></textarea></div>'+
+    '<div class="fg full"><label>Pendências</label><textarea id="d_pend" placeholder="O que ficou pendente?" style="min-height:60px"></textarea></div>'+
+    '<div class="fg full"><label>Próximos Passos</label><textarea id="d_prox" placeholder="O que deve ser feito amanhã?" style="min-height:60px"></textarea></div>'+
+    '</div>',
+    '<button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>'+
+    '<button class="btn btn-primary" onclick="salvarDiario(\''+obraId+'\')">Salvar</button>'
+  );
+}
+async function salvarDiario(obraId){
+  var data=document.getElementById('d_data').value;
+  var ativ=(document.getElementById('d_ativ').value||'').trim();
+  if(!data){showToast('Informe a data.','error');return;}
+  if(!ativ){showToast('Descreva as atividades.','error');return;}
+  var{error}=await supaPost('ecm_obra_diario',{
+    obra_id:obraId, data, clima:document.getElementById('d_clima').value,
+    equipe:(document.getElementById('d_equipe').value||'').trim(),
+    atividades:ativ,
+    pendencias:(document.getElementById('d_pend').value||'').trim(),
+    proximos_passos:(document.getElementById('d_prox').value||'').trim(),
+  });
+  if(error){showToast('Erro: '+error,'error');return;}
+  await supaPost('ecm_obra_historico',{obra_id:obraId,tipo:'diario',descricao:'Diário registrado por '+( ENG.perfil.nome||'usuário'),usuario_nome:ENG.perfil.nome});
+  closeModal();
+  showToast('Entrada salva!','success');
+  var o=ENG.obras.find(function(x){return x.id===obraId;});
+  if(o) await renderObraModal(obraId,'diario');
+}
+
+async function renderHistoricoTab(o,body,footer){
+  var{data:hist}=await supaGet('ecm_obra_historico','obra_id=eq.'+o.id+'&order=created_at.desc');
+  hist=hist||[];
+  var html=hist.length?hist.map(function(h){
+    return '<div class="hist-item">'+
+      '<div class="hist-dot"></div>'+
+      '<div style="flex:1">'+
+        '<div class="hist-txt">'+esc(h.descricao||'')+'</div>'+
+        '<div class="hist-data">'+fmtDataHora(h.created_at)+'</div>'+
+      '</div>'+
+    '</div>';
+  }).join(''):'<div class="empty">Sem histórico ainda.</div>';
+  body.innerHTML='<div>'+html+'</div>';
+  footer.innerHTML='<button class="btn btn-primary" onclick="closeObraModal()">Fechar</button>';
+}
+
+// ════════════════════════════════════════════
+// EDITAR OBRA
+// ════════════════════════════════════════════
+function editarObra(id){
+  var o=ENG.obras.find(function(x){return x.id===id;});
+  if(!o) return;
+  var prodOpts=PRODUTOS.map(function(p){return '<option value="'+p+'"'+(p===o.produto?' selected':'')+'>'+p+'</option>';}).join('');
+  var colOpts=COLUNAS.map(function(c){return '<option value="'+c.id+'"'+(c.id===o.status?' selected':'')+'>'+c.label+'</option>';}).join('');
+  openModal('Editar Obra — '+esc(o.nome),
+    '<div class="form-grid">'+
+    '<div class="fg full"><label>Nome *</label><input id="eo_nome" value="'+esc(o.nome)+'"></div>'+
+    '<div class="fg"><label>Cliente *</label><input id="eo_cliente" value="'+esc(o.cliente||'')+'"></div>'+
+    '<div class="fg"><label>Produto</label><select id="eo_produto"><option value="">Selecione...</option>'+prodOpts+'</select></div>'+
+    '<div class="fg"><label>Vagas</label><input type="number" id="eo_vagas" value="'+(o.vagas||0)+'"></div>'+
+    '<div class="fg"><label>Valor do Contrato (R$)</label><input type="number" id="eo_valor" value="'+(o.valor_contrato||0)+'" step="0.01"></div>'+
+    '<div class="fg"><label>Etapa</label><select id="eo_status">'+colOpts+'</select></div>'+
+    '<div class="fg"><label>Líder de Obra</label><input id="eo_lider" value="'+esc(o.lider_obra||'')+'"></div>'+
+    '<div class="fg"><label>Resp. Engenharia</label><input id="eo_resp" value="'+esc(o.responsavel_eng||'')+'"></div>'+
+    '<div class="fg"><label>Data de Início</label><input type="date" id="eo_inicio" value="'+(o.data_inicio||'')+'"></div>'+
+    '<div class="fg"><label>Previsão de Entrega</label><input type="date" id="eo_entrega" value="'+(o.data_entrega_prevista||'')+'"></div>'+
+    '<div class="fg full"><label>Observações</label><textarea id="eo_obs">'+esc(o.observacoes||'')+'</textarea></div>'+
+    '</div>',
+    '<button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>'+
+    '<button class="btn btn-primary" onclick="salvarEdicaoObra(\''+id+'\')">Salvar</button>'
+  );
+}
+async function salvarEdicaoObra(id){
+  var nome=(document.getElementById('eo_nome').value||'').trim();
+  var cliente=(document.getElementById('eo_cliente').value||'').trim();
+  if(!nome||!cliente){showToast('Nome e cliente são obrigatórios.','error');return;}
+  var{error}=await supaPatch('ecm_obras','id=eq.'+id,{
+    nome, cliente,
+    produto:document.getElementById('eo_produto').value,
+    vagas:parseInt(document.getElementById('eo_vagas').value)||0,
+    valor_contrato:parseFloat(document.getElementById('eo_valor').value)||0,
+    status:document.getElementById('eo_status').value,
+    lider_obra:(document.getElementById('eo_lider').value||'').trim(),
+    responsavel_eng:(document.getElementById('eo_resp').value||'').trim(),
+    data_inicio:document.getElementById('eo_inicio').value||null,
+    data_entrega_prevista:document.getElementById('eo_entrega').value||null,
+    observacoes:(document.getElementById('eo_obs').value||'').trim(),
+  });
+  if(error){showToast('Erro: '+error,'error');return;}
+  closeModal();
+  showToast('Obra atualizada!','success');
+  await loadObras();
+  closeObraModal();
+  navigate(_obraTab==='resumo'?'kanban':'kanban');
+  await renderKanban();
+}
+
+async function confirmarExcluirObra(id,nome){
+  if(!confirm('Excluir a obra "'+nome+'"? Esta ação não pode ser desfeita.')) return;
+  await supaDelete('ecm_obras','id=eq.'+id);
+  closeObraModal();
+  showToast('Obra excluída.','success');
+  await renderKanban();
+}
+
+// ════════════════════════════════════════════
+// MODAL GENÉRICO
+// ════════════════════════════════════════════
+function openModal(title,body,footer){
+  document.getElementById('gmTitle').textContent=title;
+  document.getElementById('gmBody').innerHTML=body;
+  document.getElementById('gmFooter').innerHTML=footer||'';
+  document.getElementById('genericModal').classList.add('open');
+  setTimeout(function(){var f=document.querySelector('#gmBody input:not([disabled])');if(f)f.focus();},100);
+}
+function closeModal(){document.getElementById('genericModal').classList.remove('open');}
+document.getElementById('genericModal').addEventListener('click',function(e){if(e.target===e.currentTarget)closeModal();});
+document.getElementById('obraModal').addEventListener('click',function(e){if(e.target===e.currentTarget)closeObraModal();});
+
+// ════════════════════════════════════════════
+// TOAST
+// ════════════════════════════════════════════
+var _tt;
+function showToast(msg,type){
+  var el=document.getElementById('toast');
+  el.textContent=msg;el.className='show '+(type||'');
+  clearTimeout(_tt);_tt=setTimeout(function(){el.className='';},3500);
+}
+
+// ════════════════════════════════════════════
+// UTILS
+// ════════════════════════════════════════════
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function fmtMoeda(v){return (v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function fmtData(s){if(!s)return'—';var d=new Date(s+'T12:00:00');return d.toLocaleDateString('pt-BR');}
+function fmtDataHora(s){if(!s)return'—';return new Date(s).toLocaleString('pt-BR');}
+function infoBox(label,val){return '<div style="background:var(--bg);border-radius:9px;padding:12px"><div style="font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">'+label+'</div><div style="font-size:13px;font-weight:600;color:var(--text)">'+esc(String(val||'—'))+'</div></div>';}
+
+// ════════════════════════════════════════════
+// BOOT
+// ════════════════════════════════════════════
+document.getElementById('loginSenha').addEventListener('keydown',function(e){if(e.key==='Enter')doLogin();});
+document.getElementById('loginEmail').addEventListener('keydown',function(e){if(e.key==='Enter')document.getElementById('loginSenha').focus();});
+
+(async function boot(){
+  try{
+    var sess=JSON.parse(localStorage.getItem('ecm_session')||'null');
+    if(sess&&sess.access_token&&sess.id){
+      SUPA_TOKEN=sess.access_token;
+      var{data:perfil}=await supaGetOne('ecm_perfis','id=eq.'+sess.id);
+      if(perfil){
+        ENG.user={id:sess.id,email:sess.email};
+        ENG.perfil=perfil;
+        document.getElementById('sbAv').textContent=(perfil.nome||'?')[0].toUpperCase();
+        document.getElementById('sbNome').textContent=perfil.nome||'—';
+        document.getElementById('sbRole').textContent=perfil.cargo||perfil.perfil||'—';
+        document.getElementById('loginScreen').style.display='none';
+        document.getElementById('appShell').style.display='block';
+        navigate('dashboard');
+        return;
+      }
+      localStorage.removeItem('ecm_session');SUPA_TOKEN=null;
+    }
+  }catch(e){console.error('Boot:',e);}
+})();
+</script>
+</body>
+</html>
