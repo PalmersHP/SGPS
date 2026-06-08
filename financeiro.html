@@ -397,6 +397,7 @@ tbody tr:last-child td{border-bottom:none;}
         </div>
         <div class="tb-right">
           <span id="tbReadonlyBadge" style="display:none;background:#fee2e2;color:#dc2626;border:1px solid #fecaca;font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;">Somente Leitura</span>
+          <select id="tbUnitSelect" style="display:none;background:rgba(154,205,50,.08);border:1px solid rgba(154,205,50,.18);color:#6FAE2E;font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;cursor:pointer;outline:none;font-family:inherit;" onchange="switchEmpresa(this.value)"></select>
           <span class="tb-unit-badge" id="tbEmpresa">—</span>
           <div class="tb-user">
             <div class="tb-av" id="tbAv">?</div>
@@ -502,11 +503,13 @@ async function _withRefresh(fn){
 }
 var _COMPANY_TABLES={fin_payables:1,fin_receivables:1,fin_projects:1,fin_payment_orders:1,fin_payroll:1};
 async function supaGet(table,params,cols){
-  // Usuários de unidade só veem dados da própria empresa
-  if(_COMPANY_TABLES[table]&&typeof FIN!=='undefined'&&FIN.nivel!=='sede'&&FIN.empresa&&FIN.empresa.id){
-    var cf='company_id=eq.'+FIN.empresa.id;
-    // Evita duplicar se já foi adicionado manualmente (ex: relatórios)
-    if(!params||params.indexOf('company_id')===-1) params=(params?params+'&':'')+cf;
+  // Filtra por empresa: unidade usa FIN.empresa, sede usa FIN.filtroEmpresa (se selecionado)
+  if(_COMPANY_TABLES[table]&&typeof FIN!=='undefined'){
+    var _emp = FIN.nivel!=='sede' ? FIN.empresa : FIN.filtroEmpresa;
+    if(_emp&&_emp.id){
+      var cf='company_id=eq.'+_emp.id;
+      if(!params||params.indexOf('company_id')===-1) params=(params?params+'&':'')+cf;
+    }
   }
   var url=SUPA_URL+'/rest/v1/'+table+'?select='+(cols||'*')+(params?'&'+params:'');
   var r=await _withRefresh(()=>fetch(url,{headers:_hdr()}));
@@ -542,7 +545,7 @@ async function confirmarExcluir(table,id,nome,reloadFn,cacheKey){
 // ════════════════════════════════════════════
 // STATE
 // ════════════════════════════════════════════
-var FIN = {user:null,perfil:null,role:null,empresa:null,unidade:null,nivel:'unidade',empresas:[]};
+var FIN = {user:null,perfil:null,role:null,empresa:null,unidade:null,nivel:'unidade',empresas:[],filtroEmpresa:null};
 // Definido no boot a partir de fin_session.finReadonly — prof_fund visualiza sem editar
 var FIN_READONLY = false;
 
@@ -719,7 +722,7 @@ async function doLogout(){
   await supaSignOut();
   localStorage.removeItem('fin_session');
   localStorage.removeItem('ecm_session');
-  FIN={user:null,perfil:null,role:null,empresa:null,unidade:null,nivel:'unidade',empresas:[]};
+  FIN={user:null,perfil:null,role:null,empresa:null,unidade:null,nivel:'unidade',empresas:[],filtroEmpresa:null};
   document.getElementById('appShell').style.display='none';
   document.getElementById('loginScreen').style.display='flex';
   document.getElementById('loginErr').style.display='none';
@@ -776,7 +779,16 @@ function buildSidebar(){
   document.getElementById('sbRole').textContent=ROLE_LABELS[FIN.role]||FIN.role;
   document.getElementById('tbAv').textContent=ini;
   document.getElementById('tbNome').textContent=(p.nome||'').split(' ')[0];
-  document.getElementById('tbEmpresa').textContent=FIN.unidade?.nome||FIN.empresa?.nome||'Sombrear';
+  if(FIN.nivel==='sede'&&FIN.empresas.length>1){
+    var sel=document.getElementById('tbUnitSelect');
+    sel.innerHTML='<option value="">Todas as Unidades</option>'+
+      FIN.empresas.map(function(e){return'<option value="'+e.id+'">'+e.nome+'</option>';}).join('');
+    sel.value=FIN.filtroEmpresa?.id||'';
+    document.getElementById('tbEmpresa').style.display='none';
+    sel.style.display='';
+  } else {
+    document.getElementById('tbEmpresa').textContent=FIN.unidade?.nome||FIN.empresa?.nome||'Sombrear';
+  }
 
   var lastSection=null, html='';
   NAV.forEach(function(n){
@@ -798,6 +810,11 @@ function buildSidebar(){
       '<span style="margin-left:auto;font-size:9px;color:rgba(255,255,255,.2);background:rgba(255,255,255,.05);padding:2px 6px;border-radius:8px">breve</span></div>';
   });
   document.getElementById('sidebarNav').innerHTML=html;
+}
+
+function switchEmpresa(id){
+  FIN.filtroEmpresa = id ? (FIN.empresas.find(function(e){return e.id===id;})||null) : null;
+  if(_currentView) navigate(_currentView);
 }
 
 var _currentView='';
