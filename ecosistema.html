@@ -275,9 +275,9 @@ tbody tr:last-child td{border-bottom:none;}
 
 /* ══ FORMS ══ */
 .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
-.fg{display:flex;flex-direction:column;gap:5px;}
+.fg{display:flex;flex-direction:column;gap:5px;min-width:0;}
 .fg label{font-size:12px;font-weight:600;color:var(--text-2);}
-.fg input,.fg select,.fg textarea{padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-family:'Poppins',sans-serif;color:var(--text);outline:none;transition:border-color .15s;background:#fff;}
+.fg input,.fg select,.fg textarea{width:100%;min-width:0;box-sizing:border-box;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-family:'Poppins',sans-serif;color:var(--text);outline:none;transition:border-color .15s;background:#fff;}
 .fg input:focus,.fg select:focus,.fg textarea:focus{border-color:var(--verde);}
 .fg input:disabled{background:#f8fafc;color:#94a3b8;}
 
@@ -409,6 +409,7 @@ tbody tr:last-child td{border-bottom:none;}
         <div class="view" id="view-usuarios"></div>
         <div class="view" id="view-unidades"></div>
         <div class="view" id="view-perfil"></div>
+        <div class="view" id="view-atribuicoes"></div>
       </div>
     </div>
   </div>
@@ -436,6 +437,7 @@ tbody tr:last-child td{border-bottom:none;}
 var SUPA_URL  = 'https://gwcgcvgowoqyhthdbear.supabase.co';
 var SUPA_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd3Y2djdmdvd29xeWh0aGRiZWFyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyMjQ1NzUsImV4cCI6MjA5MTgwMDU3NX0.lBB4o9J6DPr5MNQUP9p2lCWzhUBBS7Hvu0JETmH7hjc';
 var SUPA_TOKEN = null;
+var _refreshToken = null;
 
 function _hdr(){
   return { 'apikey':SUPA_ANON, 'Authorization':'Bearer '+(SUPA_TOKEN||SUPA_ANON), 'Content-Type':'application/json' };
@@ -454,7 +456,38 @@ async function supaSignUp(email, password){
 }
 async function supaSignOut(){
   if(SUPA_TOKEN) fetch(SUPA_URL+'/auth/v1/logout',{ method:'POST', headers:_hdr() }).catch(()=>{});
-  SUPA_TOKEN = null;
+  SUPA_TOKEN = null; _refreshToken = null;
+}
+async function supaRefreshToken(){
+  var rt = _refreshToken;
+  if(!rt){ try{ var s=JSON.parse(localStorage.getItem('ecm_session')||'null'); rt=s?.refresh_token; }catch(e){} }
+  if(!rt) return false;
+  try{
+    var r = await fetch(SUPA_URL+'/auth/v1/token?grant_type=refresh_token',{
+      method:'POST', headers:{'apikey':SUPA_ANON,'Content-Type':'application/json'},
+      body:JSON.stringify({refresh_token:rt})
+    });
+    if(!r.ok) return false;
+    var d = await r.json();
+    if(!d.access_token) return false;
+    SUPA_TOKEN = d.access_token; _refreshToken = d.refresh_token;
+    try{
+      var sess = JSON.parse(localStorage.getItem('ecm_session')||'null');
+      if(sess){ sess.access_token=d.access_token; sess.refresh_token=d.refresh_token; localStorage.setItem('ecm_session',JSON.stringify(sess)); }
+      var finSess = JSON.parse(localStorage.getItem('fin_session')||'null');
+      if(finSess){ finSess.access_token=d.access_token; finSess.refresh_token=d.refresh_token; localStorage.setItem('fin_session',JSON.stringify(finSess)); }
+    }catch(e){}
+    return true;
+  }catch(e){ return false; }
+}
+async function _withRefresh(fn){
+  var r = await fn();
+  if(r.status===401){
+    var ok = await supaRefreshToken();
+    if(ok) return await fn();
+    doLogout(); return new Response('{"message":"Sessão expirada"}',{status:401});
+  }
+  return r;
 }
 async function supaUpdatePassword(password){
   var r = await fetch(SUPA_URL+'/auth/v1/user',{ method:'PUT', headers:_hdr(), body:JSON.stringify({password}) });
@@ -463,7 +496,7 @@ async function supaUpdatePassword(password){
 }
 async function supaGet(table, params, cols){
   var url = SUPA_URL+'/rest/v1/'+table+'?select='+(cols||'*')+(params?'&'+params:'');
-  var r = await fetch(url,{ headers:_hdr() });
+  var r = await _withRefresh(()=>fetch(url,{ headers:_hdr() }));
   if(!r.ok){ var e=await r.json(); return { data:[], error:e }; }
   return { data: await r.json() };
 }
@@ -472,17 +505,17 @@ async function supaGetOne(table, params, cols){
   return { data:(Array.isArray(data)&&data.length)?data[0]:null, error };
 }
 async function supaPost(table, body){
-  var r = await fetch(SUPA_URL+'/rest/v1/'+table,{ method:'POST', headers:Object.assign({},_hdr(),{'Prefer':'return=representation'}), body:JSON.stringify(body) });
+  var r = await _withRefresh(()=>fetch(SUPA_URL+'/rest/v1/'+table,{ method:'POST', headers:Object.assign({},_hdr(),{'Prefer':'return=representation'}), body:JSON.stringify(body) }));
   if(!r.ok){ var e=await r.json(); return { error:e.message||JSON.stringify(e) }; }
   var d = await r.json(); return { data:Array.isArray(d)?d[0]:d };
 }
 async function supaPatch(table, params, body){
-  var r = await fetch(SUPA_URL+'/rest/v1/'+table+'?'+params,{ method:'PATCH', headers:Object.assign({},_hdr(),{'Prefer':'return=minimal'}), body:JSON.stringify(body) });
+  var r = await _withRefresh(()=>fetch(SUPA_URL+'/rest/v1/'+table+'?'+params,{ method:'PATCH', headers:Object.assign({},_hdr(),{'Prefer':'return=minimal'}), body:JSON.stringify(body) }));
   if(!r.ok){ var e=await r.json(); return { error:e.message||JSON.stringify(e) }; }
   return { data:true };
 }
 async function supaDelete(table, params){
-  var r = await fetch(SUPA_URL+'/rest/v1/'+table+'?'+params,{ method:'DELETE', headers:_hdr() });
+  var r = await _withRefresh(()=>fetch(SUPA_URL+'/rest/v1/'+table+'?'+params,{ method:'DELETE', headers:_hdr() }));
   return { ok:r.ok };
 }
 
@@ -496,30 +529,38 @@ var ECO = { user:null, perfil:null, unidade:null };
 // ════════════════════════════════════════════
 var PERFIL_LABELS = {
   proprietario:'Proprietário', gestor:'Gestor Geral', admin:'Administrador',
+  prof_fund:'Prop. Fundadora', socio_prop:'Sócio Prop.',
   gestor_unidade:'Gestor de Unidade', vendedor:'Vendedor',
   engenharia:'Engenharia', compras:'Compras', financeiro:'Financeiro',
   lider_obra:'Líder de Obra', visualizador:'Visualizador'
 };
 var PERFIL_COR = {
-  proprietario:'bg-purple', gestor:'bg-blue', admin:'bg-orange',
+  proprietario:'bg-purple', gestor:'bg-blue', admin:'bg-green',
+  prof_fund:'bg-purple', socio_prop:'bg-orange',
   gestor_unidade:'bg-blue', vendedor:'bg-green',
   engenharia:'bg-orange', compras:'bg-gray', financeiro:'bg-teal',
   lider_obra:'bg-orange', visualizador:'bg-gray'
 };
 var ACESSO = {
-  proprietario:  ['crm','pedidos','producao','relatorios','usuarios','unidades'],
-  gestor:        ['crm','pedidos','producao','relatorios','usuarios','unidades'],
-  admin:         ['crm','pedidos','producao','relatorios','usuarios','unidades'],
-  gestor_unidade:['crm','pedidos','producao','relatorios'],
-  vendedor:      ['crm'],
-  engenharia:    ['pedidos','producao'],
-  compras:       ['pedidos'],
-  financeiro:    ['relatorios'],
-  lider_obra:    ['producao'],
+  proprietario:  ['crm','pedidos','producao','engenharia','relatorios','financeiro','usuarios','unidades'],
+  gestor:        ['crm','pedidos','producao','engenharia','relatorios','financeiro','usuarios','unidades'],
+  admin:         ['crm','pedidos','producao','engenharia','relatorios','financeiro','usuarios','unidades'],
+  prof_fund:     ['crm','pedidos','producao','engenharia','relatorios','financeiro'],
+  socio_prop:    ['pedidos','producao','engenharia','relatorios','financeiro','usuarios'],
+  gestor_unidade:['crm','pedidos','producao','engenharia','relatorios','financeiro'],
+  vendedor:      ['crm','financeiro'],
+  engenharia:    ['pedidos','producao','engenharia','financeiro'],
+  compras:       ['pedidos','financeiro'],
+  financeiro:    ['relatorios','financeiro'],
+  lider_obra:    ['producao','engenharia','financeiro'],
   visualizador:  []
 };
 function pode(mod){ return (ACESSO[ECO.perfil?.perfil||'']||[]).includes(mod); }
 function isAdmin(){ return ['proprietario','gestor','admin'].includes(ECO.perfil?.perfil||''); }
+function isSocio(){ return ECO.perfil?.perfil === 'socio_prop'; }
+function isFinanceiroReadOnly(){ return ECO.perfil?.perfil === 'prof_fund'; }
+function podeGerenciarUsuarios(){ return isAdmin() || isSocio(); }
+function podeGerenciarUnidades(){ return isAdmin(); }
 
 // ════════════════════════════════════════════
 // AUTH
@@ -535,6 +576,7 @@ async function doLogin(){
     var result = await supaAuth(email, senha);
     if(result.error){ mostrarErroLogin(result.error); return; }
     SUPA_TOKEN = result.data.access_token;
+    _refreshToken = result.data.refresh_token||null;
     await iniciarSessao(result.data, result.data.user);
   } catch(e) {
     mostrarErroLogin('Erro de conexão: '+e.message);
@@ -575,13 +617,17 @@ async function iniciarSessao(session, user){
 }
 
 function salvarSSOLocal(user, perfil, token){
-  localStorage.setItem('ecm_session', JSON.stringify({
+  var sessData = {
     id: user.id, email: user.email,
     nome: perfil.nome, perfil: perfil.perfil,
     unidade_id: perfil.unidade_id||null,
     unidade_nome: ECO.unidade?.nome || 'Sede Sombrear',
-    access_token: token
-  }));
+    access_token: token,
+    refresh_token: _refreshToken||null
+  };
+  localStorage.setItem('ecm_session', JSON.stringify(sessData));
+  // Sincroniza fin_session — finReadonly: prof_fund visualiza financeiro sem editar
+  localStorage.setItem('fin_session', JSON.stringify(Object.assign({}, sessData, { finReadonly: isFinanceiroReadOnly() })));
   // SSO com SGPS — busca usuário pelo email e simula login
   conectarSGPS(user.email);
 }
@@ -614,10 +660,11 @@ async function doLogout(){
 // SIDEBAR + NAVEGAÇÃO
 // ════════════════════════════════════════════
 var NAV = [
-  { id:'dashboard', icon:'⊞',  label:'Dashboard',  section:'MENU' },
-  { id:'usuarios',  icon:'👥',  label:'Usuários',   section:null,  admin:true },
-  { id:'unidades',  icon:'🏢',  label:'Unidades',   section:null,  admin:true },
-  { id:'perfil',    icon:'⚙️', label:'Meu Perfil', section:'CONFIGURAÇÕES' },
+  { id:'dashboard',   icon:'⊞',  label:'Dashboard',   section:'MENU' },
+  { id:'usuarios',    icon:'👥',  label:'Usuários',    section:null,  socio:true },
+  { id:'unidades',    icon:'🏢',  label:'Unidades',    section:null,  admin:true },
+  { id:'atribuicoes', icon:'🔑',  label:'Atribuições', section:'CONFIGURAÇÕES', admin:true },
+  { id:'perfil',      icon:'⚙️',  label:'Meu Perfil',  section:null },
 ];
 
 function buildSidebar(){
@@ -632,6 +679,7 @@ function buildSidebar(){
   var lastSection = null, html = '';
   NAV.forEach(function(n){
     if(n.admin && !isAdmin()) return;
+    if(n.socio && !podeGerenciarUsuarios()) return;
     if(n.section && n.section !== lastSection){
       html += '<div class="sb-section">'+n.section+'</div>';
       lastSection = n.section;
@@ -642,7 +690,7 @@ function buildSidebar(){
   document.getElementById('sidebarNav').innerHTML = html;
 }
 
-var PAGE_TITLES = { dashboard:'Dashboard', usuarios:'Usuários', unidades:'Unidades', perfil:'Meu Perfil' };
+var PAGE_TITLES = { dashboard:'Dashboard', usuarios:'Usuários', unidades:'Unidades', perfil:'Meu Perfil', atribuicoes:'Atribuições' };
 function navigate(view){
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
@@ -655,6 +703,7 @@ function navigate(view){
   else if(view==='usuarios') renderUsuarios();
   else if(view==='unidades') renderUnidades();
   else if(view==='perfil') renderPerfil();
+  else if(view==='atribuicoes') renderAtribuicoes();
 }
 
 // ════════════════════════════════════════════
@@ -664,11 +713,12 @@ async function renderDashboard(){
   var el = document.getElementById('view-dashboard');
   el.innerHTML = '<div class="page-hdr"><div class="skeleton" style="width:200px;height:28px;margin-bottom:8px"></div><div class="skeleton" style="width:300px;height:16px"></div></div>';
 
-  var [ {data:leads}, {data:obras} ] = await Promise.all([
+  var [ {data:leads}, {data:obras}, {data:varPedidos} ] = await Promise.all([
     supaGet('ecm_leads','perdido=eq.false','id,etapa,valor_estimado,perdido'),
-    supaGet('ecm_obras','','id,status')
+    supaGet('ecm_obras','','id,status'),
+    supaGet('var_pedidos','status=neq.cancelado&status=neq.finalizado','id,status,valor_total')
   ]);
-  leads = leads||[]; obras = obras||[];
+  leads = leads||[]; obras = obras||[]; varPedidos = varPedidos||[];
 
   var pipeline      = leads.reduce((s,l)=>s+(l.valor_estimado||0), 0);
   var emNeg         = leads.filter(l=>['em_negociacao','assembleia','proposta_enviada'].includes(l.etapa)).length;
@@ -676,19 +726,29 @@ async function renderDashboard(){
   var obrasEntregues= obras.filter(o=>o.status==='entregue'||o.status==='concluida').length;
   var propostas     = leads.filter(l=>l.etapa==='proposta_enviada').length;
 
+  var obrasFinalizadas = obras.filter(function(o){return o.status==='finalizada';}).length;
+  var varAtivos  = varPedidos.length;
+  var varValMes  = varPedidos.reduce(function(s,p){ return s+(p.valor_total||0); }, 0);
   var MODULOS = [
-    { id:'crm',      icon:'🎯', cor:'rgba(154,205,50,.1)',   href:'crm.html',      title:'CRM',
+    { id:'crm',        icon:'🎯', cor:'rgba(154,205,50,.1)',  href:'https://salve-gestor.vercel.app/index.html', title:'CRM',
       desc:'Kanban de leads, propostas e gestão comercial completa.',
       stats:[{val:leads.length,lbl:'Leads ativos'},{val:emNeg,lbl:'Em negociação'}],
       live:true, modulo:'crm' },
-    { id:'producao', icon:'🔧', cor:'rgba(96,165,250,.12)',  href:'producao.html', title:'Produção / Operação',
-      desc:'Gestão de obras, etapas, checklist e diário de campo.',
-      stats:[{val:obrasAtivas,lbl:'Em andamento'},{val:obrasEntregues,lbl:'Entregues'}],
-      live:true, modulo:'producao' },
-    { id:'pedidos',  icon:'📦', cor:'rgba(245,158,11,.1)',   href:'app.html',      title:'Sistema de Pedidos',
+    { id:'engenharia', icon:'🏗️', cor:'rgba(141,198,63,.12)', href:'engenharia.html', title:'Controle de Obras',
+      desc:'Kanban de execução, checklists por tipo de cobertura, diário e quantitativos.',
+      stats:[{val:obrasAtivas,lbl:'Em execução'},{val:obrasFinalizadas,lbl:'Finalizadas'}],
+      live:true, modulo:'engenharia' },
+    { id:'varejo',     icon:'🛒', cor:'rgba(59,130,246,.1)',  href:'varejo.html',     title:'Pedidos Varejo',
+      desc:'Gestão de pedidos de varejo com Kanban, medidas, financeiro e documentos.',
+      stats:[{val:varAtivos,lbl:'Pedidos ativos'},{val:'R$ '+varValMes.toLocaleString('pt-BR',{minimumFractionDigits:0,maximumFractionDigits:0}),lbl:'Valor em aberto'}],
+      live:true, modulo:'pedidos' },
+    { id:'pedidos',    icon:'📦', cor:'rgba(245,158,11,.1)',  href:'app.html',        title:'Sistema de Pedidos',
       desc:'Pedidos de materiais entre filiais e indústria Sombrear.',
       stats:[], live:true, modulo:'pedidos' },
-    { id:'rel',      icon:'📊', cor:'rgba(139,92,246,.1)',   href:null,            title:'Relatórios',
+    { id:'financeiro', icon:'💰', cor:'rgba(16,185,129,.1)',  href:'financeiro.html', title:'Financeiro',
+      desc:'Contas a pagar e receber, projetos, ordens de pagamento e gestão financeira completa.',
+      stats:[], live:true, modulo:'financeiro' },
+    { id:'rel',        icon:'📊', cor:'rgba(139,92,246,.1)',  href:null,              title:'Relatórios',
       desc:'Análise financeira e operacional integrada de todas as unidades.',
       stats:[], live:false, modulo:'relatorios' },
   ];
@@ -746,21 +806,34 @@ async function renderUsuarios(){
   var el = document.getElementById('view-usuarios');
   el.innerHTML = '<div class="page-hdr"><h1>Usuários</h1></div><div style="color:var(--text-3);font-size:13px">Carregando...</div>';
 
-  var [{ data:users },{ data:unidades }] = await Promise.all([
+  var [{ data:allUsers },{ data:unidades }] = await Promise.all([
     supaGet('ecm_perfis','order=nome'),
     supaGet('ecm_unidades','order=nome','id,nome')
   ]);
-  users = users||[]; unidades = unidades||[];
+  allUsers = allUsers||[]; unidades = unidades||[];
   var unMap = Object.fromEntries(unidades.map(u=>[u.id, u.nome]));
+
+  // Sócio Prop vê apenas usuários da própria filial
+  var users = allUsers.filter(function(u){
+    if(isAdmin()) return true;
+    if(isSocio()) return u.unidade_id === ECO.perfil?.unidade_id;
+    return false;
+  });
 
   var rows = users.map(function(u){
     var pBadge = '<span class="badge '+(PERFIL_COR[u.perfil]||'bg-gray')+'">'+( PERFIL_LABELS[u.perfil]||u.perfil)+'</span>';
     var sBadge = u.ativo
       ? '<span class="badge bg-green">Ativo</span>'
       : '<span class="badge bg-gray">Inativo</span>';
-    var euBtn = u.id===ECO.user.id
+    var isMe = u.id === ECO.user.id;
+    var podeExcluir = !isMe && isAdmin();
+    var euBtn = isMe
       ? '<span style="font-size:11px;color:#94a3b8">você</span>'
       : '<button class="btn btn-sm btn-danger" onclick="toggleUsuario(\''+u.id+'\','+u.ativo+')">'+(u.ativo?'Inativar':'Ativar')+'</button>';
+    var excluirBtn = podeExcluir
+      ? ' <button class="btn btn-sm btn-danger" onclick="excluirUsuario(\''+u.id+'\',\''+esc(u.nome)+'\')" title="Excluir usuário">🗑️</button>'
+      : '';
+    var senhaBtn = isMe ? '' : ' <button class="btn btn-sm btn-outline" onclick="abrirAlterarSenha(\''+u.id+'\',\''+esc(u.nome)+'\')" title="Alterar senha">🔒</button>';
     return '<tr>'+
       '<td><div style="display:flex;align-items:center;gap:10px">'+
         '<div class="av av-sm">'+( u.nome||'?')[0].toUpperCase()+'</div>'+
@@ -771,8 +844,8 @@ async function renderUsuarios(){
       '<td>'+pBadge+'</td>'+
       '<td>'+sBadge+'</td>'+
       '<td style="white-space:nowrap">'+
-        '<button class="btn btn-sm btn-outline" onclick="editarUsuario(\''+u.id+'\')">✏️ Editar</button> '+
-        euBtn+
+        '<button class="btn btn-sm btn-outline" onclick="editarUsuario(\''+u.id+'\')">✏️ Editar</button>'+
+        senhaBtn+' '+euBtn+excluirBtn+
       '</td>'+
     '</tr>';
   }).join('') || '<tr><td colspan="6" style="text-align:center;padding:40px;color:#94a3b8">Nenhum usuário.</td></tr>';
@@ -780,7 +853,7 @@ async function renderUsuarios(){
   el.innerHTML =
   '<div class="page-hdr-row">'+
     '<div><h1 style="font-size:22px;font-weight:700;color:var(--text)">Usuários</h1><p style="font-size:13px;color:var(--text-2);margin-top:3px">'+users.length+' usuário(s) cadastrado(s).</p></div>'+
-    '<button class="btn btn-primary" onclick="novoUsuario()">＋ Novo Usuário</button>'+
+    (podeGerenciarUsuarios() ? '<button class="btn btn-primary" onclick="novoUsuario()">＋ Novo Usuário</button>' : '')+
   '</div>'+
   '<div class="card"><div class="card-body" style="padding:0"><div class="tbl-wrap">'+
   '<table><thead><tr><th>Usuário</th><th>Cargo</th><th>Unidade</th><th>Perfil</th><th>Status</th><th></th></tr></thead>'+
@@ -801,6 +874,7 @@ async function novoUsuario(){
     '<div class="fg"><label>Confirmar Senha *</label><input type="password" id="nu_senha2" placeholder="Repita a senha"></div>'+
     '<div class="fg"><label>Perfil de Acesso *</label><select id="nu_perfil">'+pOpts+'</select></div>'+
     '<div class="fg"><label>Unidade</label><select id="nu_unidade">'+unOpts+'</select></div>'+
+    '<div class="fg"><label>Nível Financeiro</label><select id="nu_nivel"><option value="unidade">Unidade (vê só sua empresa)</option><option value="sede">Sede (vê todas as empresas)</option></select></div>'+
     '</div>',
     '<button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>'+
     '<button class="btn btn-primary" onclick="salvarNovoUsuario()">Criar Usuário</button>'
@@ -815,17 +889,23 @@ async function salvarNovoUsuario(){
   var cargo = (document.getElementById('nu_cargo').value||'').trim();
   var perfil= document.getElementById('nu_perfil').value;
   var unid  = document.getElementById('nu_unidade').value||null;
+  var nivel = document.getElementById('nu_nivel').value||'unidade';
   if(!nome)  { showToast('Informe o nome.','error'); return; }
   if(!email||!email.includes('@')){ showToast('E-mail inválido.','error'); return; }
   if(senha.length<6){ showToast('Senha deve ter ao menos 6 caracteres.','error'); return; }
   if(senha!==senha2){ showToast('As senhas não conferem.','error'); return; }
 
-  var { data:authData, error:authErr } = await supaSignUp(email, senha);
-  if(authErr){ showToast('Erro: '+authErr,'error'); return; }
-  var uid = authData?.user?.id || authData?.id;
-  if(!uid){ showToast('Erro: ative "Auto Confirm" no Supabase e tente novamente.','error'); return; }
+  // Verifica email duplicado antes de tentar criar
+  var { data:existente } = await supaGetOne('ecm_perfis','email=eq.'+encodeURIComponent(email));
+  if(existente){ showToast('E-mail já cadastrado.','error'); return; }
 
-  var { error:pe } = await supaPost('ecm_perfis', { id:uid, nome, email, cargo, perfil, unidade_id:unid, ativo:true });
+  var { data:authData, error:authErr } = await supaSignUp(email, senha);
+  if(authErr){ showToast('Erro ao criar conta: '+authErr,'error'); return; }
+  var uid = authData?.user?.id || authData?.id;
+  if(!uid){ showToast('Erro: não foi possível obter o ID do usuário criado.','error'); return; }
+
+  // Trigger já cria o perfil; apenas atualiza com os dados completos
+  var { error:pe } = await supaPatch('ecm_perfis','id=eq.'+uid,{ nome, email, cargo, perfil, unidade_id:unid, nivel, ativo:true });
   if(pe){ showToast('Conta criada mas perfil falhou: '+pe,'error'); return; }
 
   closeModal();
@@ -846,9 +926,10 @@ async function editarUsuario(id){
     '<div class="form-grid">'+
     '<div class="fg"><label>Nome *</label><input id="eu_nome" value="'+esc(u.nome)+'"></div>'+
     '<div class="fg"><label>Cargo</label><input id="eu_cargo" value="'+esc(u.cargo||'')+'"></div>'+
-    '<div class="fg" style="grid-column:1/-1"><label>E-mail</label><input value="'+esc(u.email||'')+'" disabled></div>'+
+    '<div class="fg" style="grid-column:1/-1"><label>E-mail *</label><input type="email" id="eu_email" value="'+esc(u.email||'')+'"></div>'+
     '<div class="fg"><label>Perfil de Acesso</label><select id="eu_perfil">'+pOpts+'</select></div>'+
     '<div class="fg"><label>Unidade</label><select id="eu_unidade">'+unOpts+'</select></div>'+
+    '<div class="fg"><label>Nível Financeiro</label><select id="eu_nivel"><option value="unidade"'+(u.nivel!=='sede'?' selected':'')+'>Unidade (vê só sua empresa)</option><option value="sede"'+(u.nivel==='sede'?' selected':'')+'>Sede (vê todas as empresas)</option></select></div>'+
     '</div>',
     '<button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>'+
     '<button class="btn btn-primary" onclick="salvarEdicaoUsuario(\''+id+'\')">Salvar</button>'
@@ -857,11 +938,14 @@ async function editarUsuario(id){
 
 async function salvarEdicaoUsuario(id){
   var nome  = (document.getElementById('eu_nome').value||'').trim();
+  var email = (document.getElementById('eu_email').value||'').trim().toLowerCase();
   if(!nome){ showToast('Informe o nome.','error'); return; }
+  if(!email||!email.includes('@')){ showToast('E-mail inválido.','error'); return; }
   var { error } = await supaPatch('ecm_perfis','id=eq.'+id,{
-    nome, cargo:(document.getElementById('eu_cargo').value||'').trim(),
+    nome, email, cargo:(document.getElementById('eu_cargo').value||'').trim(),
     perfil:document.getElementById('eu_perfil').value,
-    unidade_id:document.getElementById('eu_unidade').value||null
+    unidade_id:document.getElementById('eu_unidade').value||null,
+    nivel:document.getElementById('eu_nivel').value||'unidade'
   });
   if(error){ showToast('Erro: '+error,'error'); return; }
   if(id===ECO.user.id){
@@ -873,10 +957,114 @@ async function salvarEdicaoUsuario(id){
   closeModal(); showToast('Usuário atualizado.','success'); renderUsuarios();
 }
 
+async function excluirUsuario(id, nome){
+  if(!confirm('Excluir o usuário "'+nome+'" permanentemente? Esta ação não pode ser desfeita.')) return;
+  var { error } = await supaDelete('ecm_perfis','id=eq.'+id);
+  if(error){ showToast('Erro ao excluir: '+error,'error'); return; }
+  showToast('Usuário "'+nome+'" excluído.','success');
+  renderUsuarios();
+}
+
 async function toggleUsuario(id, ativo){
   await supaPatch('ecm_perfis','id=eq.'+id,{ ativo:!ativo });
   showToast(ativo?'Usuário inativado.':'Usuário reativado.', 'success');
   renderUsuarios();
+}
+
+function abrirAlterarSenha(id, nome){
+  openModal('🔒 Alterar Senha — '+nome,
+    '<div class="form-grid">'+
+    '<div class="fg" style="grid-column:1/-1"><label>Nova senha *</label>'+
+    '<input type="password" id="ns_senha" placeholder="Mínimo 6 caracteres" autocomplete="new-password"></div>'+
+    '<div class="fg" style="grid-column:1/-1"><label>Confirmar nova senha *</label>'+
+    '<input type="password" id="ns_senha2" placeholder="Repita a senha" autocomplete="new-password"></div>'+
+    '</div>',
+    '<button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>'+
+    '<button class="btn btn-primary" onclick="salvarNovaSenha(\''+id+'\')">Salvar senha</button>'
+  );
+  setTimeout(function(){ var el=document.getElementById('ns_senha'); if(el) el.focus(); }, 100);
+}
+
+async function salvarNovaSenha(id){
+  var s  = (document.getElementById('ns_senha').value||'');
+  var s2 = (document.getElementById('ns_senha2').value||'');
+  if(s.length < 6){ showToast('Senha deve ter ao menos 6 caracteres.','error'); return; }
+  if(s !== s2){ showToast('As senhas não conferem.','error'); return; }
+
+  var btn = document.querySelector('#modal-footer .btn-primary');
+  if(btn){ btn.disabled=true; btn.textContent='Salvando…'; }
+
+  var r = await fetch(SUPA_URL+'/functions/v1/admin-change-password', {
+    method: 'POST',
+    headers: { 'Content-Type':'application/json', 'Authorization':'Bearer '+SUPA_TOKEN, 'apikey':SUPA_ANON },
+    body: JSON.stringify({ user_id: id, password: s })
+  });
+  var d = await r.json();
+  if(!r.ok || d.error){ showToast('Erro: '+(d.error||'Falha ao alterar senha.'),'error'); if(btn){btn.disabled=false;btn.textContent='Salvar senha';} return; }
+  closeModal();
+  showToast('Senha alterada com sucesso!','success');
+}
+
+// ════════════════════════════════════════════
+// ATRIBUIÇÕES
+// ════════════════════════════════════════════
+var ACESSO_LABELS = {
+  crm:'CRM', pedidos:'Pedidos', producao:'Produção', engenharia:'Obras',
+  relatorios:'Relatórios', usuarios:'Usuários', unidades:'Unidades'
+};
+
+async function renderAtribuicoes(){
+  var el = document.getElementById('view-atribuicoes');
+  el.innerHTML = '<div class="page-hdr"><h1>Atribuições</h1></div><div style="color:var(--text-3);font-size:13px">Carregando...</div>';
+  var { data:users } = await supaGet('ecm_perfis','ativo=eq.true&order=nome&id=neq.'+ECO.user.id);
+  users = users||[];
+
+  var pOpts = Object.entries(PERFIL_LABELS).map(([k,v])=>'<option value="'+k+'">'+v+'</option>').join('');
+
+  var rows = users.map(function(u){
+    var pOptsU = Object.entries(PERFIL_LABELS).map(([k,v])=>
+      '<option value="'+k+'"'+(k===u.perfil?' selected':'')+'>'+v+'</option>'
+    ).join('');
+    var mods = (ACESSO[u.perfil]||[]).map(function(m){
+      return '<span style="display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;background:rgba(141,198,63,.12);color:var(--verde);margin:2px 2px 0 0">'+( ACESSO_LABELS[m]||m)+'</span>';
+    }).join('');
+    return '<div style="display:grid;grid-template-columns:40px 1fr auto auto;gap:12px;align-items:center;padding:14px 16px;border-bottom:1px solid var(--border)">'+
+      '<div style="width:40px;height:40px;border-radius:50%;background:var(--verde);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;flex-shrink:0">'+esc((u.nome||'?')[0].toUpperCase())+'</div>'+
+      '<div>'+
+        '<div style="font-weight:600;font-size:14px;color:var(--text)">'+esc(u.nome)+'</div>'+
+        '<div style="font-size:12px;color:var(--text-3);margin-bottom:4px">'+esc(u.email||'')+'</div>'+
+        '<div id="mods-'+u.id+'">'+mods+'</div>'+
+      '</div>'+
+      '<select id="role-'+u.id+'" onchange="atualizarMods(\''+u.id+'\')" style="padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;min-width:160px">'+pOptsU+'</select>'+
+      '<button class="btn btn-primary btn-sm" onclick="salvarAtribuicao(\''+u.id+'\')">Salvar</button>'+
+    '</div>';
+  }).join('');
+
+  el.innerHTML =
+    '<div class="page-hdr">'+
+      '<div><h1>Atribuições</h1><p style="font-size:13px;color:var(--text-2);margin-top:3px">Defina o perfil de acesso de cada usuário.</p></div>'+
+    '</div>'+
+    '<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden">'+
+      (rows || '<div style="padding:32px;text-align:center;color:var(--text-3)">Nenhum outro usuário cadastrado.</div>')+
+    '</div>';
+}
+
+function atualizarMods(userId){
+  var sel = document.getElementById('role-'+userId);
+  var perfil = sel ? sel.value : null;
+  var mods = (ACESSO[perfil]||[]).map(function(m){
+    return '<span style="display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;background:rgba(141,198,63,.12);color:var(--verde);margin:2px 2px 0 0">'+( ACESSO_LABELS[m]||m)+'</span>';
+  }).join('');
+  var modsEl = document.getElementById('mods-'+userId);
+  if(modsEl) modsEl.innerHTML = mods || '<span style="font-size:11px;color:var(--text-3)">Sem acesso</span>';
+}
+
+async function salvarAtribuicao(userId){
+  var sel = document.getElementById('role-'+userId);
+  if(!sel) return;
+  var { error } = await supaPatch('ecm_perfis','id=eq.'+userId,{ perfil:sel.value });
+  if(error){ showToast('Erro ao salvar: '+error,'error'); return; }
+  showToast('Atribuição salva!','success');
 }
 
 // ════════════════════════════════════════════
@@ -895,8 +1083,10 @@ async function renderUnidades(){
   var rows = uns.map(function(u){
     var sBadge = u.ativo?'<span class="badge bg-green">Ativa</span>':'<span class="badge bg-gray">Inativa</span>';
     return '<tr>'+
-      '<td><div style="font-weight:600">'+esc(u.nome)+'</div>'+
-         '<div style="font-size:11px;color:var(--text-2)">'+esc(u.cidade||'')+(u.estado?' — '+esc(u.estado):'')+'</div></td>'+
+      '<td><div style="display:flex;align-items:center;gap:8px">'+
+         '<div style="width:12px;height:12px;border-radius:50%;background:'+(u.cor||'#64748b')+';flex-shrink:0"></div>'+
+         '<div><div style="font-weight:600">'+esc(u.nome)+'</div>'+
+         '<div style="font-size:11px;color:var(--text-2)">'+esc(u.cidade||'')+(u.estado?' ('+esc(u.estado)+')':'')+'</div></div></div></td>'+
       '<td>'+esc(u.responsavel||'—')+'</td>'+
       '<td style="font-family:monospace;font-size:12px">'+esc(u.cnpj||'—')+'</td>'+
       '<td style="text-align:center"><strong>'+(contMap[u.id]||0)+'</strong></td>'+
@@ -918,16 +1108,21 @@ async function renderUnidades(){
   '<tbody>'+rows+'</tbody></table></div></div></div>';
 }
 
-function novaUnidade(){
+async function novaUnidade(){
+  var{data:comps}=await supaGet('fin_companies','order=nome.asc','id,nome');
+  comps=comps||[];
+  var compOpts='<option value="">— Vincular empresa financeira —</option>'+comps.map(c=>'<option value="'+c.id+'">'+esc(c.nome)+'</option>').join('');
   openModal('Nova Unidade',
     '<div class="form-grid">'+
-    '<div class="fg" style="grid-column:1/-1"><label>Nome *</label><input id="nu2_nome" placeholder="Ex: Sombrear SP"></div>'+
-    '<div class="fg"><label>Cidade</label><input id="nu2_cidade" placeholder="Ex: São Paulo"></div>'+
-    '<div class="fg"><label>Estado</label><input id="nu2_estado" placeholder="SP" maxlength="2" style="text-transform:uppercase"></div>'+
+    '<div class="fg" style="grid-column:1/-1"><label>Nome *</label><input id="nu2_nome" placeholder="Ex: Sombrear DF"></div>'+
+    '<div class="fg"><label>Cidade</label><input id="nu2_cidade" placeholder="Ex: Brasília"></div>'+
+    '<div class="fg"><label>Estado (UF)</label><input id="nu2_estado" placeholder="DF" maxlength="2" style="text-transform:uppercase"></div>'+
+    '<div class="fg"><label>Cor da Unidade</label><input type="color" id="nu2_cor" value="#3b82f6" style="width:60px;height:36px;padding:2px;cursor:pointer"></div>'+
+    '<div class="fg"><label>Empresa Financeira</label><select id="nu2_company">'+compOpts+'</select></div>'+
     '<div class="fg"><label>Responsável</label><input id="nu2_resp" placeholder="Nome do gestor"></div>'+
     '<div class="fg"><label>CNPJ</label><input id="nu2_cnpj" placeholder="00.000.000/0001-00"></div>'+
     '<div class="fg"><label>Telefone</label><input id="nu2_tel" placeholder="(00) 00000-0000"></div>'+
-    '<div class="fg" style="grid-column:1/-1"><label>E-mail</label><input type="email" id="nu2_email" placeholder="sp@sombrear.com.br"></div>'+
+    '<div class="fg" style="grid-column:1/-1"><label>E-mail</label><input type="email" id="nu2_email" placeholder="df@sombrear.com.br"></div>'+
     '</div>',
     '<button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>'+
     '<button class="btn btn-primary" onclick="salvarNovaUnidade()">Salvar</button>'
@@ -941,6 +1136,8 @@ async function salvarNovaUnidade(){
     nome, ativo:true,
     cidade:(document.getElementById('nu2_cidade').value||'').trim(),
     estado:(document.getElementById('nu2_estado').value||'').trim().toUpperCase(),
+    cor:document.getElementById('nu2_cor').value||'#64748b',
+    company_id:document.getElementById('nu2_company').value||null,
     responsavel:(document.getElementById('nu2_resp').value||'').trim(),
     cnpj:(document.getElementById('nu2_cnpj').value||'').trim(),
     telefone:(document.getElementById('nu2_tel').value||'').trim(),
@@ -951,13 +1148,19 @@ async function salvarNovaUnidade(){
 }
 
 async function editarUnidade(id){
-  var { data:u } = await supaGetOne('ecm_unidades','id=eq.'+id);
-  if(!u) return;
+  var [{data:u},{data:comps}]=await Promise.all([
+    supaGetOne('ecm_unidades','id=eq.'+id),
+    supaGet('fin_companies','order=nome.asc','id,nome')
+  ]);
+  if(!u) return; comps=comps||[];
+  var compOpts='<option value="">— Sem empresa vinculada —</option>'+comps.map(c=>'<option value="'+c.id+'"'+(c.id===u.company_id?' selected':'')+'>'+esc(c.nome)+'</option>').join('');
   openModal('Editar — '+esc(u.nome),
     '<div class="form-grid">'+
     '<div class="fg" style="grid-column:1/-1"><label>Nome *</label><input id="eu2_nome" value="'+esc(u.nome)+'"></div>'+
     '<div class="fg"><label>Cidade</label><input id="eu2_cidade" value="'+esc(u.cidade||'')+'"></div>'+
-    '<div class="fg"><label>Estado</label><input id="eu2_estado" value="'+esc(u.estado||'')+'" maxlength="2"></div>'+
+    '<div class="fg"><label>Estado (UF)</label><input id="eu2_estado" value="'+esc(u.estado||'')+'" maxlength="2"></div>'+
+    '<div class="fg"><label>Cor da Unidade</label><input type="color" id="eu2_cor" value="'+(u.cor||'#64748b')+'" style="width:60px;height:36px;padding:2px;cursor:pointer"></div>'+
+    '<div class="fg"><label>Empresa Financeira</label><select id="eu2_company">'+compOpts+'</select></div>'+
     '<div class="fg"><label>Responsável</label><input id="eu2_resp" value="'+esc(u.responsavel||'')+'"></div>'+
     '<div class="fg"><label>CNPJ</label><input id="eu2_cnpj" value="'+esc(u.cnpj||'')+'"></div>'+
     '<div class="fg"><label>Telefone</label><input id="eu2_tel" value="'+esc(u.telefone||'')+'"></div>'+
@@ -976,6 +1179,8 @@ async function salvarEdicaoUnidade(id){
     nome,
     cidade:(document.getElementById('eu2_cidade').value||'').trim(),
     estado:(document.getElementById('eu2_estado').value||'').trim().toUpperCase(),
+    cor:document.getElementById('eu2_cor').value||'#64748b',
+    company_id:document.getElementById('eu2_company').value||null,
     responsavel:(document.getElementById('eu2_resp').value||'').trim(),
     cnpj:(document.getElementById('eu2_cnpj').value||'').trim(),
     telefone:(document.getElementById('eu2_tel').value||'').trim(),
@@ -1084,7 +1289,9 @@ document.getElementById('loginEmail').addEventListener('keydown', e=>{ if(e.key=
     var sess = JSON.parse(localStorage.getItem('ecm_session')||'null');
     if(sess&&sess.access_token&&sess.id){
       SUPA_TOKEN = sess.access_token;
-      // verifica se token ainda é válido
+      _refreshToken = sess.refresh_token||null;
+      // Tenta renovar o token proativamente antes de qualquer requisição
+      await supaRefreshToken();
       var { data:perfil } = await supaGetOne('ecm_perfis','id=eq.'+sess.id);
       if(perfil){
         ECO.user = { id:sess.id, email:sess.email };
@@ -1093,6 +1300,9 @@ document.getElementById('loginEmail').addEventListener('keydown', e=>{ if(e.key=
           var { data:un } = await supaGetOne('ecm_unidades','id=eq.'+perfil.unidade_id);
           ECO.unidade = un||null;
         }
+        // Atualiza fin_session com flag de readonly baseado no perfil atual do banco
+        var _sessAtual = JSON.parse(localStorage.getItem('ecm_session')||'{}');
+        localStorage.setItem('fin_session', JSON.stringify(Object.assign({}, _sessAtual, { finReadonly: isFinanceiroReadOnly() })));
         document.getElementById('loginScreen').style.display='none';
         document.getElementById('appShell').style.display='block';
         buildSidebar(); navigate('dashboard');
