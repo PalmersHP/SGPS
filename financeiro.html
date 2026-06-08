@@ -545,7 +545,7 @@ async function confirmarExcluir(table,id,nome,reloadFn,cacheKey){
 // ════════════════════════════════════════════
 // STATE
 // ════════════════════════════════════════════
-var FIN = {user:null,perfil:null,role:null,empresa:null,unidade:null,nivel:'unidade',empresas:[],filtroEmpresa:null};
+var FIN = {user:null,perfil:null,role:null,empresa:null,unidade:null,nivel:'unidade',empresas:[],unidades:[],filtroEmpresa:null};
 // Definido no boot a partir de fin_session.finReadonly — prof_fund visualiza sem editar
 var FIN_READONLY = false;
 
@@ -779,11 +779,11 @@ function buildSidebar(){
   document.getElementById('sbRole').textContent=ROLE_LABELS[FIN.role]||FIN.role;
   document.getElementById('tbAv').textContent=ini;
   document.getElementById('tbNome').textContent=(p.nome||'').split(' ')[0];
-  if(FIN.nivel==='sede'&&FIN.empresas.length>1){
+  if(FIN.nivel==='sede'&&FIN.unidades&&FIN.unidades.length>1){
     var sel=document.getElementById('tbUnitSelect');
     sel.innerHTML='<option value="">Todas as Unidades</option>'+
-      FIN.empresas.map(function(e){return'<option value="'+e.id+'">'+e.nome+'</option>';}).join('');
-    sel.value=FIN.filtroEmpresa?.id||'';
+      FIN.unidades.map(function(u){return'<option value="'+u.id+'">'+u.nome+'</option>';}).join('');
+    sel.value=FIN.filtroEmpresa?.unidade_id||'';
     document.getElementById('tbEmpresa').style.display='none';
     sel.style.display='';
   } else {
@@ -812,8 +812,13 @@ function buildSidebar(){
   document.getElementById('sidebarNav').innerHTML=html;
 }
 
-function switchEmpresa(id){
-  FIN.filtroEmpresa = id ? (FIN.empresas.find(function(e){return e.id===id;})||null) : null;
+function switchEmpresa(unidadeId){
+  if(!unidadeId){
+    FIN.filtroEmpresa=null;
+  } else {
+    var u=FIN.unidades.find(function(x){return x.id===unidadeId;});
+    FIN.filtroEmpresa=u?{id:u.company_id,nome:u.nome,unidade_id:u.id}:null;
+  }
   if(_currentView) navigate(_currentView);
 }
 
@@ -3050,18 +3055,36 @@ async function pagarFolha(id){
         if(FIN.nivel!=='sede'&&!sess.empresa_id){
           bootSession(FIN.user); return;
         }
-        var empQ=FIN.nivel==='sede'
-          ?supaGet('fin_companies','order=nome.asc','id,nome')
-          :supaGet('fin_companies','id=eq.'+sess.empresa_id,'id,nome');
-        empQ.then(function(r){
-          var emps=r.data||[];
-          FIN.empresas=emps; FIN.empresa=emps[0]||null;
-          _cache['emps']={data:emps};
-          if(emps.length===1){ _dreEmpresa=emps[0].id; _fluxoEmpresa=emps[0].id; _relEmpresa=emps[0].id; }
-          buildSidebar();
-          if(FIN_READONLY) document.getElementById('tbReadonlyBadge').style.display='';
-          navigate('dashboard');
-        });
+        if(FIN.nivel==='sede'){
+          Promise.all([
+            supaGet('ecm_unidades','order=nome.asc','id,nome'),
+            supaGet('fin_companies','order=nome.asc','id,nome,unidade_id')
+          ]).then(function(res){
+            var unidades=res[0].data||[];
+            var emps=res[1].data||[];
+            FIN.empresas=emps; FIN.empresa=emps[0]||null;
+            _cache['emps']={data:emps};
+            // Mapeia cada unidade à sua fin_company
+            FIN.unidades=unidades.map(function(u){
+              var c=emps.find(function(e){return e.unidade_id===u.id;});
+              return {id:u.id,nome:u.nome,company_id:c?c.id:null};
+            });
+            if(emps.length===1){_dreEmpresa=emps[0].id;_fluxoEmpresa=emps[0].id;_relEmpresa=emps[0].id;}
+            buildSidebar();
+            if(FIN_READONLY) document.getElementById('tbReadonlyBadge').style.display='';
+            navigate('dashboard');
+          });
+        } else {
+          supaGet('fin_companies','id=eq.'+sess.empresa_id,'id,nome').then(function(r){
+            var emps=r.data||[];
+            FIN.empresas=emps; FIN.empresa=emps[0]||null;
+            _cache['emps']={data:emps};
+            if(emps.length===1){_dreEmpresa=emps[0].id;_fluxoEmpresa=emps[0].id;_relEmpresa=emps[0].id;}
+            buildSidebar();
+            if(FIN_READONLY) document.getElementById('tbReadonlyBadge').style.display='';
+            navigate('dashboard');
+          });
+        }
       });
       return;
     }
