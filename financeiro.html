@@ -679,8 +679,15 @@ async function bootSession(user){
   // Carrega empresas filtradas por unidade
   var emps;
   if(FIN.nivel==='sede'){
-    var{data:allEmps}=await supaGet('fin_companies','order=nome.asc','id,nome');
+    var[{data:allUnidades},{data:allEmps}]=await Promise.all([
+      supaGet('ecm_unidades','order=nome.asc','id,nome'),
+      supaGet('fin_companies','order=nome.asc','id,nome,unidade_id')
+    ]);
     emps=allEmps||[]; FIN.unidade=null;
+    FIN.unidades=(allUnidades||[]).map(function(u){
+      var c=(allEmps||[]).find(function(e){return e.unidade_id===u.id;});
+      return {id:u.id,nome:u.nome,company_id:c?c.id:null};
+    });
   } else {
     var{data:unidade}=perfil.unidade_id
       ?await supaGetOne('ecm_unidades','id=eq.'+perfil.unidade_id,'id,nome,estado,cor,company_id')
@@ -3051,8 +3058,8 @@ async function pagarFolha(id){
       // Renova token proativamente antes de carregar (evita JWT expirado)
       FIN.nivel=sess.nivel||'unidade';
       supaRefreshToken().finally(function(){
-        // Sessão antiga sem empresa_id para usuário de unidade → re-deriva via bootSession
-        if(FIN.nivel!=='sede'&&!sess.empresa_id){
+        // Sessão sem nivel ou sem empresa_id → re-deriva via bootSession (busca ecm_perfis)
+        if(!sess.nivel||(FIN.nivel!=='sede'&&!sess.empresa_id)){
           bootSession(FIN.user); return;
         }
         if(FIN.nivel==='sede'){

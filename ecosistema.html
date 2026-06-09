@@ -620,6 +620,7 @@ function salvarSSOLocal(user, perfil, token){
   var sessData = {
     id: user.id, email: user.email,
     nome: perfil.nome, perfil: perfil.perfil,
+    nivel: perfil.nivel || 'unidade',
     unidade_id: perfil.unidade_id||null,
     unidade_nome: ECO.unidade?.nome || 'Sede Sombrear',
     access_token: token,
