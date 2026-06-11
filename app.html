@@ -1432,13 +1432,30 @@ function confirmarDevolucao(id){
 // ════════════════════════════════════════════
 // VIEW: SEDE — DETALHE PEDIDO
 // ════════════════════════════════════════════
-function verPedidoSede(id){window._pedidoId=id;location.hash='sede-pedido';}
+function verPedidoSede(id){window._pedidoId=id;window._osfSel={};location.hash='sede-pedido';}
+if(!window._osfSel)window._osfSel={};
+
+function toggleOSFItem(idx){
+  window._osfSel[idx]=!window._osfSel[idx];
+  var cb=document.getElementById('osfcb_'+idx);
+  if(cb)cb.checked=!!window._osfSel[idx];
+  var n=Object.keys(window._osfSel).filter(function(k){return window._osfSel[k];}).length;
+  var btn=document.getElementById('osfConfirmarBtn');
+  if(btn)btn.textContent='Gerar OS de Fabricação ('+n+' item'+(n!==1?'s':'')+')';
+}
+function marcarTodosOSF(id){
+  var p=DB.getPedido(id);
+  (p.itens||[]).forEach(function(it,idx){
+    if(it.item_status==='aprovado'&&it.os_status!=='fabricado')window._osfSel[idx]=true;
+  });
+  renderView_sedePedido();
+}
 
 function renderView_sedePedido(){
   var p=DB.getPedido(window._pedidoId);
   if(!p){document.getElementById('view-sede-pedido').innerHTML='<p>Pedido não encontrado.</p>';return;}
-  var filObj=DB.filiais().find(function(f){return f.id===p.filial_id;})||{};
   var pricing=calcTotalPedido(p.itens||[]);
+  var osfAtivo=!!window._osfAtivo;
   var itensHtml=(p.itens||[]).map(function(it,idx){
     if(!it.qtd||it.qtd<=0) return '';
     var pu=lookupPreco(it.desc);
@@ -1455,8 +1472,18 @@ function renderView_sedePedido(){
     }else{
       statusCell='<td style="text-align:center;padding:4px"><span onclick="toggleItemAprovacao(\''+p.id+'\','+idx+')" title="Clique para aprovar" style="cursor:pointer;background:#fef3c7;color:#d97706;border:1px solid #fde68a;border-radius:12px;padding:3px 10px;font-size:11px;font-weight:700;white-space:nowrap;display:inline-block">⏳ Aguardando</span></td>';
     }
-    return'<tr>'+statusCell+'<td>'+it.desc+'</td><td style="text-align:center">'+it.ma+'</td><td style="text-align:center">'+it.mb+'</td><td style="text-align:center">'+it.mc+'</td><td style="text-align:center">'+it.un+'</td><td style="text-align:center;font-weight:700;color:var(--verde-d)">'+it.qtd+'</td><td style="text-align:right">'+puCell+'</td><td style="text-align:right">'+subCell+'</td></tr>';
+    var isElegivel=it.item_status==='aprovado'&&it.os_status!=='fabricado';
+    var cbCell='';
+    if(osfAtivo){
+      if(isElegivel){
+        cbCell='<td style="text-align:center;padding:4px"><input type="checkbox" id="osfcb_'+idx+'" '+(window._osfSel[idx]?'checked':'')+' onchange="toggleOSFItem('+idx+')" style="width:16px;height:16px;cursor:pointer;accent-color:#6FAE2E"></td>';
+      }else{
+        cbCell='<td style="text-align:center;padding:4px;color:#cbd5e1">—</td>';
+      }
+    }
+    return'<tr>'+(osfAtivo?cbCell:'')+statusCell+'<td>'+it.desc+'</td><td style="text-align:center">'+it.ma+'</td><td style="text-align:center">'+it.mb+'</td><td style="text-align:center">'+it.mc+'</td><td style="text-align:center">'+it.un+'</td><td style="text-align:center;font-weight:700;color:var(--verde-d)">'+it.qtd+'</td><td style="text-align:right">'+puCell+'</td><td style="text-align:right">'+subCell+'</td></tr>';
   }).join('');
+
   var tlHtml=(p.log||[]).map(function(l,i){
     var isLast=i===p.log.length-1;
     return'<div class="tl-item '+(isLast?'current':'done')+'"><div class="tl-dot">'+(isLast?'●':'✓')+'</div>'+
@@ -1464,48 +1491,60 @@ function renderView_sedePedido(){
     '<div class="tl-sub">'+fmtDate(l.data)+' • '+l.user+'</div></div>';
   }).join('');
 
-  // Status update section
   var nextStatus=STATUS_NEXT[p.status];
   var statusSection='';
   var temPendente=(p.itens||[]).some(function(it){return it.qtd>0&&(!it.os_status||it.os_status==='pendente');});
   if(p.status==='aguardando'){
     var aprovados=(p.itens||[]).filter(function(it){return it.item_status==='aprovado'&&it.os_status!=='em_os'&&it.os_status!=='fabricado'&&it.qtd>0;}).length;
     var totalItens=(p.itens||[]).filter(function(it){return it.qtd>0;}).length;
-    statusSection='<div class="apv-box apv-pending" style="margin-top:16px">'+
+    statusSection='<div class="apv-box apv-pending" style="margin-top:12px">'+
       '<strong>⏳ Aguardando aprovação</strong>'+
-      '<p style="font-size:12px;color:#64748b;margin:6px 0 4px">Clique no status de cada item na ficha para aprovar individualmente.</p>'+
-      '<p style="font-size:12px;font-weight:700;color:#475569;margin:0 0 10px">'+aprovados+' de '+totalItens+' item(s) aprovado(s)</p>'+
-      '<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">'+
-        '<button class="btn btn-approve" onclick="gerarOS(\''+p.id+'\')">📋 Gerar OS</button>'+
+      '<p style="font-size:12px;color:#64748b;margin:4px 0 8px">'+aprovados+' de '+totalItens+' item(s) aprovado(s)</p>'+
+      '<div style="display:flex;gap:6px;flex-wrap:wrap">'+
+        '<button class="btn btn-approve btn-sm" onclick="gerarOS(\''+p.id+'\')">📋 Gerar OS de Serviço</button>'+
         '<button class="btn btn-outline btn-sm" onclick="aprovarTodosItens(\''+p.id+'\')">✓ Aprovar Todos</button>'+
-        '<button class="btn btn-danger" onclick="devolverPedido(\''+p.id+'\')">↩ Devolver</button>'+
-        '<button class="btn btn-outline" onclick="editarPedidoNaAprovacao(\''+p.id+'\')">✏️ Editar Pedido</button>'+
+        '<button class="btn btn-danger btn-sm" onclick="devolverPedido(\''+p.id+'\')">↩ Devolver</button>'+
+        '<button class="btn btn-outline btn-sm" onclick="editarPedidoNaAprovacao(\''+p.id+'\')">✏️ Editar</button>'+
       '</div></div>';
   } else if(p.status==='em_fabricacao'&&temPendente){
-    statusSection='<div class="apv-box apv-info" style="margin-top:16px"><strong>📋 Itens pendentes de OS</strong>'+
-      '<p style="font-size:12px;color:#64748b;margin:6px 0 10px">Aprove os itens restantes na ficha e gere a próxima OS.</p>'+
-      '<button class="btn btn-primary btn-sm" onclick="gerarOS(\''+p.id+'\')">📋 Gerar OS Parcial</button></div>';
+    statusSection='<div class="apv-box apv-info" style="margin-top:12px"><strong>📋 Itens pendentes de OS</strong>'+
+      '<p style="font-size:12px;color:#64748b;margin:4px 0 8px">Aprove os itens restantes e gere a próxima OS.</p>'+
+      '<button class="btn btn-primary btn-sm" onclick="gerarOS(\''+p.id+'\')">📋 OS Parcial</button></div>';
   } else if(nextStatus){
-    statusSection='<div class="apv-box apv-info" style="margin-top:16px"><strong>Avançar Status</strong><p style="font-size:12px;color:#64748b;margin:4px 0 10px">Próximo: '+badge(nextStatus)+'</p><button class="btn btn-primary btn-sm" onclick="avancarStatus(\''+p.id+'\',\''+nextStatus+'\')">Atualizar → '+STATUS_LABELS[nextStatus]+'</button></div>';
+    statusSection='<div class="apv-box apv-info" style="margin-top:12px"><strong>Avançar Status</strong><p style="font-size:12px;color:#64748b;margin:4px 0 8px">Próximo: '+badge(nextStatus)+'</p><button class="btn btn-primary btn-sm" onclick="avancarStatus(\''+p.id+'\',\''+nextStatus+'\')">Atualizar → '+STATUS_LABELS[nextStatus]+'</button></div>';
   }
 
   var prazosHtml=(p.prazos||[]).map(function(pr){
     return'<div class="prazo-row"><span class="prazo-label">'+pr.grupo+'</span><strong style="font-size:13px;color:#1e293b">'+pr.prazo+'</strong></div>';
   }).join('');
 
+  var nSel=Object.keys(window._osfSel).filter(function(k){return window._osfSel[k];}).length;
+  var osfBarra=osfAtivo
+    ?'<div style="background:#f0fdf4;border:1.5px solid #86efac;border-radius:8px;padding:10px 14px;margin-bottom:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">'+
+        '<span style="font-size:12px;color:#16a34a;font-weight:700">🔧 Selecione os itens para a OS de Fabricação</span>'+
+        '<button class="btn btn-sm" style="background:none;border:1px solid #86efac;color:#16a34a" onclick="marcarTodosOSF(\''+p.id+'\')">Selecionar Todos</button>'+
+        '<button id="osfConfirmarBtn" class="btn btn-approve btn-sm" onclick="confirmarOSFabricacao(\''+p.id+'\')">Gerar OS de Fabricação ('+nSel+' item'+(nSel!==1?'s':'')+')' +'</button>'+
+        '<button class="btn btn-outline btn-sm" onclick="cancelarOSFabricacao()">Cancelar</button>'+
+      '</div>'
+    :'';
+
+  var thCb=osfAtivo?'<th style="width:36px;text-align:center">☑</th>':'';
+  var tdColspan=osfAtivo?9:8;
+
   document.getElementById('view-sede-pedido').innerHTML=
   '<div class="page-hdr">'+
     '<div><button class="btn btn-ghost btn-sm" onclick="history.back()" style="margin-bottom:8px">← Voltar</button><h1>'+p.cliente+'</h1><p>'+p.filial_nome+' • Pedido #'+p.id+' • '+fmtDate(p.criado)+'</p></div>'+
-    '<div style="display:flex;gap:8px">'+
-      '<button class="btn btn-outline" onclick="imprimirPedido(\''+p.id+'\')">📄 Gerar Ordem de Serviço (PDF)</button>'+
-      '<button class="btn btn-sm" style="background:#fef2f2;border:1px solid #fecaca;color:#dc2626;font-weight:600" onclick="excluirPedido(\''+p.id+'\',\''+esc(p.cliente)+'\')">🗑️ Excluir Pedido</button>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
+      '<button class="btn btn-outline btn-sm" onclick="imprimirPedido(\''+p.id+'\')">📄 OS de Serviço</button>'+
+      '<button class="btn btn-sm" style="background:#f0fdf4;border:1.5px solid #86efac;color:#16a34a;font-weight:600" onclick="iniciarOSFabricacao()">🔧 OS de Fabricação</button>'+
+      '<button class="btn btn-sm" style="background:#fef2f2;border:1px solid #fecaca;color:#dc2626;font-weight:600" onclick="excluirPedido(\''+p.id+'\',\''+esc(p.cliente)+'\')">🗑️ Excluir</button>'+
     '</div>'+
   '</div>'+
-  '<div style="display:grid;grid-template-columns:1fr 1.6fr;gap:20px;align-items:start">'+
-    '<div>'+
-      '<div class="card"><div class="card-hdr"><h2>Status</h2></div><div class="card-body">'+
-        '<div style="margin-bottom:16px">'+badge(p.status)+'</div>'+
-        '<div class="timeline">'+tlHtml+'</div>'+
+  '<div style="display:grid;grid-template-columns:280px 1fr;gap:20px;align-items:start">'+
+    '<div style="display:flex;flex-direction:column;gap:16px">'+
+      '<div class="card"><div class="card-hdr"><h2>Status do Pedido</h2></div><div class="card-body">'+
+        '<div style="margin-bottom:10px">'+badge(p.status)+'</div>'+
+        '<div class="timeline" style="font-size:11px">'+tlHtml+'</div>'+
         statusSection+
       '</div></div>'+
       '<div class="card"><div class="card-hdr"><h2>Diretrizes</h2></div><div class="card-body">'+
@@ -1520,16 +1559,114 @@ function renderView_sedePedido(){
         '<div class="info-row"><div class="info-key">Síndico</div><div class="info-val">'+p.sindico+'</div></div>'+
         '<div class="info-row"><div class="info-key">Vagas</div><div class="info-val"><strong>'+p.vagas+'</strong> ('+p.tipo+')</div></div>'+
       '</div></div>'+
-    '</div>'+
-    '<div>'+
-      '<div class="card"><div class="card-hdr"><h2>Ficha de Fabricação</h2></div><div class="card-body" style="padding:0">'+
-        '<div class="tbl-wrap"><table><thead><tr><th style="text-align:center;width:80px">Status</th><th>Descrição do Item</th><th>Med.A</th><th>Med.B</th><th>Med.C</th><th>Unid.</th><th>Qtde</th><th style="text-align:right">V. Unit.</th><th style="text-align:right">Subtotal</th></tr></thead><tbody>'+itensHtml+'</tbody>'+
-        (pricing.subtotal>0?'<tfoot>'+
-        '<tr style="background:#6FAE2E"><td colspan="8" style="text-align:right;font-weight:700;color:#fff;padding:10px 12px;font-size:13px">TOTAL DO PEDIDO</td><td style="text-align:right;font-weight:700;color:#fff;padding:10px 12px;font-size:14px">'+fmtMoeda(pricing.total)+'</td></tr></tfoot>':'')+'</table></div>'+
-      '</div></div>'+
       '<div class="card"><div class="card-hdr"><h2>Prazos</h2></div><div class="card-body"><div class="prazo-grid">'+prazosHtml+'</div></div></div>'+
     '</div>'+
+    '<div style="display:flex;flex-direction:column;gap:16px">'+
+      '<div class="card">'+
+        '<div class="card-hdr"><h2>Ficha de Fabricação</h2></div>'+
+        '<div class="card-body">'+
+          osfBarra+
+          '<div class="tbl-wrap"><table><thead><tr>'+thCb+'<th style="text-align:center;width:80px">Status</th><th>Descrição do Item</th><th>Med.A</th><th>Med.B</th><th>Med.C</th><th>Unid.</th><th>Qtde</th><th style="text-align:right">V. Unit.</th><th style="text-align:right">Subtotal</th></tr></thead><tbody>'+itensHtml+'</tbody>'+
+          (pricing.subtotal>0?'<tfoot><tr style="background:#6FAE2E"><td colspan="'+tdColspan+'" style="text-align:right;font-weight:700;color:#fff;padding:10px 12px;font-size:13px">TOTAL DO PEDIDO</td><td style="text-align:right;font-weight:700;color:#fff;padding:10px 12px;font-size:14px">'+fmtMoeda(pricing.total)+'</td></tr></tfoot>':'')+'</table></div>'+
+        '</div>'+
+      '</div>'+
+    '</div>'+
   '</div>';
+}
+
+function iniciarOSFabricacao(){
+  window._osfAtivo=true;
+  window._osfSel={};
+  renderView_sedePedido();
+}
+function cancelarOSFabricacao(){
+  window._osfAtivo=false;
+  window._osfSel={};
+  renderView_sedePedido();
+}
+function confirmarOSFabricacao(id){
+  var idxs=Object.keys(window._osfSel).filter(function(k){return window._osfSel[k];}).map(Number);
+  if(!idxs.length){showToast('Selecione ao menos um item.','error');return;}
+  window._osfAtivo=false;
+  window._osfSel={};
+  imprimirOSFabricacao(id,idxs);
+  renderView_sedePedido();
+}
+
+function imprimirOSFabricacao(id,idxs){
+  var p=DB.getPedido(id);
+  if(!p)return;
+  var itens=(p.itens||[]).filter(function(it,i){return idxs.indexOf(i)>=0&&it.item_status==='aprovado';});
+  if(!itens.length){showToast('Nenhum item aprovado selecionado.','error');return;}
+  var itensHtml=itens.map(function(it){
+    return'<tr>'+
+      '<td style="font-size:10pt;padding:8px 10px">'+it.desc+'</td>'+
+      '<td style="text-align:center;font-size:11pt;font-weight:700;padding:8px">'+it.ma+'</td>'+
+      '<td style="text-align:center;font-size:11pt;font-weight:700;padding:8px">'+it.mb+'</td>'+
+      '<td style="text-align:center;font-size:11pt;font-weight:700;padding:8px">'+it.mc+'</td>'+
+      '<td style="text-align:center;font-size:10pt;padding:8px">'+it.un+'</td>'+
+      '<td style="text-align:center;font-size:13pt;font-weight:900;color:#1e293b;padding:8px">'+it.qtd+'</td>'+
+      '<td style="text-align:center;font-size:10pt;color:#64748b;padding:8px;min-width:80px"></td>'+
+    '</tr>';
+  }).join('');
+  var ftBox=function(label,val){
+    return'<div style="flex:1;border:1.5px solid #9ACD32;border-radius:6px;padding:6px 10px;min-width:0">'+
+      '<div style="font-size:7pt;font-weight:700;color:#9ACD32;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px">'+label+'</div>'+
+      '<div style="font-size:9pt;font-weight:600;color:#1e293b">'+val+'</div>'+
+    '</div>';
+  };
+  var d=new Date();
+  var pad=function(n){return String(n).padStart(2,'0');};
+  var dt=pad(d.getDate())+pad(d.getMonth()+1)+d.getFullYear()+pad(d.getHours())+pad(d.getMinutes());
+  var nomeCliente=(p.cliente||'').replace(/[^a-zA-Z0-9À-ÿ]/g,'-').replace(/-+/g,'-').substring(0,30);
+  var nomeFilial=(p.filial_nome||'').replace(/[^a-zA-Z0-9À-ÿ]/g,'-').replace(/-+/g,'-');
+  var osNome='OSF-'+dt+'-'+nomeCliente+'-'+nomeFilial;
+  document.getElementById('printArea').innerHTML=
+  '<div style="padding:0">'+
+    '<table style="width:100%;margin-bottom:6px"><tr>'+
+      '<td style="vertical-align:middle"><img src="'+LOGO_URI+'" alt="Sombrear" style="height:44px"></td>'+
+      '<td style="text-align:right;vertical-align:middle">'+
+        '<div style="font-size:18pt;font-weight:900;color:#6FAE2E;letter-spacing:1px">OS DE FABRICAÇÃO</div>'+
+        '<div style="font-size:9pt;color:#6FAE2E;font-weight:700">'+osNome+'</div>'+
+        '<div style="font-size:8pt;color:#999">'+p.filial_nome+' — Emissão: '+new Date().toLocaleString('pt-BR')+'</div>'+
+      '</td>'+
+    '</tr></table>'+
+    '<div class="pr-line"></div>'+
+    '<table style="width:100%;margin-bottom:10px;font-size:8.5pt"><tr>'+
+      '<td style="width:20%;background:#f5f5f5;padding:4px 6px;font-weight:700">CLIENTE</td>'+
+      '<td style="width:30%;padding:4px 6px">'+p.cliente+'</td>'+
+      '<td style="width:20%;background:#f5f5f5;padding:4px 6px;font-weight:700">ENDEREÇO</td>'+
+      '<td style="width:30%;padding:4px 6px">'+p.endereco+'</td>'+
+    '</tr><tr>'+
+      '<td style="background:#f5f5f5;padding:4px 6px;font-weight:700">SÍNDICO</td>'+
+      '<td style="padding:4px 6px">'+p.sindico+'</td>'+
+      '<td style="background:#f5f5f5;padding:4px 6px;font-weight:700">VAGAS</td>'+
+      '<td style="padding:4px 6px"><strong>'+p.vagas+'</strong> ('+p.tipo+')</td>'+
+    '</tr></table>'+
+    '<div class="pr-sec">Itens para Fabricação</div>'+
+    '<table><thead><tr>'+
+      '<th style="min-width:180px;text-align:left">Descrição Item</th>'+
+      '<th>Med.A</th><th>Med.B</th><th>Med.C</th><th>Unid.</th>'+
+      '<th style="font-size:12pt">Qtde</th>'+
+      '<th style="min-width:80px;color:#94a3b8;font-weight:400">Conferido ✓</th>'+
+    '</tr></thead><tbody>'+itensHtml+'</tbody></table>'+
+    '<div class="pr-sec" style="margin-top:12px">Ficha Técnica</div>'+
+    '<div style="display:flex;gap:8px;margin-bottom:16px">'+
+      ftBox('Estrutura',p.cor_estrutura)+ftBox('Tela',p.cor_tela)+ftBox('Chumbação',p.chumbacao)+ftBox('Pilares',p.pilares)+
+    '</div>'+
+    '<div class="pr-sec">Observações</div>'+
+    '<div style="border:1px solid #e2e8f0;border-radius:6px;min-height:60px;margin-bottom:16px;padding:8px"></div>'+
+    '<div class="pr-sign-wrap" style="margin-top:40px">'+
+      '<div class="pr-sign"><div style="font-size:9pt;font-weight:700">RESPONSÁVEL PRODUÇÃO</div><div style="font-size:8pt;color:#666">Sombrear Indústria</div></div>'+
+      '<div class="pr-sign"><div style="font-size:9pt;font-weight:700">SERRALHEIRO / EXECUTOR</div><div style="font-size:8pt;color:#666">Assinatura e data</div></div>'+
+    '</div>'+
+  '</div>';
+  var prev=document.title;
+  document.title=osNome;
+  setTimeout(function(){
+    window.print();
+    setTimeout(function(){document.title=prev;},2000);
+  },50);
 }
 
 function editarItensPedido(id){
