@@ -871,8 +871,10 @@ function renderWizard(){
     '</div></div>'
   :'';
 
+  var sugerirBtn=WZ._calcItens?
+    '<button class="btn btn-outline btn-sm" style="margin-left:8px;font-size:12px" onclick="wzAplicarCalcSugerido()">💡 Aplicar Cálculo Automático</button>':'';
   panels+='<div class="wz-panel'+(WZ.step===4?' active':'')+'">'+
-  '<div class="card"><div class="card-hdr"><h2>📋 Ficha de Fabricação — Revisão Final</h2><span style="font-size:12px;color:#64748b">Todos os campos são editáveis</span></div><div class="card-body">'+
+  '<div class="card"><div class="card-hdr" style="flex-wrap:wrap;gap:8px"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><h2 style="margin:0">📋 Selecione as Peças</h2>'+sugerirBtn+'</div><span style="font-size:12px;color:#64748b">Itens com quantidade 0 não serão incluídos no pedido</span></div><div class="card-body">'+
   '<div class="tbl-wrap"><table class="rev-tbl"><thead><tr><th style="min-width:220px">Descrição do Item</th><th>Medida A</th><th>Medida B</th><th>Medida C</th><th>Unid.</th><th>Qtde</th></tr></thead><tbody>'+itensHtml+'</tbody></table></div>'+
   resumoFinanceiro+
   '<div class="sec-title" style="margin-top:20px">Prazos Previstos para Entrega</div>'+
@@ -960,13 +962,18 @@ function wzNext(){
       wzCalc();
       if(!WZ.dim.vagas){showToast('Informe a quantidade de vagas.','error');return;}
       var d=WZ.dim,calc=calcularPecas(d);
-      WZ.itens=gerarItens(d.vagas,d.mod2vMA,d.mod3vMA,d.mod2vMT,d.mod3vMT,calc.align,1);
+      var itensCalc=gerarItens(d.vagas,d.mod2vMA,d.mod3vMA,d.mod2vMT,d.mod3vMT,calc.align,1);
+      WZ._calcItens=itensCalc;
+      WZ.itens=itensCalc.map(function(it){return Object.assign({},it,{qtd:0});});
     } else if(tipo==='Telha'){
       wzCalcTelha();
       if(!WZ.dim.vagasTelha){showToast('Informe a quantidade de vagas.','error');return;}
       WZ.dim.vagas=WZ.dim.vagasTelha;
-      WZ.itens=gerarItensTelha(WZ.dim.vagasTelha,WZ.dim.fixacaoTelha||'Solo');
+      var itensCalcT=gerarItensTelha(WZ.dim.vagasTelha,WZ.dim.fixacaoTelha||'Solo');
+      WZ._calcItens=itensCalcT;
+      WZ.itens=itensCalcT.map(function(it){return Object.assign({},it,{qtd:0});});
     } else {
+      WZ._calcItens=null;
       WZ.itens=[];
     }
   }
@@ -986,12 +993,19 @@ function wzPrev(){WZ.step--;renderWizard();}
 
 function wzSetTipo(t){WZ.dim.tipo=t;renderWizard();}
 
+function wzAplicarCalcSugerido(){
+  if(!WZ._calcItens){showToast('Nenhum cálculo disponível.','error');return;}
+  WZ.itens=WZ._calcItens.map(function(it){return Object.assign({},it);});
+  renderWizard();
+  showToast('Quantidades sugeridas pelo cálculo aplicadas.','success');
+}
+
 function wzEnviar(){
   var id=uid();
   var calc=calcularPecas(WZ.dim);
   var filObj=DB.filiais().find(function(f){return f.id===USER.filial_id;})||{};
   var pricing=calcTotalPedido(WZ.itens,filObj.frete||0);
-  var itensComPreco=WZ.itens.map(function(it){
+  var itensComPreco=WZ.itens.filter(function(it){return (it.qtd||0)>0;}).map(function(it){
     var pu=lookupPreco(it.desc);
     return Object.assign({},it,{preco_unit:pu,subtotal:pu*(it.qtd||0)});
   });
@@ -2111,7 +2125,7 @@ function imprimirPedido(id,idxsFiltro){
   var isOS=Array.isArray(idxsFiltro)&&idxsFiltro.length>0;
   var itensParaImprimir=isOS
     ?(p.itens||[]).filter(function(it,i){return idxsFiltro.indexOf(i)>=0;})
-    :(p.itens||[]);
+    :(p.itens||[]).filter(function(it){return (it.qtd||0)>0;});
   var itensHtml=itensParaImprimir.map(function(it){
     return'<tr><td>'+it.desc+'</td><td style="text-align:center">'+it.ma+'</td><td style="text-align:center">'+it.mb+'</td><td style="text-align:center">'+it.mc+'</td><td style="text-align:center">'+it.un+'</td><td style="text-align:center;font-weight:700">'+it.qtd+'</td></tr>';
   }).join('');
