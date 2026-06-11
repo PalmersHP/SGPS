@@ -738,6 +738,35 @@ function renderFilialDash(){
 // ════════════════════════════════════════════
 var WZ={step:1,cliente:{},dim:{tipo:'Sombrite',vagasTelha:0,fixacaoTelha:'Solo'},dir:{},itens:[],prazos:prazoesPadrao()};
 var WZ_CHARTS={};
+var WZ_CATALOGO=[
+  {desc:'CHUMBADOR PARA PILAR MA',ma:'—',mb:'—',mc:'—',un:'PÇ'},
+  {desc:'PILAR SOMBRITE MA',ma:'2,40',mb:'0,00',mc:'0,00',un:'PÇ'},
+  {desc:'PILAR SOMBRITE MT',ma:'2,20',mb:'0,00',mc:'0,00',un:'PÇ'},
+  {desc:'BRAÇO SOMBRITE SIMPLES',ma:'4,30',mb:'0,00',mc:'0,00',un:'PÇ'},
+  {desc:'ARCOS DE 1VG',ma:'1,20',mb:'0,00',mc:'0,00',un:'PÇ'},
+  {desc:'ARCOS DE 2VG',ma:'1,50',mb:'0,00',mc:'0,00',un:'PÇ'},
+  {desc:'ARCOS DE 3VG',ma:'1,80',mb:'0,00',mc:'0,00',un:'PÇ'},
+  {desc:'ESTRELA 1VG',ma:'1,20',mb:'0,00',mc:'0,00',un:'PÇ'},
+  {desc:'ESTRELA 2VG',ma:'1,50',mb:'0,00',mc:'0,00',un:'PÇ'},
+  {desc:'ESTRELA 3VG',ma:'1,80',mb:'0,00',mc:'0,00',un:'PÇ'},
+  {desc:'TELA COMPLETA SOMBRITE 1 VG',ma:'2,50',mb:'5,00',mc:'0,00',un:'UNID'},
+  {desc:'TELA COMPLETA SOMBRITE 2 VG',ma:'4,80',mb:'5,00',mc:'0,00',un:'UNID'},
+  {desc:'TELA COMPLETA SOMBRITE 3 VG',ma:'7,20',mb:'5,00',mc:'0,00',un:'UNID'},
+  {desc:'TELA COMPLETA SOMBRITE 4 VG',ma:'9,60',mb:'5,00',mc:'0,00',un:'UNID'},
+  {desc:'TELA COMPLETA SOMBRITE TAM ESPECIAL',ma:'0,00',mb:'0,00',mc:'0,00',un:'M²'},
+  {desc:'PILAR LISO',ma:'2,40',mb:'0,00',mc:'0,00',un:'PÇ'},
+  {desc:'BASE PVC CHUMBAÇÃO DIRETA',ma:'—',mb:'—',mc:'—',un:'PÇ'},
+  {desc:'BASE PVC PARAFUSADO',ma:'—',mb:'—',mc:'—',un:'PÇ'},
+  {desc:'BRAÇO PVC',ma:'0,00',mb:'0,00',mc:'0,00',un:'PÇ'},
+  {desc:'BRAÇO PVC PAINEL SOLAR',ma:'0,00',mb:'0,00',mc:'0,00',un:'PÇ'},
+  {desc:'BASE PVC',ma:'0,00',mb:'0,00',mc:'0,00',un:'PÇ'},
+  {desc:'TERÇAS PARA TELHA GALVALUME',ma:'0,00',mb:'0,00',mc:'0,00',un:'PÇ'},
+  {desc:'TERÇAS PARA TELHA ISOTÉRMICA',ma:'0,00',mb:'0,00',mc:'0,00',un:'PÇ'},
+  {desc:'TERÇAS PARA TELHA',ma:'0,00',mb:'0,00',mc:'0,00',un:'PÇ'},
+  {desc:'TERÇAS PARA PAINEL SOLAR',ma:'0,00',mb:'0,00',mc:'0,00',un:'PÇ'},
+  {desc:'SUPORTE DUPLO PARA BICICLETAS',ma:'0,00',mb:'0,00',mc:'0,00',un:'UNID'},
+  {desc:'DEIXAR EM BRANCO (EDITÁVEL)',ma:'0,00',mb:'0,00',mc:'0,00',un:'INS UNID'}
+];
 
 function renderNovoPedido(){
   WZ={step:1,cliente:{},dim:{tipo:'Sombrite',mod2vMA:0,mod3vMA:0,mod2vMT:0,mod3vMT:0,vagas:0,align:1,semParam:false,vagasTelha:0,fixacaoTelha:'Solo'},dir:{},itens:[],prazos:prazoesPadrao()};
@@ -834,15 +863,23 @@ function renderWizard(){
   '</div></div></div></div>';
 
   // Step 4
-  var itensHtml=WZ.itens.map(function(it,i){
-    return '<tr><td>'+it.desc+'</td>'+
-      '<td><input type="text" value="'+it.ma+'" style="width:58px;padding:3px 6px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px" onchange="WZ.itens['+i+'].ma=this.value"></td>'+
-      '<td><input type="text" value="'+it.mb+'" style="width:58px;padding:3px 6px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px" onchange="WZ.itens['+i+'].mb=this.value"></td>'+
-      '<td><input type="text" value="'+it.mc+'" style="width:58px;padding:3px 6px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px" onchange="WZ.itens['+i+'].mc=this.value"></td>'+
-      '<td>'+it.un+'</td>'+
-      '<td><input type="number" class="rev-tbl" value="'+it.qtd+'" min="0" style="width:70px;padding:4px 6px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;text-align:center" onchange="WZ.itens['+i+'].qtd=parseInt(this.value)||0"></td>'+
-    '</tr>';
-  }).join('');
+  var catOpts=WZ_CATALOGO.map(function(c){return'<option value="'+c.desc+'">'+c.desc+'</option>';}).join('');
+  var itensHtml=WZ.itens.length===0?
+    '<tr><td colspan="7" style="text-align:center;padding:32px 20px;color:#94a3b8;font-style:italic">Nenhuma peça lançada ainda. Use o botão "+ Lançar Peça" acima.</td></tr>':
+    WZ.itens.map(function(it,i){
+      var opts='<option value="">— selecione a peça —</option>'+WZ_CATALOGO.map(function(c){
+        return'<option value="'+c.desc+'"'+(c.desc===it.desc?' selected':'')+'>'+c.desc+'</option>';
+      }).join('');
+      return'<tr data-item-row="'+i+'">'+
+        '<td><select data-peca-sel style="width:100%;min-width:200px;padding:4px 6px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px" onchange="wzSelectPeca('+i+',this.value)">'+opts+'</select></td>'+
+        '<td><input type="text" value="'+it.ma+'" data-ma style="width:58px;padding:3px 6px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px" onchange="WZ.itens['+i+'].ma=this.value"></td>'+
+        '<td><input type="text" value="'+it.mb+'" data-mb style="width:58px;padding:3px 6px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px" onchange="WZ.itens['+i+'].mb=this.value"></td>'+
+        '<td><input type="text" value="'+it.mc+'" data-mc style="width:58px;padding:3px 6px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px" onchange="WZ.itens['+i+'].mc=this.value"></td>'+
+        '<td data-un style="font-size:11px;text-align:center;white-space:nowrap">'+it.un+'</td>'+
+        '<td><input type="number" value="'+it.qtd+'" min="0" style="width:70px;padding:4px 6px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;text-align:center" onchange="WZ.itens['+i+'].qtd=parseInt(this.value)||0"></td>'+
+        '<td><button onclick="wzRemoveItem('+i+')" style="background:none;border:none;color:#ef4444;font-size:16px;cursor:pointer;padding:2px 6px" title="Remover">✕</button></td>'+
+      '</tr>';
+    }).join('');
 
   var prazosHtml=WZ.prazos.map(function(p,i){
     var opts=['10 dias','15 dias','20 dias','25 dias','30 dias','35 dias','40 dias','45 dias','60 dias','75 dias','90 dias','Da data do pagamento'].map(function(o){return'<option'+(o===p.prazo?' selected':'')+'>'+o+'</option>';}).join('');
@@ -872,10 +909,17 @@ function renderWizard(){
   :'';
 
   var sugerirBtn=WZ._calcItens?
-    '<button class="btn btn-outline btn-sm" style="margin-left:8px;font-size:12px" onclick="wzAplicarCalcSugerido()">💡 Aplicar Cálculo Automático</button>':'';
+    '<button class="btn btn-outline btn-sm" style="font-size:12px" onclick="wzAplicarCalcSugerido()">💡 Usar Cálculo Automático</button>':'';
   panels+='<div class="wz-panel'+(WZ.step===4?' active':'')+'">'+
-  '<div class="card"><div class="card-hdr" style="flex-wrap:wrap;gap:8px"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><h2 style="margin:0">📋 Selecione as Peças</h2>'+sugerirBtn+'</div><span style="font-size:12px;color:#64748b">Itens com quantidade 0 não serão incluídos no pedido</span></div><div class="card-body">'+
-  '<div class="tbl-wrap"><table class="rev-tbl"><thead><tr><th style="min-width:220px">Descrição do Item</th><th>Medida A</th><th>Medida B</th><th>Medida C</th><th>Unid.</th><th>Qtde</th></tr></thead><tbody>'+itensHtml+'</tbody></table></div>'+
+  '<div class="card"><div class="card-hdr" style="flex-wrap:wrap;gap:8px">'+
+    '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'+
+      '<h2 style="margin:0">📋 Lançamento de Peças</h2>'+
+      '<button class="btn btn-primary btn-sm" onclick="wzAddItem()" style="font-size:13px;padding:6px 14px">+ Lançar Peça</button>'+
+      sugerirBtn+
+    '</div>'+
+    '<span style="font-size:12px;color:#64748b">Selecione a peça, preencha as medidas e a quantidade</span>'+
+  '</div><div class="card-body">'+
+  '<div class="tbl-wrap"><table class="rev-tbl"><thead><tr><th style="min-width:220px">Peça</th><th>Medida A</th><th>Medida B</th><th>Medida C</th><th>Unid.</th><th>Qtde</th><th style="width:32px"></th></tr></thead><tbody>'+itensHtml+'</tbody></table></div>'+
   resumoFinanceiro+
   '<div class="sec-title" style="margin-top:20px">Prazos Previstos para Entrega</div>'+
   '<div class="prazo-grid">'+prazosHtml+'</div>'+
@@ -964,14 +1008,14 @@ function wzNext(){
       var d=WZ.dim,calc=calcularPecas(d);
       var itensCalc=gerarItens(d.vagas,d.mod2vMA,d.mod3vMA,d.mod2vMT,d.mod3vMT,calc.align,1);
       WZ._calcItens=itensCalc;
-      WZ.itens=itensCalc.map(function(it){return Object.assign({},it,{qtd:0});});
+      WZ.itens=[];
     } else if(tipo==='Telha'){
       wzCalcTelha();
       if(!WZ.dim.vagasTelha){showToast('Informe a quantidade de vagas.','error');return;}
       WZ.dim.vagas=WZ.dim.vagasTelha;
       var itensCalcT=gerarItensTelha(WZ.dim.vagasTelha,WZ.dim.fixacaoTelha||'Solo');
       WZ._calcItens=itensCalcT;
-      WZ.itens=itensCalcT.map(function(it){return Object.assign({},it,{qtd:0});});
+      WZ.itens=[];
     } else {
       WZ._calcItens=null;
       WZ.itens=[];
@@ -995,9 +1039,36 @@ function wzSetTipo(t){WZ.dim.tipo=t;renderWizard();}
 
 function wzAplicarCalcSugerido(){
   if(!WZ._calcItens){showToast('Nenhum cálculo disponível.','error');return;}
-  WZ.itens=WZ._calcItens.map(function(it){return Object.assign({},it);});
+  WZ.itens=WZ._calcItens.filter(function(it){return (it.qtd||0)>0;}).map(function(it){return Object.assign({},it);});
   renderWizard();
-  showToast('Quantidades sugeridas pelo cálculo aplicadas.','success');
+  showToast('Peças calculadas lançadas automaticamente.','success');
+}
+function wzAddItem(){
+  WZ.itens.push({desc:'',ma:'0,00',mb:'0,00',mc:'0,00',un:'PÇ',qtd:1});
+  renderWizard();
+  setTimeout(function(){
+    var sels=document.querySelectorAll('[data-peca-sel]');
+    if(sels.length)sels[sels.length-1].focus();
+  },60);
+}
+function wzRemoveItem(i){
+  WZ.itens.splice(i,1);
+  renderWizard();
+}
+function wzSelectPeca(i,val){
+  var cat=WZ_CATALOGO.find(function(c){return c.desc===val;});
+  if(cat){
+    WZ.itens[i]=Object.assign({},WZ.itens[i],{desc:cat.desc,ma:cat.ma,mb:cat.mb,mc:cat.mc,un:cat.un});
+    var row=document.querySelector('[data-item-row="'+i+'"]');
+    if(row){
+      row.querySelector('[data-ma]').value=cat.ma;
+      row.querySelector('[data-mb]').value=cat.mb;
+      row.querySelector('[data-mc]').value=cat.mc;
+      row.querySelector('[data-un]').textContent=cat.un;
+    }
+  } else {
+    WZ.itens[i].desc=val;
+  }
 }
 
 function wzEnviar(){
