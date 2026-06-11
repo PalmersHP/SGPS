@@ -1435,9 +1435,9 @@ function renderView_sedePedido(){
     var subCell=sub>0?'<strong>'+fmtMoeda(sub)+'</strong>':'<span style="color:#94a3b8">—</span>';
     var statusCell;
     if(it.os_status==='em_os'){
-      statusCell='<td style="text-align:center"><span title="Já na OS" style="font-size:14px">✅</span></td>';
+      statusCell='<td style="text-align:center;padding:4px"><span style="background:#dcfce7;color:#16a34a;border:1px solid #86efac;border-radius:12px;padding:3px 10px;font-size:11px;font-weight:700;white-space:nowrap;display:inline-block">✓ Fabricado</span></td>';
     }else if(it.item_status==='aprovado'){
-      statusCell='<td style="text-align:center;padding:4px"><span onclick="toggleItemAprovacao(\''+p.id+'\','+idx+')" style="cursor:pointer;background:#dcfce7;color:#16a34a;border:1px solid #86efac;border-radius:12px;padding:3px 10px;font-size:11px;font-weight:700;white-space:nowrap;display:inline-block">✓ Aprovado</span></td>';
+      statusCell='<td style="text-align:center;padding:4px"><span onclick="toggleItemAprovacao(\''+p.id+'\','+idx+')" style="cursor:pointer;background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd;border-radius:12px;padding:3px 10px;font-size:11px;font-weight:700;white-space:nowrap;display:inline-block">▶ A Fabricar</span></td>';
     }else{
       statusCell='<td style="text-align:center;padding:4px"><span onclick="toggleItemAprovacao(\''+p.id+'\','+idx+')" style="cursor:pointer;background:#fef3c7;color:#d97706;border:1px solid #fde68a;border-radius:12px;padding:3px 10px;font-size:11px;font-weight:700;white-space:nowrap;display:inline-block">⏳ Aguardando</span></td>';
     }
@@ -2345,6 +2345,15 @@ function renderRelatorios(role){
 // ════════════════════════════════════════════
 // PDF / IMPRESSÃO
 // ════════════════════════════════════════════
+function osNomeArquivo(p){
+  var d=new Date();
+  var pad=function(n){return String(n).padStart(2,'0');};
+  var dt=pad(d.getDate())+pad(d.getMonth()+1)+d.getFullYear()+pad(d.getHours())+pad(d.getMinutes());
+  var cliente=(p.cliente||'').replace(/[^a-zA-Z0-9À-ÿ]/g,'-').replace(/-+/g,'-').substring(0,30);
+  var unidade=(p.filial_nome||'').replace(/[^a-zA-Z0-9À-ÿ]/g,'-').replace(/-+/g,'-');
+  return 'OS-'+dt+'-'+cliente+'-'+unidade;
+}
+
 function imprimirPedido(id,idxsFiltro){
   var p=DB.getPedido(id);
   if(!p)return;
@@ -2353,55 +2362,71 @@ function imprimirPedido(id,idxsFiltro){
     ?(p.itens||[]).filter(function(it,i){return idxsFiltro.indexOf(i)>=0;})
     :(p.itens||[]).filter(function(it){return (it.qtd||0)>0;});
   var itensHtml=itensParaImprimir.map(function(it){
-    return'<tr><td>'+it.desc+'</td><td style="text-align:center">'+it.ma+'</td><td style="text-align:center">'+it.mb+'</td><td style="text-align:center">'+it.mc+'</td><td style="text-align:center">'+it.un+'</td><td style="text-align:center;font-weight:700">'+it.qtd+'</td></tr>';
+    var statusLabel=it.os_status==='em_os'?'Fabricado':'A Fabricar';
+    var statusStyle=it.os_status==='em_os'?'background:#dcfce7;color:#16a34a':'background:#dbeafe;color:#1d4ed8';
+    var statusCell='<td style="text-align:center"><span style="font-size:7pt;font-weight:700;padding:1px 5px;border-radius:8px;'+statusStyle+'">'+statusLabel+'</span></td>';
+    return'<tr>'+statusCell+'<td>'+it.desc+'</td><td style="text-align:center">'+it.ma+'</td><td style="text-align:center">'+it.mb+'</td><td style="text-align:center">'+it.mc+'</td><td style="text-align:center">'+it.un+'</td><td style="text-align:center;font-weight:700">'+it.qtd+'</td></tr>';
   }).join('');
-  var prazosHtml=(p.prazos||[]).map(function(pr){
+  var prazosHtml=!isOS?(p.prazos||[]).map(function(pr){
     return'<tr><td>'+pr.grupo+'</td><td style="text-align:center">'+pr.prazo+'</td><td>Da data do pedido</td></tr>';
-  }).join('');
+  }).join(''):'';
+  var fichaTecnica=isOS
+    ?'<div class="pr-sec" style="margin-top:10px">Ficha Técnica</div>'+
+      '<table style="margin-bottom:6px;font-size:8pt"><tr>'+
+        '<td style="padding:3px 8px;font-weight:700;background:#f5f5f5;white-space:nowrap">Estrutura</td><td style="padding:3px 8px">'+p.cor_estrutura+'</td>'+
+        '<td style="padding:3px 8px;font-weight:700;background:#f5f5f5;white-space:nowrap">Tela</td><td style="padding:3px 8px">'+p.cor_tela+'</td>'+
+        '<td style="padding:3px 8px;font-weight:700;background:#f5f5f5;white-space:nowrap">Chumbação</td><td style="padding:3px 8px">'+p.chumbacao+'</td>'+
+        '<td style="padding:3px 8px;font-weight:700;background:#f5f5f5;white-space:nowrap">Pilares</td><td style="padding:3px 8px">'+p.pilares+'</td>'+
+      '</tr></table>'
+    :'<div class="pr-sec" style="margin-top:12px">Ficha Técnica para Produção</div>'+
+      '<table style="margin-bottom:8px"><tr><th style="width:160px">Informação</th><th>Detalhe</th></tr>'+
+      '<tr><td style="font-weight:700">INFORMAÇÃO 1</td><td>'+p.cor_estrutura+'</td></tr>'+
+      '<tr><td style="font-weight:700">INFORMAÇÃO 2</td><td>'+p.cor_tela+'</td></tr>'+
+      '<tr><td style="font-weight:700">INFORMAÇÃO 3</td><td>'+p.chumbacao+'</td></tr>'+
+      '<tr><td style="font-weight:700">INFORMAÇÃO 4</td><td>'+p.pilares+'</td></tr>'+
+      '</table>'+
+      '<div class="pr-sec">Prazo Previsto para Entrega das Peças</div>'+
+      '<table><thead><tr><th>Conjunto</th><th>Prazo</th><th>Referência</th></tr></thead><tbody>'+prazosHtml+'</tbody></table>';
+  var osNome=isOS?osNomeArquivo(p):'';
+  var titulo=isOS?'ORDEM DE SERVIÇO':'Pedido de Materiais Sombrear Indústria';
   document.getElementById('printArea').innerHTML=
   '<div style="padding:0">'+
-    '<table style="width:100%;margin-bottom:8px"><tr>'+
-      '<td style="vertical-align:top"><img src="logo.png" class="pr-logo" alt="Sombrear" style="height:40px"></td>'+
-      '<td style="text-align:right;vertical-align:top"><div class="pr-main-title">Pedido de Materiais Sombrear Indústria</div><div style="font-size:9pt;color:#999">'+p.filial_nome+' — Emissão: '+new Date().toLocaleString('pt-BR')+'</div></td>'+
+    '<table style="width:100%;margin-bottom:6px"><tr>'+
+      '<td style="vertical-align:top"><img src="logo.png" class="pr-logo" alt="Sombrear" style="height:36px"></td>'+
+      '<td style="text-align:right;vertical-align:top">'+
+        '<div class="pr-main-title">'+titulo+'</div>'+
+        (isOS?'<div style="font-size:9pt;color:#6FAE2E;font-weight:700">'+osNome+'</div>':'')+
+        '<div style="font-size:8pt;color:#999">'+p.filial_nome+' — Emissão: '+new Date().toLocaleString('pt-BR')+'</div>'+
+      '</td>'+
     '</tr></table>'+
     '<div class="pr-line"></div>'+
-    '<table style="width:100%;margin-bottom:14px"><tr>'+
-      '<td style="width:50%;background:#f5f5f5;padding:6px;font-weight:700;font-size:9pt">CLIENTE</td>'+
-      '<td style="width:50%;background:#f5f5f5;padding:6px;font-weight:700;font-size:9pt">ENDEREÇO</td>'+
+    '<table style="width:100%;margin-bottom:10px;font-size:8.5pt"><tr>'+
+      '<td style="width:25%;background:#f5f5f5;padding:4px 6px;font-weight:700">CLIENTE</td>'+
+      '<td style="width:25%;padding:4px 6px">'+p.cliente+'</td>'+
+      '<td style="width:25%;background:#f5f5f5;padding:4px 6px;font-weight:700">ENDEREÇO</td>'+
+      '<td style="width:25%;padding:4px 6px">'+p.endereco+'</td>'+
     '</tr><tr>'+
-      '<td style="padding:6px;font-size:9pt">'+p.cliente+'</td>'+
-      '<td style="padding:6px;font-size:9pt">'+p.endereco+'</td>'+
-    '</tr><tr>'+
-      '<td style="background:#f5f5f5;padding:6px;font-weight:700;font-size:9pt">CNPJ</td>'+
-      '<td style="background:#f5f5f5;padding:6px;font-weight:700;font-size:9pt">CONTATO</td>'+
-    '</tr><tr>'+
-      '<td style="padding:6px;font-size:9pt">'+p.cnpj+'</td>'+
-      '<td style="padding:6px;font-size:9pt">'+p.contato+'</td>'+
-    '</tr><tr>'+
-      '<td style="background:#f5f5f5;padding:6px;font-weight:700;font-size:9pt">SÍNDICO RESPONSÁVEL</td>'+
-      '<td style="background:#f5f5f5;padding:6px;font-weight:700;font-size:9pt">E-MAIL</td>'+
-    '</tr><tr>'+
-      '<td style="padding:6px;font-size:9pt">'+p.sindico+'</td>'+
-      '<td style="padding:6px;font-size:9pt">'+p.email+'</td>'+
+      '<td style="background:#f5f5f5;padding:4px 6px;font-weight:700">CNPJ</td>'+
+      '<td style="padding:4px 6px">'+p.cnpj+'</td>'+
+      '<td style="background:#f5f5f5;padding:4px 6px;font-weight:700">SÍNDICO</td>'+
+      '<td style="padding:4px 6px">'+p.sindico+'</td>'+
     '</tr></table>'+
-    '<div class="pr-sec">'+(isOS?'Ordem de Serviço — Itens Selecionados':'Ficha de Fabricação')+'</div>'+
-    '<table><thead><tr><th style="min-width:180px">Descrição Item</th><th>Medida A</th><th>Medida B</th><th>Medida C</th><th>Unid.</th><th>Qtde</th></tr></thead><tbody>'+itensHtml+'</tbody></table>'+
-    '<div class="pr-sec" style="margin-top:16px">Ficha Técnica para Produção</div>'+
-    '<p style="font-size:8pt;color:#555;margin-bottom:10px">Declaro ter visitado o local, realizado as locações dos pilares, bem como calculado todos os insumos necessários para a execução dos serviços.</p>'+
-    '<table style="margin-bottom:8px"><tr><th style="width:160px">Informação</th><th>Detalhe</th></tr>'+
-    '<tr><td style="font-weight:700">INFORMAÇÃO 1</td><td>'+p.cor_estrutura+'</td></tr>'+
-    '<tr><td style="font-weight:700">INFORMAÇÃO 2</td><td>'+p.cor_tela+'</td></tr>'+
-    '<tr><td style="font-weight:700">INFORMAÇÃO 3</td><td>'+p.chumbacao+'</td></tr>'+
-    '<tr><td style="font-weight:700">INFORMAÇÃO 4</td><td>'+p.pilares+'</td></tr>'+
-    '</table>'+
-    '<div class="pr-sec">Prazo Previsto para Entrega das Peças</div>'+
-    '<table><thead><tr><th>Conjunto</th><th>Prazo</th><th>Referência</th></tr></thead><tbody>'+prazosHtml+'</tbody></table>'+
-    '<div class="pr-sign-wrap" style="margin-top:36px">'+
+    '<div class="pr-sec">'+(isOS?'Itens da Ordem de Serviço':'Ficha de Fabricação')+'</div>'+
+    '<table><thead><tr><th style="width:60px">Status</th><th style="min-width:160px">Descrição Item</th><th>Med.A</th><th>Med.B</th><th>Med.C</th><th>Unid.</th><th>Qtde</th></tr></thead><tbody>'+itensHtml+'</tbody></table>'+
+    fichaTecnica+
+    '<div class="pr-sign-wrap" style="margin-top:24px">'+
       '<div class="pr-sign"><div style="font-size:9pt;font-weight:700">SOMBREAR INDÚSTRIA</div><div style="font-size:8pt;color:#666">Goiânia — GO</div></div>'+
       '<div class="pr-sign"><div style="font-size:9pt;font-weight:700">'+p.filial_nome.toUpperCase()+'</div><div style="font-size:8pt;color:#666">'+p.filial_nome+'</div></div>'+
     '</div>'+
   '</div>';
-  window.print();
+  if(isOS){
+    var prev=document.title;
+    document.title=osNome;
+    window.print();
+    document.title=prev;
+  }else{
+    window.print();
+  }
 }
 
 // ════════════════════════════════════════════
