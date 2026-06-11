@@ -876,7 +876,7 @@ function renderWizard(){
         '<td><input type="text" value="'+it.mb+'" data-mb style="width:58px;padding:3px 6px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px" onchange="WZ.itens['+i+'].mb=this.value"></td>'+
         '<td><input type="text" value="'+it.mc+'" data-mc style="width:58px;padding:3px 6px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px" onchange="WZ.itens['+i+'].mc=this.value"></td>'+
         '<td data-un style="font-size:11px;text-align:center;white-space:nowrap">'+it.un+'</td>'+
-        '<td><input type="number" value="'+it.qtd+'" min="0" style="width:70px;padding:4px 6px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;text-align:center" onchange="WZ.itens['+i+'].qtd=parseInt(this.value)||0"></td>'+
+        '<td><input type="number" value="'+it.qtd+'" min="0" style="width:70px;padding:4px 6px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;text-align:center" onchange="WZ.itens['+i+'].qtd=parseInt(this.value)||0;wzUpdateResumo()"></td>'+
         '<td><button onclick="wzRemoveItem('+i+')" style="background:none;border:none;color:#ef4444;font-size:16px;cursor:pointer;padding:2px 6px" title="Remover">✕</button></td>'+
       '</tr>';
     }).join('');
@@ -886,27 +886,8 @@ function renderWizard(){
     return '<div class="prazo-row"><span class="prazo-label">'+p.grupo+'</span><select class="prazo-select" onchange="WZ.prazos['+i+'].prazo=this.value">'+opts+'</select></div>';
   }).join('');
 
-  // Resumo financeiro do pedido
-  var filObj4=DB.filiais().find(function(f){return f.id===USER.filial_id;})||{};
-  var pricing4=calcTotalPedido(WZ.itens,filObj4.frete||0);
-  var resumoFinanceiro=pricing4.subtotal>0?
-    '<div style="background:linear-gradient(135deg,#f0fae0,#e8f5cc);border:1px solid #c6e870;border-radius:10px;padding:16px 20px;margin-top:16px">'+
-    '<div style="font-size:11px;font-weight:700;color:#6FAE2E;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">💰 Resumo Financeiro</div>'+
-    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">'+
-    '<div style="background:#fff;border-radius:8px;padding:10px;text-align:center">'+
-      '<div style="font-size:18px;font-weight:700;color:#334155">'+fmtMoeda(pricing4.subtotal)+'</div>'+
-      '<div style="font-size:10px;color:#64748b;text-transform:uppercase;margin-top:2px">Subtotal Peças</div>'+
-    '</div>'+
-    '<div style="background:#fff;border-radius:8px;padding:10px;text-align:center">'+
-      '<div style="font-size:18px;font-weight:700;color:#334155">'+fmtMoeda(pricing4.frete)+'</div>'+
-      '<div style="font-size:10px;color:#64748b;text-transform:uppercase;margin-top:2px">Frete '+(filObj4.nome||'')+'</div>'+
-    '</div>'+
-    '<div style="background:var(--verde);border-radius:8px;padding:10px;text-align:center">'+
-      '<div style="font-size:20px;font-weight:700;color:#fff">'+fmtMoeda(pricing4.total)+'</div>'+
-      '<div style="font-size:10px;color:rgba(255,255,255,.8);text-transform:uppercase;margin-top:2px">Total do Pedido</div>'+
-    '</div>'+
-    '</div></div>'
-  :'';
+  // Resumo financeiro — renderizado live via wzUpdateResumo()
+  var resumoFinanceiro='';
 
   var sugerirBtn=WZ._calcItens?
     '<button class="btn btn-outline btn-sm" style="font-size:12px" onclick="wzAplicarCalcSugerido()">💡 Usar Cálculo Automático</button>':'';
@@ -920,7 +901,7 @@ function renderWizard(){
     '<span style="font-size:12px;color:#64748b">Selecione a peça, preencha as medidas e a quantidade</span>'+
   '</div><div class="card-body">'+
   '<div class="tbl-wrap"><table class="rev-tbl"><thead><tr><th style="min-width:220px">Peça</th><th>Medida A</th><th>Medida B</th><th>Medida C</th><th>Unid.</th><th>Qtde</th><th style="width:32px"></th></tr></thead><tbody>'+itensHtml+'</tbody></table></div>'+
-  resumoFinanceiro+
+  '<div id="wzResumoFin"></div>'+
   '<div class="sec-title" style="margin-top:20px">Prazos Previstos para Entrega</div>'+
   '<div class="prazo-grid">'+prazosHtml+'</div>'+
   '</div></div></div>';
@@ -934,6 +915,7 @@ function renderWizard(){
     (WZ.step<4?'<button class="btn btn-primary" onclick="wzNext()">Próximo →</button>':
                '<button class="btn btn-primary" style="font-size:15px;padding:12px 28px" onclick="wzEnviar()">📤 Enviar Pedido para a Sede</button>')+
   '</div>';
+  if(WZ.step===4)wzUpdateResumo();
 }
 
 function dirCard(label,id,opts,val){
@@ -1069,6 +1051,32 @@ function wzSelectPeca(i,val){
   } else {
     WZ.itens[i].desc=val;
   }
+  wzUpdateResumo();
+}
+
+function wzUpdateResumo(){
+  var el=document.getElementById('wzResumoFin');
+  if(!el)return;
+  var filObj=DB.filiais().find(function(f){return f.id===USER.filial_id;})||{};
+  var pricing=calcTotalPedido(WZ.itens.filter(function(it){return (it.qtd||0)>0;}),filObj.frete||0);
+  if(pricing.subtotal<=0){el.innerHTML='';return;}
+  el.innerHTML=
+    '<div style="background:linear-gradient(135deg,#f0fae0,#e8f5cc);border:1px solid #c6e870;border-radius:10px;padding:16px 20px;margin-top:16px">'+
+    '<div style="font-size:11px;font-weight:700;color:#6FAE2E;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">💰 Resumo Financeiro</div>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">'+
+    '<div style="background:#fff;border-radius:8px;padding:10px;text-align:center">'+
+      '<div style="font-size:18px;font-weight:700;color:#334155">'+fmtMoeda(pricing.subtotal)+'</div>'+
+      '<div style="font-size:10px;color:#64748b;text-transform:uppercase;margin-top:2px">Subtotal Peças</div>'+
+    '</div>'+
+    '<div style="background:#fff;border-radius:8px;padding:10px;text-align:center">'+
+      '<div style="font-size:18px;font-weight:700;color:#334155">'+fmtMoeda(pricing.frete)+'</div>'+
+      '<div style="font-size:10px;color:#64748b;text-transform:uppercase;margin-top:2px">Frete '+(filObj.nome||USER.filial_nome||'')+'</div>'+
+    '</div>'+
+    '<div style="background:var(--verde);border-radius:8px;padding:10px;text-align:center">'+
+      '<div style="font-size:20px;font-weight:700;color:#fff">'+fmtMoeda(pricing.total)+'</div>'+
+      '<div style="font-size:10px;color:rgba(255,255,255,.8);text-transform:uppercase;margin-top:2px">Total do Pedido</div>'+
+    '</div>'+
+    '</div></div>';
 }
 
 function wzEnviar(){
