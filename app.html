@@ -2372,7 +2372,7 @@ function imprimirPedido(id,idxsFiltro){
   if(!p)return;
   var isOS=Array.isArray(idxsFiltro)&&idxsFiltro.length>0;
   var itensParaImprimir=isOS
-    ?(p.itens||[]).filter(function(it,i){return idxsFiltro.indexOf(i)>=0;})
+    ?(p.itens||[]).filter(function(it,i){return idxsFiltro.indexOf(i)>=0&&it.item_status==='aprovado';})
     :(p.itens||[]).filter(function(it){return (it.qtd||0)>0;});
   var itensHtml=itensParaImprimir.map(function(it){
     var statusLabel=it.os_status==='fabricado'?'Fabricado':'A Fabricar';
