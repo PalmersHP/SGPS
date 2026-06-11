@@ -1102,7 +1102,7 @@ function wzEnviar(){
   var pricing=calcTotalPedido(WZ.itens,filObj.frete||0);
   var itensComPreco=WZ.itens.filter(function(it){return (it.qtd||0)>0;}).map(function(it){
     var pu=lookupPreco(it.desc);
-    return Object.assign({},it,{preco_unit:pu,subtotal:pu*(it.qtd||0)});
+    return Object.assign({},it,{preco_unit:pu,subtotal:pu*(it.qtd||0),item_status:'aguardando'});
   });
   var pedido={
     id:id,filial_id:USER.filial_id,filial_nome:USER.filial_nome,
@@ -1189,6 +1189,7 @@ function renderView_filialPedido(){
     '<div class="tl-sub">'+fmtDate(l.data)+' • '+l.user+'</div></div>';
   }).join('');
   var canConfirm=p.status==='pronto_envio'||p.status==='em_transito';
+  var canEdit=p.status!=='entregue'&&p.status!=='concluido'&&p.status!=='cancelado';
   var prazosHtml=(p.prazos||[]).map(function(pr){
     return'<div class="prazo-row"><span class="prazo-label">'+pr.grupo+'</span><strong style="font-size:13px;color:#1e293b">'+pr.prazo+'</strong></div>';
   }).join('');
@@ -1198,6 +1199,7 @@ function renderView_filialPedido(){
     '<div><button class="btn btn-ghost btn-sm" onclick="history.back()" style="margin-bottom:8px">← Voltar</button><h1>'+p.cliente+'</h1><p>Pedido #'+p.id+' • Criado em '+fmtDate(p.criado)+'</p></div>'+
     '<div style="display:flex;gap:10px">'+
       (canConfirm?'<button class="btn btn-approve" onclick="confirmarRecebimento(\''+p.id+'\')">✅ Confirmar Recebimento</button>':'')+
+      (canEdit?'<button class="btn btn-outline" onclick="editarItensPedido(\''+p.id+'\')">✏️ Editar Itens</button>':'')+
       '<button class="btn btn-outline" onclick="imprimirPedido(\''+p.id+'\')">📄 Imprimir / PDF</button>'+
     '</div>'+
   '</div>'+
@@ -1352,10 +1354,12 @@ function aprovarPedido(id){
 }
 
 function gerarOS(id){
-  var checks=document.querySelectorAll('[data-os-check]:checked');
-  var idxs=Array.from(checks).map(function(c){return parseInt(c.dataset.osCheck);});
-  if(!idxs.length){showToast('Selecione ao menos um item para a OS.','error');return;}
   var p=DB.getPedido(id);
+  var idxs=(p.itens||[]).reduce(function(acc,it,i){
+    if((it.item_status==='aprovado')&&it.os_status!=='em_os'&&(it.qtd||0)>0)acc.push(i);
+    return acc;
+  },[]);
+  if(!idxs.length){showToast('Aprove ao menos um item antes de gerar a OS.','error');return;}
   var itens=(p.itens||[]).map(function(it,i){
     return idxs.indexOf(i)>=0?Object.assign({},it,{os_status:'em_os'}):it;
   });
@@ -1366,13 +1370,33 @@ function gerarOS(id){
     updates.status='em_fabricacao';
     updates.log=p.log;
     showToast('Aprovado! OS gerada com '+idxs.length+' item(s).','success');
-  } else {
+  }else{
     showToast('OS gerada com '+idxs.length+' item(s).','success');
   }
   DB.updatePedido(id,updates);
   buildSidebar();
   imprimirPedido(id,idxs);
   renderView_sedePedido();
+}
+
+function toggleItemAprovacao(id,idx){
+  var p=DB.getPedido(id);
+  var itens=(p.itens||[]).map(function(it,i){
+    if(i!==idx)return it;
+    return Object.assign({},it,{item_status:it.item_status==='aprovado'?'aguardando':'aprovado'});
+  });
+  DB.updatePedido(id,{itens:itens});
+  renderView_sedePedido();
+}
+function aprovarTodosItens(id){
+  var p=DB.getPedido(id);
+  var itens=(p.itens||[]).map(function(it){
+    if(it.os_status==='em_os')return it;
+    return Object.assign({},it,{item_status:'aprovado'});
+  });
+  DB.updatePedido(id,{itens:itens});
+  renderView_sedePedido();
+  showToast('Todos os itens aprovados.','success');
 }
 
 function devolverPedido(id){
@@ -1415,10 +1439,15 @@ function renderView_sedePedido(){
     var sub=pu*(it.qtd||0);
     var puCell=pu>0?fmtMoeda(pu):'<span style="color:#94a3b8">—</span>';
     var subCell=sub>0?'<strong>'+fmtMoeda(sub)+'</strong>':'<span style="color:#94a3b8">—</span>';
-    var osCell=it.os_status==='em_os'
-      ?'<td style="text-align:center"><span title="Já gerado em OS" style="font-size:15px">✅</span></td>'
-      :'<td style="text-align:center"><input type="checkbox" data-os-check="'+idx+'" checked style="width:16px;height:16px;accent-color:var(--verde-d);cursor:pointer"></td>';
-    return'<tr>'+osCell+'<td>'+it.desc+'</td><td style="text-align:center">'+it.ma+'</td><td style="text-align:center">'+it.mb+'</td><td style="text-align:center">'+it.mc+'</td><td style="text-align:center">'+it.un+'</td><td style="text-align:center;font-weight:700;color:var(--verde-d)">'+it.qtd+'</td><td style="text-align:right">'+puCell+'</td><td style="text-align:right">'+subCell+'</td></tr>';
+    var statusCell;
+    if(it.os_status==='em_os'){
+      statusCell='<td style="text-align:center"><span title="Já na OS" style="font-size:14px">✅</span></td>';
+    }else if(it.item_status==='aprovado'){
+      statusCell='<td style="text-align:center;padding:4px"><span onclick="toggleItemAprovacao(\''+p.id+'\','+idx+')" style="cursor:pointer;background:#dcfce7;color:#16a34a;border:1px solid #86efac;border-radius:12px;padding:3px 10px;font-size:11px;font-weight:700;white-space:nowrap;display:inline-block">✓ Aprovado</span></td>';
+    }else{
+      statusCell='<td style="text-align:center;padding:4px"><span onclick="toggleItemAprovacao(\''+p.id+'\','+idx+')" style="cursor:pointer;background:#fef3c7;color:#d97706;border:1px solid #fde68a;border-radius:12px;padding:3px 10px;font-size:11px;font-weight:700;white-space:nowrap;display:inline-block">⏳ Aguardando</span></td>';
+    }
+    return'<tr>'+statusCell+'<td>'+it.desc+'</td><td style="text-align:center">'+it.ma+'</td><td style="text-align:center">'+it.mb+'</td><td style="text-align:center">'+it.mc+'</td><td style="text-align:center">'+it.un+'</td><td style="text-align:center;font-weight:700;color:var(--verde-d)">'+it.qtd+'</td><td style="text-align:right">'+puCell+'</td><td style="text-align:right">'+subCell+'</td></tr>';
   }).join('');
   var tlHtml=(p.log||[]).map(function(l,i){
     var isLast=i===p.log.length-1;
@@ -1432,9 +1461,22 @@ function renderView_sedePedido(){
   var statusSection='';
   var temPendente=(p.itens||[]).some(function(it){return it.qtd>0&&(!it.os_status||it.os_status==='pendente');});
   if(p.status==='aguardando'){
-    statusSection='<div class="apv-box apv-pending" style="margin-top:16px"><strong>⏳ Aguardando aprovação</strong><p style="font-size:12px;color:#64748b;margin:6px 0 0">Selecione os itens na ficha ao lado e gere a OS.</p><div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap"><button class="btn btn-approve" onclick="gerarOS(\''+p.id+'\')">📋 Aprovar + Gerar OS</button><button class="btn btn-danger" onclick="devolverPedido(\''+p.id+'\')">↩ Devolver</button><button class="btn btn-outline" onclick="editarPedidoNaAprovacao(\''+p.id+'\')">✏️ Editar Pedido</button></div></div>';
+    var aprovados=(p.itens||[]).filter(function(it){return it.item_status==='aprovado'&&it.os_status!=='em_os'&&it.qtd>0;}).length;
+    var totalItens=(p.itens||[]).filter(function(it){return it.qtd>0;}).length;
+    statusSection='<div class="apv-box apv-pending" style="margin-top:16px">'+
+      '<strong>⏳ Aguardando aprovação</strong>'+
+      '<p style="font-size:12px;color:#64748b;margin:6px 0 4px">Clique no status de cada item na ficha para aprovar individualmente.</p>'+
+      '<p style="font-size:12px;font-weight:700;color:#475569;margin:0 0 10px">'+aprovados+' de '+totalItens+' item(s) aprovado(s)</p>'+
+      '<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">'+
+        '<button class="btn btn-approve" onclick="gerarOS(\''+p.id+'\')">📋 Gerar OS</button>'+
+        '<button class="btn btn-outline btn-sm" onclick="aprovarTodosItens(\''+p.id+'\')">✓ Aprovar Todos</button>'+
+        '<button class="btn btn-danger" onclick="devolverPedido(\''+p.id+'\')">↩ Devolver</button>'+
+        '<button class="btn btn-outline" onclick="editarPedidoNaAprovacao(\''+p.id+'\')">✏️ Editar Pedido</button>'+
+      '</div></div>';
   } else if(p.status==='em_fabricacao'&&temPendente){
-    statusSection='<div class="apv-box apv-info" style="margin-top:16px"><strong>📋 Itens pendentes de OS</strong><p style="font-size:12px;color:#64748b;margin:6px 0 10px">Selecione os itens restantes na ficha e gere a próxima OS.</p><button class="btn btn-primary btn-sm" onclick="gerarOS(\''+p.id+'\')">📋 Gerar OS Parcial</button></div>';
+    statusSection='<div class="apv-box apv-info" style="margin-top:16px"><strong>📋 Itens pendentes de OS</strong>'+
+      '<p style="font-size:12px;color:#64748b;margin:6px 0 10px">Aprove os itens restantes na ficha e gere a próxima OS.</p>'+
+      '<button class="btn btn-primary btn-sm" onclick="gerarOS(\''+p.id+'\')">📋 Gerar OS Parcial</button></div>';
   } else if(nextStatus){
     statusSection='<div class="apv-box apv-info" style="margin-top:16px"><strong>Avançar Status</strong><p style="font-size:12px;color:#64748b;margin:4px 0 10px">Próximo: '+badge(nextStatus)+'</p><button class="btn btn-primary btn-sm" onclick="avancarStatus(\''+p.id+'\',\''+nextStatus+'\')">Atualizar → '+STATUS_LABELS[nextStatus]+'</button></div>';
   }
@@ -1473,7 +1515,7 @@ function renderView_sedePedido(){
     '</div>'+
     '<div>'+
       '<div class="card"><div class="card-hdr"><h2>Ficha de Fabricação</h2></div><div class="card-body" style="padding:0">'+
-        '<div class="tbl-wrap"><table><thead><tr><th style="text-align:center;width:38px">OS</th><th>Descrição do Item</th><th>Med.A</th><th>Med.B</th><th>Med.C</th><th>Unid.</th><th>Qtde</th><th style="text-align:right">V. Unit.</th><th style="text-align:right">Subtotal</th></tr></thead><tbody>'+itensHtml+'</tbody>'+
+        '<div class="tbl-wrap"><table><thead><tr><th style="text-align:center;width:80px">Status</th><th>Descrição do Item</th><th>Med.A</th><th>Med.B</th><th>Med.C</th><th>Unid.</th><th>Qtde</th><th style="text-align:right">V. Unit.</th><th style="text-align:right">Subtotal</th></tr></thead><tbody>'+itensHtml+'</tbody>'+
         (pricing.subtotal>0?'<tfoot><tr><td colspan="7" style="text-align:right;font-size:12px;color:#64748b;padding:8px 12px">Subtotal Peças</td><td></td><td style="text-align:right;padding:8px 12px;font-weight:700;color:#1e293b">'+fmtMoeda(pricing.subtotal)+'</td></tr>'+
         (pricing.frete>0?'<tr><td colspan="8" style="text-align:right;font-size:12px;color:#64748b;padding:4px 12px">Frete</td><td style="text-align:right;padding:4px 12px;font-weight:600;color:#1e293b">'+fmtMoeda(pricing.frete)+'</td></tr>':'')+
         '<tr style="background:#6FAE2E"><td colspan="8" style="text-align:right;font-weight:700;color:#fff;padding:10px 12px;font-size:13px">TOTAL DO PEDIDO</td><td style="text-align:right;font-weight:700;color:#fff;padding:10px 12px;font-size:14px">'+fmtMoeda(pricing.total)+'</td></tr></tfoot>':'')+'</table></div>'+
@@ -1481,6 +1523,102 @@ function renderView_sedePedido(){
       '<div class="card"><div class="card-hdr"><h2>Prazos</h2></div><div class="card-body"><div class="prazo-grid">'+prazosHtml+'</div></div></div>'+
     '</div>'+
   '</div>';
+}
+
+function editarItensPedido(id){
+  var p=DB.getPedido(id);
+  if(!p)return;
+  var catOpts=WZ_CATALOGO.map(function(c){return'<option value="'+c.desc+'">'+c.desc+'</option>';}).join('');
+  var itensHtml=(p.itens||[]).map(function(it,i){
+    if(it.item_status==='aprovado'){
+      return'<tr style="background:#f8fafc;opacity:.7">'+
+        '<td style="padding:6px 8px;font-size:12px;color:#475569">🔒 '+esc(it.desc)+'</td>'+
+        '<td style="padding:6px 8px;text-align:center;font-size:12px">'+esc(it.ma||'')+'</td>'+
+        '<td style="padding:6px 8px;text-align:center;font-size:12px">'+esc(it.mb||'')+'</td>'+
+        '<td style="padding:6px 8px;text-align:center;font-size:12px">'+esc(it.mc||'')+'</td>'+
+        '<td style="padding:6px 8px;text-align:center;font-size:12px">'+esc(it.un||'')+'</td>'+
+        '<td style="padding:6px 8px;text-align:center;font-size:12px;font-weight:700">'+it.qtd+'</td>'+
+        '<td style="padding:6px 8px;text-align:center"><span style="font-size:10px;background:#dcfce7;color:#16a34a;border-radius:8px;padding:2px 8px;font-weight:700">Aprovado</span></td>'+
+        '<td></td>'+
+      '</tr>';
+    }
+    return'<tr id="ei_row_'+i+'">'+
+      '<td style="padding:4px 6px"><select id="ei_desc_'+i+'" style="width:100%;min-width:160px;padding:4px 6px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px">'+
+        '<option value="'+esc(it.desc)+'" selected>'+esc(it.desc)+'</option>'+catOpts+
+      '</select></td>'+
+      '<td style="padding:4px 6px"><input style="width:60px;padding:4px 6px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;text-align:center" id="ei_ma_'+i+'" value="'+esc(it.ma||'')+'"></td>'+
+      '<td style="padding:4px 6px"><input style="width:60px;padding:4px 6px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;text-align:center" id="ei_mb_'+i+'" value="'+esc(it.mb||'')+'"></td>'+
+      '<td style="padding:4px 6px"><input style="width:60px;padding:4px 6px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;text-align:center" id="ei_mc_'+i+'" value="'+esc(it.mc||'')+'"></td>'+
+      '<td style="padding:4px 6px"><input style="width:44px;padding:4px 6px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;text-align:center" id="ei_un_'+i+'" value="'+esc(it.un||'')+'"></td>'+
+      '<td style="padding:4px 6px"><input type="number" min="0" style="width:56px;padding:4px 6px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;text-align:center" id="ei_qtd_'+i+'" value="'+(it.qtd||0)+'"></td>'+
+      '<td style="padding:4px 6px;text-align:center"><span style="font-size:10px;background:#fef3c7;color:#d97706;border-radius:8px;padding:2px 8px;font-weight:700">Aguardando</span></td>'+
+      '<td style="padding:4px 6px;text-align:center"><button onclick="document.getElementById(\'ei_row_'+i+'\').remove()" style="background:none;border:none;color:#ef4444;font-size:15px;cursor:pointer">✕</button></td>'+
+    '</tr>';
+  }).join('');
+  var n=(p.itens||[]).length;
+  _ei_extraCount=0;
+  openModal('Editar Itens — '+esc(p.cliente),
+    '<div id="ei_container" style="overflow-x:auto;max-height:52vh;overflow-y:auto">'+
+    '<table style="width:100%;font-size:12px;border-collapse:collapse">'+
+    '<thead><tr style="background:#f8fafc"><th style="padding:6px 8px;text-align:left;font-size:11px;color:#64748b;border-bottom:1px solid #e2e8f0">Peça</th><th style="padding:6px 8px;font-size:11px;color:#64748b;border-bottom:1px solid #e2e8f0">Med.A</th><th style="padding:6px 8px;font-size:11px;color:#64748b;border-bottom:1px solid #e2e8f0">Med.B</th><th style="padding:6px 8px;font-size:11px;color:#64748b;border-bottom:1px solid #e2e8f0">Med.C</th><th style="padding:6px 8px;font-size:11px;color:#64748b;border-bottom:1px solid #e2e8f0">Un.</th><th style="padding:6px 8px;font-size:11px;color:#64748b;border-bottom:1px solid #e2e8f0">Qtde</th><th style="padding:6px 8px;font-size:11px;color:#64748b;border-bottom:1px solid #e2e8f0">Status</th><th></th></tr></thead>'+
+    '<tbody id="ei_tbody">'+itensHtml+'</tbody></table></div>'+
+    '<button class="btn btn-outline btn-sm" style="margin-top:10px" onclick="ei_adicionarLinha()">+ Adicionar Peça</button>'+
+    '<p style="font-size:11px;color:#94a3b8;margin-top:6px">🔒 Itens aprovados pela Sede não podem ser alterados.</p>',
+    '<button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>'+
+    '<button class="btn btn-primary" onclick="salvarItensFilial(\''+id+'\')">💾 Salvar</button>'
+  );
+}
+var _ei_extraCount=0;
+function ei_adicionarLinha(){
+  var catOpts=WZ_CATALOGO.map(function(c){return'<option value="'+c.desc+'">'+c.desc+'</option>';}).join('');
+  var idx='new_'+(_ei_extraCount++);
+  var row=document.createElement('tr');row.id='ei_row_'+idx;
+  row.innerHTML=
+    '<td style="padding:4px 6px"><select id="ei_desc_'+idx+'" style="width:100%;min-width:160px;padding:4px 6px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px">'+
+      '<option value="">— selecione —</option>'+catOpts+
+    '</select></td>'+
+    '<td style="padding:4px 6px"><input style="width:60px;padding:4px 6px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;text-align:center" id="ei_ma_'+idx+'" value="0,00"></td>'+
+    '<td style="padding:4px 6px"><input style="width:60px;padding:4px 6px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;text-align:center" id="ei_mb_'+idx+'" value="0,00"></td>'+
+    '<td style="padding:4px 6px"><input style="width:60px;padding:4px 6px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;text-align:center" id="ei_mc_'+idx+'" value="0,00"></td>'+
+    '<td style="padding:4px 6px"><input style="width:44px;padding:4px 6px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;text-align:center" id="ei_un_'+idx+'" value="PÇ"></td>'+
+    '<td style="padding:4px 6px"><input type="number" min="0" style="width:56px;padding:4px 6px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;text-align:center" id="ei_qtd_'+idx+'" value="1"></td>'+
+    '<td style="padding:4px 6px;text-align:center"><span style="font-size:10px;background:#fef3c7;color:#d97706;border-radius:8px;padding:2px 8px;font-weight:700">Aguardando</span></td>'+
+    '<td style="padding:4px 6px;text-align:center"><button onclick="this.closest(\'tr\').remove()" style="background:none;border:none;color:#ef4444;font-size:15px;cursor:pointer">✕</button></td>';
+  document.getElementById('ei_tbody').appendChild(row);
+}
+function salvarItensFilial(id){
+  var p=DB.getPedido(id);
+  if(!p)return;
+  var tbody=document.getElementById('ei_tbody');
+  if(!tbody){closeModal();return;}
+  var rows=Array.from(tbody.querySelectorAll('tr[id^="ei_row_"]'));
+  var novosItens=[];
+  rows.forEach(function(row){
+    var rowId=row.id.replace('ei_row_','');
+    var descEl=document.getElementById('ei_desc_'+rowId);
+    var qtdEl=document.getElementById('ei_qtd_'+rowId);
+    if(!descEl||!qtdEl)return;
+    var desc=descEl.value.trim();
+    if(!desc)return;
+    var pu=lookupPreco(desc);
+    var qtd=parseInt(qtdEl.value)||0;
+    novosItens.push({
+      desc:desc,
+      ma:(document.getElementById('ei_ma_'+rowId)||{}).value||'0,00',
+      mb:(document.getElementById('ei_mb_'+rowId)||{}).value||'0,00',
+      mc:(document.getElementById('ei_mc_'+rowId)||{}).value||'0,00',
+      un:(document.getElementById('ei_un_'+rowId)||{}).value||'PÇ',
+      qtd:qtd,
+      preco_unit:pu,subtotal:pu*qtd,
+      item_status:'aguardando'
+    });
+  });
+  var approvedItems=(p.itens||[]).filter(function(it){return it.item_status==='aprovado';});
+  var finalItens=approvedItems.concat(novosItens);
+  DB.updatePedido(id,{itens:finalItens});
+  closeModal();
+  showToast('Itens salvos com sucesso.','success');
+  renderView_filialPedido();
 }
 
 function editarPedidoNaAprovacao(id){
