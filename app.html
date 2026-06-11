@@ -2422,8 +2422,10 @@ function imprimirPedido(id,idxsFiltro){
   if(isOS){
     var prev=document.title;
     document.title=osNome;
-    window.print();
-    document.title=prev;
+    setTimeout(function(){
+      window.print();
+      setTimeout(function(){document.title=prev;},2000);
+    },50);
   }else{
     window.print();
   }
