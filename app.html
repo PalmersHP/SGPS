@@ -1073,20 +1073,15 @@ function wzUpdateRowTotal(i,val){
 function wzUpdateResumo(){
   var el=document.getElementById('wzResumoFin');
   if(!el)return;
-  var filObj=DB.filiais().find(function(f){return f.id===USER.filial_id;})||{};
-  var pricing=calcTotalPedido(WZ.itens.filter(function(it){return (it.qtd||0)>0;}),filObj.frete||0);
+  var pricing=calcTotalPedido(WZ.itens.filter(function(it){return (it.qtd||0)>0;}));
   if(pricing.subtotal<=0){el.innerHTML='';return;}
   el.innerHTML=
     '<div style="background:linear-gradient(135deg,#f0fae0,#e8f5cc);border:1px solid #c6e870;border-radius:10px;padding:16px 20px;margin-top:16px">'+
     '<div style="font-size:11px;font-weight:700;color:#6FAE2E;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">💰 Resumo Financeiro</div>'+
-    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;max-width:500px">'+
     '<div style="background:#fff;border-radius:8px;padding:10px;text-align:center">'+
       '<div style="font-size:18px;font-weight:700;color:#334155">'+fmtMoeda(pricing.subtotal)+'</div>'+
       '<div style="font-size:10px;color:#64748b;text-transform:uppercase;margin-top:2px">Subtotal Peças</div>'+
-    '</div>'+
-    '<div style="background:#fff;border-radius:8px;padding:10px;text-align:center">'+
-      '<div style="font-size:18px;font-weight:700;color:#334155">'+fmtMoeda(pricing.frete)+'</div>'+
-      '<div style="font-size:10px;color:#64748b;text-transform:uppercase;margin-top:2px">Frete '+(filObj.nome||USER.filial_nome||'')+'</div>'+
     '</div>'+
     '<div style="background:var(--verde);border-radius:8px;padding:10px;text-align:center">'+
       '<div style="font-size:20px;font-weight:700;color:#fff">'+fmtMoeda(pricing.total)+'</div>'+
@@ -1099,7 +1094,7 @@ function wzEnviar(){
   var id=uid();
   var calc=calcularPecas(WZ.dim);
   var filObj=DB.filiais().find(function(f){return f.id===USER.filial_id;})||{};
-  var pricing=calcTotalPedido(WZ.itens,filObj.frete||0);
+  var pricing=calcTotalPedido(WZ.itens);
   var itensComPreco=WZ.itens.filter(function(it){return (it.qtd||0)>0;}).map(function(it){
     var pu=lookupPreco(it.desc);
     return Object.assign({},it,{preco_unit:pu,subtotal:pu*(it.qtd||0),item_status:'aguardando'});
@@ -1111,7 +1106,7 @@ function wzEnviar(){
     contato:WZ.cliente.tel,sindico:WZ.cliente.sindico,email:WZ.cliente.email,
     vagas:WZ.dim.vagas,cor_estrutura:WZ.dir.estrutura,cor_tela:WZ.dir.tela,
     chumbacao:WZ.dir.chumb,pilares:WZ.dir.pilares,
-    subtotal_pecas:pricing.subtotal,frete:pricing.frete,valor:pricing.total,
+    subtotal_pecas:pricing.subtotal,frete:0,valor:pricing.total,
     criado:hoje(),atualizado:hoje(),obs:'',
     itens:itensComPreco,prazos:WZ.prazos,
     log:[{status:'aguardando',data:hoje(),user:USER.nome}]
@@ -1174,7 +1169,7 @@ function renderView_filialPedido(){
   var p=DB.getPedido(window._pedidoId);
   if(!p){document.getElementById('view-filial-pedido').innerHTML='<p>Pedido não encontrado.</p>';return;}
   var filObj=DB.filiais().find(function(f){return f.id===p.filial_id;})||{};
-  var pricing=calcTotalPedido(p.itens||[],filObj.frete||0);
+  var pricing=calcTotalPedido(p.itens||[]);
   var itensHtml=(p.itens||[]).filter(function(it){return it.qtd>0;}).map(function(it){
     var pu=lookupPreco(it.desc);
     var sub=pu*(it.qtd||0);
@@ -1230,7 +1225,6 @@ function renderView_filialPedido(){
     '<div class="card"><div class="card-hdr"><h2>Ficha de Fabricação</h2></div><div class="card-body" style="padding:0">'+
     '<div class="tbl-wrap"><table><thead><tr><th>Descrição</th><th>Med.A</th><th>Med.B</th><th>Med.C</th><th>Unid.</th><th>Qtde</th><th style="text-align:right">V. Unit.</th><th style="text-align:right">Subtotal</th></tr></thead><tbody>'+itensHtml+'</tbody>'+
     (pricing.subtotal>0?'<tfoot><tr><td colspan="6" style="text-align:right;font-size:12px;color:#64748b;padding:8px 12px">Subtotal Peças</td><td></td><td style="text-align:right;padding:8px 12px;font-weight:700;color:#1e293b">'+fmtMoeda(pricing.subtotal)+'</td></tr>'+
-    (pricing.frete>0?'<tr><td colspan="7" style="text-align:right;font-size:12px;color:#64748b;padding:4px 12px">Frete</td><td style="text-align:right;padding:4px 12px;font-weight:600;color:#1e293b">'+fmtMoeda(pricing.frete)+'</td></tr>':'')+
     '<tr style="background:#6FAE2E"><td colspan="7" style="text-align:right;font-weight:700;color:#fff;padding:10px 12px;font-size:13px">TOTAL DO PEDIDO</td><td style="text-align:right;font-weight:700;color:#fff;padding:10px 12px;font-size:14px">'+fmtMoeda(pricing.total)+'</td></tr></tfoot>':'')+'</table></div>'+
     '</div></div>'+
     '<div class="card"><div class="card-hdr"><h2>Prazos de Entrega</h2></div><div class="card-body"><div class="prazo-grid">'+prazosHtml+'</div></div></div>'+
@@ -1432,7 +1426,7 @@ function renderView_sedePedido(){
   var p=DB.getPedido(window._pedidoId);
   if(!p){document.getElementById('view-sede-pedido').innerHTML='<p>Pedido não encontrado.</p>';return;}
   var filObj=DB.filiais().find(function(f){return f.id===p.filial_id;})||{};
-  var pricing=calcTotalPedido(p.itens||[],filObj.frete||0);
+  var pricing=calcTotalPedido(p.itens||[]);
   var itensHtml=(p.itens||[]).map(function(it,idx){
     if(!it.qtd||it.qtd<=0) return '';
     var pu=lookupPreco(it.desc);
@@ -1516,8 +1510,7 @@ function renderView_sedePedido(){
     '<div>'+
       '<div class="card"><div class="card-hdr"><h2>Ficha de Fabricação</h2></div><div class="card-body" style="padding:0">'+
         '<div class="tbl-wrap"><table><thead><tr><th style="text-align:center;width:80px">Status</th><th>Descrição do Item</th><th>Med.A</th><th>Med.B</th><th>Med.C</th><th>Unid.</th><th>Qtde</th><th style="text-align:right">V. Unit.</th><th style="text-align:right">Subtotal</th></tr></thead><tbody>'+itensHtml+'</tbody>'+
-        (pricing.subtotal>0?'<tfoot><tr><td colspan="7" style="text-align:right;font-size:12px;color:#64748b;padding:8px 12px">Subtotal Peças</td><td></td><td style="text-align:right;padding:8px 12px;font-weight:700;color:#1e293b">'+fmtMoeda(pricing.subtotal)+'</td></tr>'+
-        (pricing.frete>0?'<tr><td colspan="8" style="text-align:right;font-size:12px;color:#64748b;padding:4px 12px">Frete</td><td style="text-align:right;padding:4px 12px;font-weight:600;color:#1e293b">'+fmtMoeda(pricing.frete)+'</td></tr>':'')+
+        (pricing.subtotal>0?'<tfoot>'+
         '<tr style="background:#6FAE2E"><td colspan="8" style="text-align:right;font-weight:700;color:#fff;padding:10px 12px;font-size:13px">TOTAL DO PEDIDO</td><td style="text-align:right;font-weight:700;color:#fff;padding:10px 12px;font-size:14px">'+fmtMoeda(pricing.total)+'</td></tr></tfoot>':'')+'</table></div>'+
       '</div></div>'+
       '<div class="card"><div class="card-hdr"><h2>Prazos</h2></div><div class="card-body"><div class="prazo-grid">'+prazosHtml+'</div></div></div>'+
@@ -1830,9 +1823,9 @@ function lookupPreco(desc){
   var item=DB.catalogo().find(function(c){return c.desc===desc;});
   return item?item.preco:0;
 }
-function calcTotalPedido(itens,frete){
+function calcTotalPedido(itens){
   var sub=itens.reduce(function(s,it){return s+(lookupPreco(it.desc)*(it.qtd||0));},0);
-  return {subtotal:sub,frete:frete||0,total:sub+(frete||0)};
+  return {subtotal:sub,frete:0,total:sub};
 }
 
 // ════════════════════════════════════════════
@@ -2200,7 +2193,7 @@ function renderRelatorios(role){
 
   function valorPedido(p){
     var filObj=filiais.find(function(f){return f.id===p.filial_id;})||{};
-    return calcTotalPedido(p.itens||[],filObj.frete||0).total;
+    return calcTotalPedido(p.itens||[]).total;
   }
 
   var entregues=peds.filter(function(p){return p.status==='entregue'||p.status==='concluido';});
