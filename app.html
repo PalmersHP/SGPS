@@ -435,6 +435,35 @@ function prazoesPadrao(){
   ];
 }
 
+function gerarItensTelha(vagas,fixacao){
+  var mods=Math.floor(vagas/2);
+  var bases=mods+1,bracos=mods+1,tercas=mods*4;
+  var baseDesc=fixacao==='Laje'?'BASE PVC PARAFUSADO':'BASE PVC CHUMBAÇÃO DIRETA';
+  return[
+    {desc:baseDesc,ma:'—',mb:'—',mc:'—',un:'PÇ',qtd:bases},
+    {desc:'BRAÇO PVC',ma:'—',mb:'—',mc:'—',un:'PÇ',qtd:bracos},
+    {desc:'TERÇAS PARA TELHA',ma:'—',mb:'—',mc:'—',un:'PÇ',qtd:tercas},
+    {desc:'DEIXAR EM BRANCO (EDITÁVEL)',ma:'0,00',mb:'0,00',mc:'0,00',un:'INS UNID',qtd:0}
+  ];
+}
+function renderCalcSummaryTelha(vagas,fixacao){
+  if(!vagas)return'<h4 style="color:#94a3b8">Insira as vagas para ver o cálculo.</h4>';
+  var mods=Math.floor(vagas/2);
+  return'<h4>📐 Resumo — Telha</h4><div class="calc-grid">'+
+    '<div class="calc-item"><div class="cv">'+mods+'</div><div class="cl">Módulos</div></div>'+
+    '<div class="calc-item"><div class="cv">'+(mods+1)+'</div><div class="cl">Bases PVC</div></div>'+
+    '<div class="calc-item"><div class="cv">'+(mods+1)+'</div><div class="cl">Braços PVC</div></div>'+
+    '<div class="calc-item"><div class="cv">'+(mods*4)+'</div><div class="cl">Terças</div></div>'+
+    '<div class="calc-item"><div class="cv">'+(fixacao||'Solo')+'</div><div class="cl">Fixação</div></div>'+
+  '</div>';
+}
+function wzCalcTelha(){
+  var v=parseInt(document.getElementById('w_vagas_t').value)||0;
+  var fix=document.getElementById('w_fix_t').value||'Solo';
+  WZ.dim.vagasTelha=v;WZ.dim.fixacaoTelha=fix;
+  document.getElementById('wzCalcBoxT').innerHTML=renderCalcSummaryTelha(v,fix);
+}
+
 function gerarItens(vagas,mod2vMA,mod3vMA,mod2vMT,mod3vMT,align,mult){
   var modMA=mod2vMA+mod3vMA, modMT=mod2vMT+mod3vMT, modTotal=modMA+modMT;
   if(!modTotal){modTotal=Math.round(vagas/2.5);mod3vMA=Math.round(modTotal*.8);mod2vMA=modTotal-mod3vMA;modMA=modTotal;}
@@ -707,11 +736,11 @@ function renderFilialDash(){
 // ════════════════════════════════════════════
 // WIZARD STATE
 // ════════════════════════════════════════════
-var WZ={step:1,cliente:{},dim:{tipo:'Sombrite'},dir:{},itens:[],prazos:prazoesPadrao()};
+var WZ={step:1,cliente:{},dim:{tipo:'Sombrite',vagasTelha:0,fixacaoTelha:'Solo'},dir:{},itens:[],prazos:prazoesPadrao()};
 var WZ_CHARTS={};
 
 function renderNovoPedido(){
-  WZ={step:1,cliente:{},dim:{tipo:'Sombrite',mod2vMA:0,mod3vMA:0,mod2vMT:0,mod3vMT:0,vagas:0,align:1,semParam:false},dir:{},itens:[],prazos:prazoesPadrao()};
+  WZ={step:1,cliente:{},dim:{tipo:'Sombrite',mod2vMA:0,mod3vMA:0,mod2vMT:0,mod3vMT:0,vagas:0,align:1,semParam:false,vagasTelha:0,fixacaoTelha:'Solo'},dir:{},itens:[],prazos:prazoesPadrao()};
   renderWizard();
 }
 
@@ -765,11 +794,20 @@ function renderWizard(){
     '<div class="mod-group"><h4>📦 Módulos MT — Médio Topo</h4><div class="form-grid"><div class="fg"><label>2V — MT</label><input type="number" id="w_m2mt" min="0" value="'+(d.mod2vMT||0)+'" oninput="wzCalc()"></div><div class="fg"><label>3V — MT</label><input type="number" id="w_m3mt" min="0" value="'+(d.mod3vMT||0)+'" oninput="wzCalc()"></div></div></div>'+
     '</div>'+
     '<div class="calc-summary" id="wzCalcBox">'+renderCalcSummary(calc)+'</div>'
+  :tipoAtual==='Telha'?
+    '<div class="form-grid" style="margin-bottom:16px">'+
+    '<div class="fg"><label>Qtd Total de Vagas *</label><input type="number" id="w_vagas_t" min="0" value="'+(d.vagasTelha||0)+'" oninput="wzCalcTelha()"></div>'+
+    '<div class="fg"><label>Tipo de Fixação</label><select id="w_fix_t" onchange="wzCalcTelha()">'+
+      '<option'+((!d.fixacaoTelha||d.fixacaoTelha==='Solo')?' selected':'')+'>Solo</option>'+
+      '<option'+(d.fixacaoTelha==='Laje'?' selected':'')+'>Laje</option>'+
+    '</select></div>'+
+    '</div>'+
+    '<div class="calc-summary" id="wzCalcBoxT">'+renderCalcSummaryTelha(d.vagasTelha||0,d.fixacaoTelha||'Solo')+'</div>'
   :
     '<div class="em-breve-box">'+
-      '<div class="em-breve-icon">'+(tipoAtual==='Telha'?'🏠':'🚗')+'</div>'+
-      '<div class="em-breve-title">'+tipoAtual+' — Em desenvolvimento</div>'+
-      '<div class="em-breve-desc">O cálculo automático para <strong>'+tipoAtual+'</strong> estará disponível em breve.<br>Você já pode avançar e preencher os demais dados do pedido.</div>'+
+      '<div class="em-breve-icon">🚗</div>'+
+      '<div class="em-breve-title">Carport — Em desenvolvimento</div>'+
+      '<div class="em-breve-desc">O cálculo automático para <strong>Carport</strong> estará disponível em breve.<br>Você já pode avançar e preencher os demais dados do pedido.</div>'+
       '<div class="em-breve-badge">🔧 Em breve</div>'+
     '</div>';
 
@@ -783,13 +821,16 @@ function renderWizard(){
 
   // Step 3
   var dir=WZ.dir;
+  var dirCards3=tipoAtual==='Telha'?
+    dirCard('Cor da Estrutura','w_estrutura',['Estrutura Branca','Estrutura Preta'],dir.estrutura)
+  :
+    dirCard('Informação 1 — Cor da Estrutura','w_estrutura',['Estrutura Branca','Estrutura Preta','Estrutura Cor Especial (Descrever)'],dir.estrutura)+
+    dirCard('Informação 2 — Cor da Tela','w_tela',['Tela Prata','Tela Verde','Tela Azul','Tela Vermelha','Tela Bege','Tela Cor Especial (Descrever)'],dir.tela)+
+    dirCard('Informação 3 — Tipo de Chumbação','w_chumb',['Chumbação Direta em Solo','Chumbação em Laje','Chumbação por Chumbador'],dir.chumb)+
+    dirCard('Informação 4 — Pilares','w_pilares',['Tipo Direto','Pilares com Chapa'],dir.pilares);
   panels+='<div class="wz-panel'+(WZ.step===3?' active':'')+'">'+
   '<div class="card"><div class="card-hdr"><h2>⚙️ Diretrizes Técnicas</h2></div><div class="card-body">'+
-  '<div class="dir-grid">'+
-  dirCard('Informação 1 — Cor da Estrutura','w_estrutura',['Estrutura Branca','Estrutura Preta','Estrutura Cor Especial (Descrever)'],dir.estrutura)+
-  dirCard('Informação 2 — Cor da Tela','w_tela',['Tela Prata','Tela Verde','Tela Azul','Tela Vermelha','Tela Bege','Tela Cor Especial (Descrever)'],dir.tela)+
-  dirCard('Informação 3 — Tipo de Chumbação','w_chumb',['Chumbação Direta em Solo','Chumbação em Laje','Chumbação por Chumbador'],dir.chumb)+
-  dirCard('Informação 4 — Pilares','w_pilares',['Tipo Direto','Pilares com Chapa'],dir.pilares)+
+  '<div class="dir-grid">'+dirCards3+
   '</div></div></div></div>';
 
   // Step 4
@@ -920,12 +961,22 @@ function wzNext(){
       if(!WZ.dim.vagas){showToast('Informe a quantidade de vagas.','error');return;}
       var d=WZ.dim,calc=calcularPecas(d);
       WZ.itens=gerarItens(d.vagas,d.mod2vMA,d.mod3vMA,d.mod2vMT,d.mod3vMT,calc.align,1);
+    } else if(tipo==='Telha'){
+      wzCalcTelha();
+      if(!WZ.dim.vagasTelha){showToast('Informe a quantidade de vagas.','error');return;}
+      WZ.dim.vagas=WZ.dim.vagasTelha;
+      WZ.itens=gerarItensTelha(WZ.dim.vagasTelha,WZ.dim.fixacaoTelha||'Solo');
     } else {
       WZ.itens=[];
     }
   }
   if(WZ.step===3){
-    WZ.dir={estrutura:document.getElementById('w_estrutura').value,tela:document.getElementById('w_tela').value,chumb:document.getElementById('w_chumb').value,pilares:document.getElementById('w_pilares').value};
+    var tipoDir=WZ.dim.tipo||'Sombrite';
+    if(tipoDir==='Telha'){
+      WZ.dir={estrutura:document.getElementById('w_estrutura').value,tela:'—',chumb:WZ.dim.fixacaoTelha||'Solo',pilares:'—'};
+    } else {
+      WZ.dir={estrutura:document.getElementById('w_estrutura').value,tela:document.getElementById('w_tela').value,chumb:document.getElementById('w_chumb').value,pilares:document.getElementById('w_pilares').value};
+    }
   }
   WZ.step++;
   renderWizard();
