@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Sombrear — Engenharia</title>
+<title>Sombrear — Controle de Obras</title>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 <style>
@@ -84,8 +84,8 @@ body{font-family:'Poppins',sans-serif;background:var(--bg);color:var(--text);}
 .kpi.amarelo{border-left-color:#f59e0b;}
 .kpi.vermelho{border-left-color:#ef4444;}
 .funil-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px;}
-.card{background:var(--card);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow);}
-.card-title{font-size:13px;font-weight:700;color:var(--text);margin-bottom:16px;}
+.card-blk{background:var(--card);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow);}
+.card-blk-title{font-size:13px;font-weight:700;color:var(--text);margin-bottom:16px;}
 .funil-item{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);}
 .funil-item:last-child{border-bottom:none;}
 .funil-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
@@ -97,6 +97,7 @@ body{font-family:'Poppins',sans-serif;background:var(--bg);color:var(--text);}
 .pend-etapa{font-size:11px;color:var(--text-2);}
 .pend-badge{font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;flex-shrink:0;}
 .pend-badge.atrasada{background:#fee2e2;color:#dc2626;}
+.pend-badge.pendente{background:#fef9c3;color:#854d0e;}
 
 /* ── KANBAN ── */
 .kanban-wrap{flex:1;overflow-x:auto;padding:16px 24px;display:flex;gap:14px;align-items:flex-start;}
@@ -110,23 +111,42 @@ body{font-family:'Poppins',sans-serif;background:var(--bg);color:var(--text);}
 .obra-card:hover{box-shadow:var(--shadow-md);transform:translateY(-1px);}
 .obra-card.sortable-ghost{opacity:.35;}
 .obra-card.sortable-drag{box-shadow:0 8px 30px rgba(0,0,0,.2);}
-.card-nome{font-size:12px;font-weight:700;color:var(--text);margin-bottom:3px;}
-.card-cliente{font-size:11px;color:var(--text-2);margin-bottom:8px;}
-.card-meta{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;}
-.card-tag{font-size:10px;font-weight:600;padding:2px 7px;border-radius:6px;background:rgba(141,198,63,.1);color:#5a8f1a;}
+.card-nome{font-size:12px;font-weight:700;color:var(--text);margin-bottom:2px;}
+.card-cliente{font-size:11px;color:var(--text-2);margin-bottom:5px;}
+.card-phase{font-size:10px;color:var(--text-3);margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.card-meta{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:7px;}
+.card-tag{font-size:10px;font-weight:600;padding:2px 7px;border-radius:6px;background:rgba(141,198,63,.1);color:#5a8f1a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px;}
 .card-tag.warn{background:rgba(239,68,68,.1);color:#dc2626;}
+.card-tag.extras{background:rgba(59,130,246,.1);color:#1d4ed8;}
+.timeline-badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;display:inline-block;}
+.tl-adiantada{background:#dcfce7;color:#166534;}
+.tl-prazo{background:#fff7ed;color:#c2410c;}
+.tl-atrasada{background:#fee2e2;color:#dc2626;}
 .card-progress{height:3px;background:#e5e7eb;border-radius:2px;overflow:hidden;}
 .card-progress-bar{height:100%;background:var(--verde);border-radius:2px;transition:width .3s;}
-.card-footer{display:flex;justify-content:space-between;align-items:center;margin-top:8px;}
+.card-footer{display:flex;justify-content:space-between;align-items:center;margin-top:7px;}
 .card-data{font-size:10px;color:var(--text-3);}
 .card-vagas{font-size:10px;font-weight:600;color:var(--text-2);}
 .col-add{margin:0 8px 8px;padding:9px;border:1.5px dashed rgba(0,0,0,.12);border-radius:8px;text-align:center;font-size:11px;color:var(--text-3);cursor:pointer;transition:all .15s;flex-shrink:0;}
 .col-add:hover{border-color:var(--verde);color:var(--verde);}
 
+/* ── CONFIGURAÇÕES ── */
+.config-content{flex:1;overflow-y:auto;padding:24px;max-width:860px;}
+.config-tipo-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px 18px;display:flex;align-items:center;gap:12px;box-shadow:var(--shadow);}
+.config-tipo-nome{font-size:14px;font-weight:700;color:var(--text);}
+.config-tipo-sub{font-size:11px;color:var(--text-3);margin-top:2px;}
+.etapa-edit-row{display:grid;grid-template-columns:1fr 130px 130px auto auto;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);}
+.etapa-edit-row:last-child{border-bottom:none;}
+.etapa-edit-inp{padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-family:'Poppins',sans-serif;font-size:12px;color:var(--text);outline:none;transition:border-color .2s;background:#fff;width:100%;}
+.etapa-edit-inp:focus{border-color:var(--verde);}
+.etapa-edit-sel{padding:7px 8px;border:1.5px solid var(--border);border-radius:8px;font-family:'Poppins',sans-serif;font-size:11px;color:var(--text);outline:none;background:#fff;width:100%;}
+.obrig-toggle{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text-2);white-space:nowrap;}
+.obrig-toggle input[type=checkbox]{accent-color:#ef4444;width:14px;height:14px;}
+
 /* ── MODAL ── */
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);backdrop-filter:blur(4px);z-index:1000;display:none;align-items:center;justify-content:center;padding:20px;}
 .modal-overlay.open{display:flex;}
-.modal{background:var(--card);border-radius:18px;width:100%;max-width:760px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.25);}
+.modal{background:var(--card);border-radius:18px;width:100%;max-width:780px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.25);}
 .modal-hdr{padding:20px 24px 0;display:flex;align-items:flex-start;gap:12px;flex-shrink:0;}
 .modal-hdr-info{flex:1;}
 .modal-hdr-title{font-size:18px;font-weight:700;color:var(--text);}
@@ -136,18 +156,30 @@ body{font-family:'Poppins',sans-serif;background:var(--bg);color:var(--text);}
 .modal-tab{padding:10px 16px;font-size:12px;font-weight:600;color:var(--text-2);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;transition:all .15s;}
 .modal-tab.active{color:var(--verde);border-bottom-color:var(--verde);}
 .modal-body{flex:1;overflow-y:auto;padding:20px 24px;}
-.modal-footer{padding:14px 24px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px;flex-shrink:0;}
+.modal-footer{padding:14px 24px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px;flex-shrink:0;align-items:center;}
 
 /* ── FORM ── */
 .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
-.fg{display:flex;flex-direction:column;gap:6px;}
+.fg{display:flex;flex-direction:column;gap:6px;min-width:0;}
 .fg.full{grid-column:1/-1;}
 .fg label{font-size:11px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px;}
-.fg input,.fg select,.fg textarea{padding:10px 12px;border:1.5px solid var(--border);border-radius:9px;font-family:'Poppins',sans-serif;font-size:13px;color:var(--text);outline:none;transition:border-color .2s;background:#fff;}
+.fg input,.fg select,.fg textarea{width:100%;min-width:0;box-sizing:border-box;padding:10px 12px;border:1.5px solid var(--border);border-radius:9px;font-family:'Poppins',sans-serif;font-size:13px;color:var(--text);outline:none;transition:border-color .2s;background:#fff;}
 .fg input:focus,.fg select:focus,.fg textarea:focus{border-color:var(--verde);}
 .fg textarea{resize:vertical;min-height:80px;}
 
-/* ── CHECKLIST ══ */
+/* ── BONUS CHIPS ── */
+.bonus-grid{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px;align-items:flex-start;}
+.bonus-chip{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border:1.5px solid var(--border);border-radius:20px;cursor:pointer;font-size:12px;font-weight:400;color:var(--text-2);transition:all .15s;user-select:none;text-transform:none;letter-spacing:0;white-space:nowrap;width:fit-content;}
+.bonus-chip:hover{border-color:var(--verde);}
+.bonus-chip.selected{border-color:#3b82f6;background:rgba(59,130,246,.08);color:#1d4ed8;}
+.bonus-chip input[type=checkbox]{accent-color:#3b82f6;flex-shrink:0;}
+
+/* ── EXTRAS ── */
+.extra-item{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
+.extra-inp{flex:1;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-family:'Poppins',sans-serif;font-size:12px;color:var(--text);outline:none;transition:border-color .2s;}
+.extra-inp:focus{border-color:var(--verde);}
+
+/* ── CHECKLIST ── */
 .etapa-group{margin-bottom:20px;}
 .etapa-group-title{font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border);}
 .etapa-item{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:9px;border:1px solid var(--border);margin-bottom:6px;transition:background .15s;cursor:pointer;}
@@ -160,6 +192,7 @@ body{font-family:'Poppins',sans-serif;background:var(--bg);color:var(--text);}
 .etapa-label{flex:1;font-size:13px;color:var(--text);}
 .etapa-item.done .etapa-label{text-decoration:line-through;color:var(--text-3);}
 .etapa-data{font-size:10px;color:var(--text-3);}
+.etapa-obrig{font-size:9px;font-weight:700;color:#dc2626;background:#fee2e2;padding:1px 6px;border-radius:8px;flex-shrink:0;}
 
 /* ── DIÁRIO ── */
 .diario-entry{background:var(--bg);border-radius:10px;padding:14px;margin-bottom:12px;border:1px solid var(--border);}
@@ -168,6 +201,16 @@ body{font-family:'Poppins',sans-serif;background:var(--bg);color:var(--text);}
 .diario-clima{font-size:11px;color:var(--text-2);}
 .diario-ativ{font-size:13px;color:var(--text);margin-bottom:6px;}
 .diario-pend{font-size:12px;color:#dc2626;}
+
+/* ── QUANTITATIVOS ── */
+.quant-inputs{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;}
+.quant-result{background:var(--bg);border-radius:10px;padding:16px;}
+.quant-section{font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:1px;margin:0 0 10px;}
+.quant-line{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);font-size:13px;}
+.quant-line:last-child{border-bottom:none;}
+.quant-label{color:var(--text-2);}
+.quant-val{font-weight:700;color:var(--text);}
+.quant-divider{height:1px;background:var(--border);margin:14px 0;}
 
 /* ── HISTÓRICO ── */
 .hist-item{display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);}
@@ -191,18 +234,20 @@ body{font-family:'Poppins',sans-serif;background:var(--bg);color:var(--text);}
 .bg-gray{background:#f1f5f9;color:#475569;}
 .bg-blue{background:#dbeafe;color:#1d4ed8;}
 .bg-orange{background:#fff7ed;color:#c2410c;}
-.bg-yellow{background:#fef9c3;color:#854d0e;}
+
+/* ── PREVIEW ETAPAS ── */
+.preview-etapas{background:var(--bg);border-radius:10px;padding:14px;margin-top:8px;}
+.preview-etapa-row{display:flex;align-items:center;gap:8px;padding:5px 0;font-size:12px;color:var(--text-2);border-bottom:1px solid var(--border);}
+.preview-etapa-row:last-child{border-bottom:none;}
+.preview-dot{width:6px;height:6px;border-radius:50%;background:var(--verde);flex-shrink:0;}
+.preview-dot.obrig{background:#ef4444;}
 
 /* ── TOAST ── */
 #toast{position:fixed;bottom:24px;right:24px;background:#1f2937;color:#fff;padding:12px 18px;border-radius:10px;font-size:13px;font-weight:500;opacity:0;transform:translateY(8px);transition:all .3s;pointer-events:none;z-index:9999;max-width:320px;}
 #toast.show{opacity:1;transform:translateY(0);}
 #toast.success{background:#166534;}
 #toast.error{background:#991b1b;}
-
-/* ── EMPTY ── */
 .empty{padding:32px;text-align:center;color:var(--text-3);font-size:13px;}
-
-/* ── SCROLLBAR ── */
 ::-webkit-scrollbar{width:4px;height:4px;}
 ::-webkit-scrollbar-track{background:transparent;}
 ::-webkit-scrollbar-thumb{background:rgba(0,0,0,.15);border-radius:4px;}
@@ -214,7 +259,7 @@ body{font-family:'Poppins',sans-serif;background:var(--bg);color:var(--text);}
 <div id="loginScreen">
   <div class="login-box">
     <div class="login-brand">
-      <div class="login-brand-icon">🔧</div>
+      <div class="login-brand-icon">🏗️</div>
       <div>
         <div class="login-brand-name">Sombrear</div>
         <div class="login-brand-sub">Engenharia</div>
@@ -232,11 +277,10 @@ body{font-family:'Poppins',sans-serif;background:var(--bg);color:var(--text);}
 <!-- APP -->
 <div id="appShell">
   <div class="app-layout">
-    <!-- SIDEBAR -->
     <div id="sidebar">
       <div class="sb-top">
         <div class="sb-brand">
-          <div class="sb-brand-icon">🔧</div>
+          <div class="sb-brand-icon">🏗️</div>
           <div>
             <div class="sb-brand-name">Engenharia</div>
             <div class="sb-brand-sub">Sombrear</div>
@@ -247,8 +291,10 @@ body{font-family:'Poppins',sans-serif;background:var(--bg);color:var(--text);}
         <div class="sb-section">Menu</div>
         <div class="nav-item active" id="nav-dashboard" onclick="navigate('dashboard')"><span class="ni-icon">⊞</span>Dashboard</div>
         <div class="nav-item" id="nav-kanban" onclick="navigate('kanban')"><span class="ni-icon">🗂️</span>Kanban de Obras</div>
-        <div class="sb-section">Sistema</div>
-        <div class="nav-item" id="nav-ecosistema" onclick="window.location.href='ecosistema.html'"><span class="ni-icon">🏠</span>Ecosistema</div>
+        <div class="sb-section">Admin</div>
+        <div class="nav-item" id="nav-config" onclick="navigate('config')"><span class="ni-icon">⚙️</span>Configurações</div>
+        <div style="height:1px;background:rgba(255,255,255,.07);margin:8px 0"></div>
+        <div class="nav-item" id="nav-ecosistema" onclick="window.location.href='ecosistema.html'" style="color:rgba(255,255,255,.5);font-size:12px;"><span class="ni-icon">🏠</span>Voltar ao Ecossistema</div>
       </div>
       <div class="sb-bottom">
         <div class="sb-user" onclick="doLogout()">
@@ -261,24 +307,23 @@ body{font-family:'Poppins',sans-serif;background:var(--bg);color:var(--text);}
       </div>
     </div>
 
-    <!-- MAIN -->
     <div class="app-main">
       <div id="topbar">
         <div class="tb-title" id="tbTitle">Dashboard</div>
-        <div class="tb-badge" id="tbBadge">🔧 Engenharia</div>
+        <div class="tb-badge">🏗️ Engenharia</div>
         <button class="tb-btn tb-btn-primary" id="tbNovaObra" onclick="novaObra()" style="display:none">＋ Nova Obra</button>
       </div>
 
-      <!-- DASHBOARD -->
       <div class="view active" id="view-dashboard">
-        <div class="dash-content" id="dashContent">
-          <div class="empty">Carregando...</div>
-        </div>
+        <div class="dash-content" id="dashContent"><div class="empty">Carregando...</div></div>
       </div>
 
-      <!-- KANBAN -->
       <div class="view" id="view-kanban">
         <div class="kanban-wrap" id="kanbanWrap"></div>
+      </div>
+
+      <div class="view" id="view-config">
+        <div class="config-content" id="configContent"><div class="empty">Carregando...</div></div>
       </div>
     </div>
   </div>
@@ -302,7 +347,7 @@ body{font-family:'Poppins',sans-serif;background:var(--bg);color:var(--text);}
 
 <!-- MODAL GENÉRICO -->
 <div class="modal-overlay" id="genericModal">
-  <div class="modal" style="max-width:520px;">
+  <div class="modal" style="max-width:560px;">
     <div class="modal-hdr">
       <div class="modal-hdr-info"><div class="modal-hdr-title" id="gmTitle"></div></div>
       <button class="modal-close" onclick="closeModal()">✕</button>
@@ -316,51 +361,33 @@ body{font-family:'Poppins',sans-serif;background:var(--bg);color:var(--text);}
 
 <script>
 // ════════════════════════════════════════════
-// SUPABASE — fetch direto
+// SUPABASE
 // ════════════════════════════════════════════
 var SUPA_URL  = 'https://gwcgcvgowoqyhthdbear.supabase.co';
 var SUPA_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd3Y2djdmdvd29xeWh0aGRiZWFyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyMjQ1NzUsImV4cCI6MjA5MTgwMDU3NX0.lBB4o9J6DPr5MNQUP9p2lCWzhUBBS7Hvu0JETmH7hjc';
 var SUPA_TOKEN = null;
 
-function _hdr(){
-  return {'apikey':SUPA_ANON,'Authorization':'Bearer '+(SUPA_TOKEN||SUPA_ANON),'Content-Type':'application/json'};
-}
-async function supaAuth(email,pw){
-  var r=await fetch(SUPA_URL+'/auth/v1/token?grant_type=password',{method:'POST',headers:_hdr(),body:JSON.stringify({email,password:pw})});
-  var d=await r.json(); if(!r.ok) return{error:d.error_description||'Credenciais inválidas'}; return{data:d};
-}
-async function supaSignOut(){
-  if(SUPA_TOKEN) fetch(SUPA_URL+'/auth/v1/logout',{method:'POST',headers:_hdr()}).catch(()=>{});
-  SUPA_TOKEN=null;
-}
-async function supaGet(table,params,cols){
-  var url=SUPA_URL+'/rest/v1/'+table+'?select='+(cols||'*')+(params?'&'+params:'');
-  var r=await fetch(url,{headers:_hdr()}); if(!r.ok) return{data:[]}; return{data:await r.json()};
-}
-async function supaGetOne(table,params,cols){
-  var{data}=await supaGet(table,(params||'')+'&limit=1',cols);
-  return{data:(Array.isArray(data)&&data.length)?data[0]:null};
-}
-async function supaPost(table,body){
-  var r=await fetch(SUPA_URL+'/rest/v1/'+table,{method:'POST',headers:Object.assign({},_hdr(),{'Prefer':'return=representation'}),body:JSON.stringify(body)});
-  if(!r.ok){var e=await r.json();return{error:e.message||JSON.stringify(e)};} var d=await r.json(); return{data:Array.isArray(d)?d[0]:d};
-}
-async function supaPatch(table,params,body){
-  var r=await fetch(SUPA_URL+'/rest/v1/'+table+'?'+params,{method:'PATCH',headers:Object.assign({},_hdr(),{'Prefer':'return=minimal'}),body:JSON.stringify(body)});
-  if(!r.ok){var e=await r.json();return{error:e.message||JSON.stringify(e)};} return{data:true};
-}
-async function supaDelete(table,params){
-  var r=await fetch(SUPA_URL+'/rest/v1/'+table+'?'+params,{method:'DELETE',headers:_hdr()}); return{ok:r.ok};
-}
+function _hdr(){return{'apikey':SUPA_ANON,'Authorization':'Bearer '+(SUPA_TOKEN||SUPA_ANON),'Content-Type':'application/json'};}
+async function supaAuth(email,pw){var r=await fetch(SUPA_URL+'/auth/v1/token?grant_type=password',{method:'POST',headers:_hdr(),body:JSON.stringify({email,password:pw})});var d=await r.json();if(!r.ok)return{error:d.error_description||'Credenciais inválidas'};return{data:d};}
+async function supaSignOut(){if(SUPA_TOKEN)fetch(SUPA_URL+'/auth/v1/logout',{method:'POST',headers:_hdr()}).catch(function(){});SUPA_TOKEN=null;}
+async function supaGet(table,params,cols){var url=SUPA_URL+'/rest/v1/'+table+'?select='+(cols||'*')+(params?'&'+params:'');var r=await fetch(url,{headers:_hdr()});if(!r.ok)return{data:[]};return{data:await r.json()};}
+async function supaGetOne(table,params,cols){var{data}=await supaGet(table,(params||'')+'&limit=1',cols);return{data:(Array.isArray(data)&&data.length)?data[0]:null};}
+async function supaPost(table,body){var r=await fetch(SUPA_URL+'/rest/v1/'+table,{method:'POST',headers:Object.assign({},_hdr(),{'Prefer':'return=representation'}),body:JSON.stringify(body)});if(!r.ok){var e=await r.json();return{error:e.message||JSON.stringify(e)};}var d=await r.json();return{data:Array.isArray(d)?d[0]:d};}
+async function supaPatch(table,params,body){var r=await fetch(SUPA_URL+'/rest/v1/'+table+'?'+params,{method:'PATCH',headers:Object.assign({},_hdr(),{'Prefer':'return=minimal'}),body:JSON.stringify(body)});if(!r.ok){var e=await r.json();return{error:e.message||JSON.stringify(e)};}return{data:true};}
+async function supaDelete(table,params){var r=await fetch(SUPA_URL+'/rest/v1/'+table+'?'+params,{method:'DELETE',headers:_hdr()});return{ok:r.ok};}
 
 // ════════════════════════════════════════════
 // STATE
 // ════════════════════════════════════════════
-var ENG = { user:null, perfil:null, obras:[], etapasMap:{} };
+var ENG = {user:null,perfil:null,obras:[],etapasMap:{},tipos:[],tipoEtapasMap:{},unidades:[],unidadeMap:{}};
 var _obraAtualId = null;
+var _extrasNova  = [];
+var _extrasEdit  = [];
+var _editTipoId  = null;
+var _editTipoEtapas = [];
 
 // ════════════════════════════════════════════
-// COLUNAS KANBAN
+// CONSTANTES
 // ════════════════════════════════════════════
 var COLUNAS = [
   {id:'contrato',   label:'Contrato',        cor:'#64748b'},
@@ -374,40 +401,76 @@ var COLUNAS = [
   {id:'finalizada', label:'Finalizada',       cor:'#22c55e'},
 ];
 
-// ════════════════════════════════════════════
-// ETAPAS (15 itens com grupos)
-// ════════════════════════════════════════════
-var ETAPAS_DEF = [
-  {id:'e1', label:'Em fase de contrato',                grupo:'Contrato',    coluna:'contrato'},
-  {id:'e2', label:'Em fase de plantão',                 grupo:'Contrato',    coluna:'contrato'},
-  {id:'e3', label:'Docs finais de financiamento',       grupo:'Financiamento',coluna:'plantao'},
-  {id:'e4', label:'Fase de desembolso',                 grupo:'Financiamento',coluna:'plantao'},
-  {id:'e5', label:'Docs análise de financiamento',      grupo:'Financiamento',coluna:'plantao'},
-  {id:'e6', label:'Fechamento do aditivo',              grupo:'Financiamento',coluna:'plantao'},
-  {id:'e7', label:'Contrato da financeira',             grupo:'Financiamento',coluna:'plantao'},
-  {id:'e8', label:'Finalização da etapa de contrato',   grupo:'Financiamento',coluna:'plantao'},
-  {id:'e9', label:'Fabricação das bases / pés / chumbadores', grupo:'Fabricação', coluna:'fabricacao'},
-  {id:'e10',label:'Início do canteiro de obras',        grupo:'Execução',    coluna:'canteiro'},
-  {id:'e11',label:'Execução das fundações e chumbação', grupo:'Execução',    coluna:'fundacoes'},
-  {id:'e12',label:'Fabricação dos braços / arcos / telas',grupo:'Fabricação',coluna:'fabricacao'},
-  {id:'e13',label:'Instalação dos braços / arcos / telas',grupo:'Execução',  coluna:'instalacao'},
-  {id:'e14',label:'Retoques de pintura',                grupo:'Finalização', coluna:'retoques'},
-  {id:'e15',label:'Entrega do termo de entrega e garantia',grupo:'Finalização',coluna:'entrega'},
+// Etapas fixas compartilhadas por todos os tipos (Contrato + Financiamento)
+// Não contam no % de progresso operacional
+var ETAPAS_FIXAS = [
+  {id:'ef1',label:'Em fase de contrato',              grupo:'Contrato',     coluna:'contrato', obrigatorio:true},
+  {id:'ef2',label:'Em fase de plantão',               grupo:'Contrato',     coluna:'contrato', obrigatorio:false},
+  {id:'ef3',label:'Docs finais de financiamento',     grupo:'Financiamento',coluna:'plantao',  obrigatorio:false},
+  {id:'ef4',label:'Fase de desembolso',               grupo:'Financiamento',coluna:'plantao',  obrigatorio:false},
+  {id:'ef5',label:'Docs análise de financiamento',    grupo:'Financiamento',coluna:'plantao',  obrigatorio:false},
+  {id:'ef6',label:'Fechamento do aditivo',            grupo:'Financiamento',coluna:'plantao',  obrigatorio:false},
+  {id:'ef7',label:'Contrato da financeira',           grupo:'Financiamento',coluna:'plantao',  obrigatorio:false},
+  {id:'ef8',label:'Finalização da etapa de contrato', grupo:'Financiamento',coluna:'plantao',  obrigatorio:true},
 ];
 
-// Bloqueio: ao mover para uma coluna, quais etapas devem estar concluídas
-var BLOQUEIOS = {
-  plantao:    ['e1'],
-  fabricacao: ['e8'],
-  canteiro:   ['e9'],
-  fundacoes:  ['e10'],
-  instalacao: ['e11'],
-  retoques:   ['e13'],
-  entrega:    ['e14'],
-  finalizada: ['e15'],
-};
+var GRUPOS_NAO_OP = ['Contrato','Financiamento'];
 
-var PRODUTOS = ['Sombrite Garagem','Sombrite Parquinho','Sombrite Piscina','Telha Galvalume','Telha Termoacústica','Carport Solar','Manutenção','Produto Personalizado'];
+// Produtos bonus: vão automaticamente para Serviços Extras
+var PRODUTOS_BONUS = ['Sombrite Piscina','Sombrite Bicicletário','Sombrite Parquinho','Manutenção'];
+
+var COLUNAS_OP = ['fabricacao','canteiro','fundacoes','instalacao','retoques','entrega'];
+var GRUPOS_OP  = ['Fabricação','Execução','Finalização'];
+
+// ════════════════════════════════════════════
+// HELPERS DE ETAPAS
+// ════════════════════════════════════════════
+function getAllEtapasObra(o){
+  var tipoEts = (o&&o.tipo_cobertura_id) ? (ENG.tipoEtapasMap[o.tipo_cobertura_id]||[]) : [];
+  return ETAPAS_FIXAS.concat(tipoEts);
+}
+
+function calcProgresso(obraId){
+  var map = ENG.etapasMap[obraId]||{};
+  var o   = ENG.obras.find(function(x){return x.id===obraId;})||{};
+  var extras   = o.itens_extras||[];
+  var allEts   = getAllEtapasObra(o);
+  var opEts    = allEts.filter(function(e){return GRUPOS_NAO_OP.indexOf(e.grupo)===-1;});
+  var total    = opEts.length + extras.length;
+  var conc     = opEts.filter(function(e){return map[e.id]&&map[e.id].concluida;}).length;
+  extras.forEach(function(ex){if(map[ex.id]&&map[ex.id].concluida)conc++;});
+  return {conc:conc,total:total,pct:total>0?Math.round(conc/total*100):0};
+}
+
+function calcTimeline(o,concOp,totalOp){
+  if(!o.data_inicio||!o.data_entrega_prevista) return null;
+  if(o.status==='finalizada') return {status:'adiantada',label:'Concluída'};
+  var start=new Date(o.data_inicio),end=new Date(o.data_entrega_prevista),now=new Date();
+  var dur=end-start; if(dur<=0) return null;
+  var diff=(totalOp>0?concOp/totalOp:0)-((now-start)/dur);
+  if(diff>0.20) return {status:'adiantada',label:'Adiantada'};
+  if(diff>=0)   return {status:'prazo',label:'No Prazo'};
+  return {status:'atrasada',label:'Atrasada'};
+}
+
+function getProximaEtapa(obraId){
+  var map=ENG.etapasMap[obraId]||{};
+  var o=ENG.obras.find(function(x){return x.id===obraId;})||{};
+  var proxima=getAllEtapasObra(o).find(function(e){return GRUPOS_NAO_OP.indexOf(e.grupo)===-1&&(!map[e.id]||!map[e.id].concluida);});
+  if(proxima) return '▸ '+proxima.label;
+  var ext=(o.itens_extras||[]).find(function(ex){return !map[ex.id]||!map[ex.id].concluida;});
+  if(ext) return '▸ '+ext.label;
+  return '✓ Todas as etapas concluídas';
+}
+
+function checkBloqueio(obraId,novoStatus){
+  var o=ENG.obras.find(function(x){return x.id===obraId;});
+  var allEts=getAllEtapasObra(o);
+  var map=ENG.etapasMap[obraId]||{};
+  var colIdx=COLUNAS.findIndex(function(c){return c.id===novoStatus;});
+  var prevCols=COLUNAS.slice(0,colIdx).map(function(c){return c.id;});
+  return allEts.filter(function(e){return prevCols.indexOf(e.coluna)!==-1&&e.obrigatorio&&(!map[e.id]||!map[e.id].concluida);});
+}
 
 // ════════════════════════════════════════════
 // AUTH
@@ -427,10 +490,7 @@ async function doLogin(){
   }catch(e){mostrarErro('Erro: '+e.message);}
   finally{btn.textContent='Entrar';btn.disabled=false;}
 }
-function mostrarErro(msg){
-  var el=document.getElementById('loginErr');
-  el.textContent=msg;el.style.display='block';
-}
+function mostrarErro(msg){var el=document.getElementById('loginErr');el.textContent=msg;el.style.display='block';}
 async function iniciarSessao(session,user){
   ENG.user=user;
   try{
@@ -443,13 +503,13 @@ async function iniciarSessao(session,user){
     localStorage.setItem('ecm_session',JSON.stringify({id:user.id,email:user.email,nome:perfil.nome,perfil:perfil.perfil,access_token:session.access_token}));
     document.getElementById('loginScreen').style.display='none';
     document.getElementById('appShell').style.display='block';
+    await loadTipos();
     navigate('dashboard');
   }catch(e){mostrarErro(e.message);SUPA_TOKEN=null;}
 }
 async function doLogout(){
-  await supaSignOut();
-  localStorage.removeItem('ecm_session');
-  ENG={user:null,perfil:null,obras:[],etapasMap:{}};
+  await supaSignOut();localStorage.removeItem('ecm_session');
+  ENG={user:null,perfil:null,obras:[],etapasMap:{},tipos:[],tipoEtapasMap:{},unidades:[],unidadeMap:{}};
   document.getElementById('appShell').style.display='none';
   document.getElementById('loginScreen').style.display='flex';
   document.getElementById('loginSenha').value='';
@@ -459,35 +519,51 @@ async function doLogout(){
 // NAVEGAÇÃO
 // ════════════════════════════════════════════
 function navigate(view){
-  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
-  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
-  var el=document.getElementById('view-'+view);
-  if(el) el.classList.add('active');
-  var ni=document.getElementById('nav-'+view);
-  if(ni) ni.classList.add('active');
-  var titles={dashboard:'Dashboard',kanban:'Kanban de Obras'};
+  document.querySelectorAll('.view').forEach(function(v){v.classList.remove('active');});
+  document.querySelectorAll('.nav-item').forEach(function(n){n.classList.remove('active');});
+  var el=document.getElementById('view-'+view); if(el) el.classList.add('active');
+  var ni=document.getElementById('nav-'+view);  if(ni) ni.classList.add('active');
+  var titles={dashboard:'Dashboard',kanban:'Kanban de Obras',config:'Configurações'};
   document.getElementById('tbTitle').textContent=titles[view]||view;
   document.getElementById('tbNovaObra').style.display=(view==='kanban')?'block':'none';
-  if(view==='dashboard') renderDashboard();
+  if(view==='dashboard')  renderDashboard();
   else if(view==='kanban') renderKanban();
+  else if(view==='config') renderConfig();
 }
 
 // ════════════════════════════════════════════
 // CARREGAR DADOS
 // ════════════════════════════════════════════
+async function loadTipos(){
+  var[tiposRes,unRes]= await Promise.all([
+    supaGet('ecm_tipos_cobertura','order=ordem.asc,nome.asc'),
+    supaGet('ecm_unidades','ativo=eq.true&order=nome.asc','id,nome,estado,cor')
+  ]);
+  ENG.tipos=tiposRes.data||[];
+  ENG.unidades=unRes.data||[];
+  ENG.unidadeMap={};
+  ENG.unidades.forEach(function(u){ENG.unidadeMap[u.id]=u;});
+  if(ENG.tipos.length){
+    var{data:ets}=await supaGet('ecm_tipo_etapas','order=tipo_id,ordem.asc');
+    ENG.tipoEtapasMap={};
+    (ets||[]).forEach(function(e){
+      if(!ENG.tipoEtapasMap[e.tipo_id]) ENG.tipoEtapasMap[e.tipo_id]=[];
+      ENG.tipoEtapasMap[e.tipo_id].push(e);
+    });
+  }
+}
+
 async function loadObras(){
   var{data}=await supaGet('ecm_obras','order=created_at.desc');
   ENG.obras=data||[];
-  // Carregar etapas de todas as obras
   if(ENG.obras.length){
     var{data:ets}=await supaGet('ecm_obra_etapas','order=obra_id');
     ENG.etapasMap={};
-    (ets||[]).forEach(function(e){ if(!ENG.etapasMap[e.obra_id]) ENG.etapasMap[e.obra_id]={}; ENG.etapasMap[e.obra_id][e.etapa_id]=e; });
+    (ets||[]).forEach(function(e){
+      if(!ENG.etapasMap[e.obra_id]) ENG.etapasMap[e.obra_id]={};
+      ENG.etapasMap[e.obra_id][e.etapa_id]=e;
+    });
   }
-}
-function getEtapasConcluidas(obraId){
-  var map=ENG.etapasMap[obraId]||{};
-  return ETAPAS_DEF.filter(function(e){return map[e.id]&&map[e.id].concluida;}).length;
 }
 
 // ════════════════════════════════════════════
@@ -503,42 +579,29 @@ async function renderDashboard(){
   var totalVagas=ativas.reduce(function(s,o){return s+(o.vagas||0);},0);
   var pendencias=[];
   ativas.forEach(function(o){
-    var col=COLUNAS.find(function(c){return c.id===o.status;});
-    var prox=COLUNAS[COLUNAS.findIndex(function(c){return c.id===o.status;})+1];
-    if(prox&&BLOQUEIOS[prox.id]){
-      var map=ENG.etapasMap[o.id]||{};
-      var faltam=BLOQUEIOS[prox.id].filter(function(eid){return !map[eid]||!map[eid].concluida;});
-      if(faltam.length){
-        faltam.forEach(function(eid){
-          var et=ETAPAS_DEF.find(function(e){return e.id===eid;});
-          pendencias.push({obra:o.nome,etapa:et?et.label:eid,atrasada:o.data_entrega_prevista&&new Date(o.data_entrega_prevista)<new Date()});
-        });
-      }
-    }
+    var bloq=checkBloqueio(o.id,COLUNAS[COLUNAS.findIndex(function(c){return c.id===o.status;})+1]?.id||'');
+    bloq.forEach(function(e){pendencias.push({obra:o.nome,etapa:e.label,atrasada:o.data_entrega_prevista&&new Date(o.data_entrega_prevista)<new Date()});});
   });
   var funnelHtml=COLUNAS.map(function(c){
     var n=obras.filter(function(o){return o.status===c.id;}).length;
     return '<div class="funil-item"><div class="funil-dot" style="background:'+c.cor+'"></div><span class="funil-col-name">'+c.label+'</span><span class="funil-count">'+n+'</span></div>';
   }).join('');
   var pendHtml=pendencias.slice(0,6).map(function(p){
-    return '<div class="pend-item"><span class="pend-badge '+(p.atrasada?'atrasada':'')+'">'+( p.atrasada?'Atrasada':'Pendente')+'</span><div><div class="pend-obra">'+esc(p.obra)+'</div><div class="pend-etapa">'+esc(p.etapa)+'</div></div></div>';
+    return '<div class="pend-item"><span class="pend-badge '+(p.atrasada?'atrasada':'pendente')+'">'+(p.atrasada?'Atrasada':'Pendente')+'</span><div><div class="pend-obra">'+esc(p.obra)+'</div><div class="pend-etapa">'+esc(p.etapa)+'</div></div></div>';
   }).join('')||'<div class="empty" style="padding:16px">Nenhuma pendência crítica</div>';
-
   el.innerHTML=
   '<div class="kpi-row">'+
-    kpiCard('Obras Ativas',ativas.length,'em andamento','','verde')+
-    kpiCard('Valor em Execução','R$ '+fmtMoeda(totalValor),'total das obras ativas','azul','azul')+
-    kpiCard('Vagas Contratadas',totalVagas,'total das obras ativas','amarelo','amarelo')+
-    kpiCard('Pendências Críticas',pendencias.length,'etapas bloqueando avanço','vermelho','vermelho')+
+    kpiCard('Obras Ativas',ativas.length,'em andamento','verde')+
+    kpiCard('Valor em Execução','R$ '+fmtMoeda(totalValor),'total das obras ativas','azul')+
+    kpiCard('Vagas Contratadas',totalVagas,'total das obras ativas','amarelo')+
+    kpiCard('Pendências Críticas',pendencias.length,'etapas bloqueando avanço','vermelho')+
   '</div>'+
   '<div class="funil-row">'+
-    '<div class="card"><div class="card-title">Funil de Obras por Etapa</div>'+funnelHtml+'</div>'+
-    '<div class="card"><div class="card-title">Pendências Críticas</div>'+pendHtml+'</div>'+
+    '<div class="card-blk"><div class="card-blk-title">Funil de Obras por Etapa</div>'+funnelHtml+'</div>'+
+    '<div class="card-blk"><div class="card-blk-title">Pendências Críticas</div>'+pendHtml+'</div>'+
   '</div>';
 }
-function kpiCard(label,val,sub,cls){
-  return '<div class="kpi '+(cls||'')+'"><div class="kpi-val">'+val+'</div><div class="kpi-label">'+label+'</div><div class="kpi-sub">'+sub+'</div></div>';
-}
+function kpiCard(label,val,sub,cls){return '<div class="kpi '+(cls||'')+'"><div class="kpi-val">'+val+'</div><div class="kpi-label">'+label+'</div><div class="kpi-sub">'+sub+'</div></div>';}
 
 // ════════════════════════════════════════════
 // KANBAN
@@ -550,197 +613,227 @@ async function renderKanban(){
   var html='';
   COLUNAS.forEach(function(col){
     var obras=ENG.obras.filter(function(o){return o.status===col.id;});
-    var cardsHtml=obras.map(function(o){ return buildCard(o); }).join('');
     html+='<div class="kanban-col" id="col-'+col.id+'">'+
       '<div class="col-header">'+
         '<div class="col-dot" style="background:'+col.cor+'"></div>'+
         '<span class="col-name">'+col.label+'</span>'+
         '<span class="col-count">'+obras.length+'</span>'+
       '</div>'+
-      '<div class="col-cards" id="cards-'+col.id+'" data-col="'+col.id+'">'+cardsHtml+'</div>'+
+      '<div class="col-cards" id="cards-'+col.id+'" data-col="'+col.id+'">'+obras.map(buildCard).join('')+'</div>'+
       '<div class="col-add" onclick="novaObraNaColuna(\''+col.id+'\')">+ Nova obra</div>'+
     '</div>';
   });
   el.innerHTML=html;
-  // Init Sortable em cada coluna
   COLUNAS.forEach(function(col){
     var container=document.getElementById('cards-'+col.id);
-    if(container) Sortable.create(container,{
-      group:'obras', animation:150, ghostClass:'sortable-ghost', dragClass:'sortable-drag',
-      onEnd:function(evt){
-        var obraId=evt.item.dataset.id;
-        var novoStatus=evt.to.dataset.col;
-        var oldStatus=evt.from.dataset.col;
-        if(novoStatus!==oldStatus) moverObra(obraId,novoStatus,oldStatus,evt);
-      }
-    });
+    if(container) Sortable.create(container,{group:'obras',animation:150,ghostClass:'sortable-ghost',dragClass:'sortable-drag',onEnd:function(evt){var obraId=evt.item.dataset.id;var novoStatus=evt.to.dataset.col;var oldStatus=evt.from.dataset.col;if(novoStatus!==oldStatus)moverObra(obraId,novoStatus,oldStatus,evt);}});
   });
 }
+
 function buildCard(o){
-  var total=ETAPAS_DEF.length;
-  var conc=getEtapasConcluidas(o.id);
-  var pct=Math.round(conc/total*100);
-  var dataStr=o.data_entrega_prevista?'📅 '+fmtData(o.data_entrega_prevista):'';
+  var prog=calcProgresso(o.id);
+  var tl=calcTimeline(o,prog.conc,prog.total);
+  var proxima=getProximaEtapa(o.id);
+  var tipo=ENG.tipos.find(function(t){return t.id===o.tipo_cobertura_id;});
+  var tipoLabel=tipo?tipo.nome:(o.produto||'Sem tipo');
+  var extras=o.itens_extras||[];
   var atrasada=o.data_entrega_prevista&&new Date(o.data_entrega_prevista)<new Date()&&o.status!=='finalizada';
-  return '<div class="obra-card" data-id="'+o.id+'" onclick="abrirObra(\''+o.id+'\')">'+
+  var un=o.unidade_id?ENG.unidadeMap[o.unidade_id]:null;
+  var unBadge=un?'<div style="position:absolute;top:8px;right:8px;background:'+(un.cor||'#64748b')+';color:#fff;font-size:9px;font-weight:700;padding:2px 6px;border-radius:20px;letter-spacing:.5px">'+(un.estado||un.nome.slice(0,2).toUpperCase())+'</div>':'';
+  return '<div class="obra-card" data-id="'+o.id+'" onclick="abrirObra(\''+o.id+'\')" style="position:relative">'+
+    unBadge+
     '<div class="card-nome">'+esc(o.nome)+'</div>'+
     '<div class="card-cliente">'+esc(o.cliente||'—')+'</div>'+
+    '<div class="card-phase">'+esc(proxima)+'</div>'+
     '<div class="card-meta">'+
-      (o.produto?'<span class="card-tag">'+esc(o.produto)+'</span>':'')+
+      '<span class="card-tag" title="'+esc(tipoLabel)+'">'+esc(tipoLabel.length>20?tipoLabel.slice(0,18)+'…':tipoLabel)+'</span>'+
+      (extras.length?'<span class="card-tag extras">+'+extras.length+' extra'+(extras.length>1?'s':'')+'</span>':'')+
       (atrasada?'<span class="card-tag warn">⚠ Atrasada</span>':'')+
+      (tl?'<span class="timeline-badge tl-'+tl.status+'">'+tl.label+'</span>':'')+
     '</div>'+
-    '<div class="card-progress"><div class="card-progress-bar" style="width:'+pct+'%"></div></div>'+
+    '<div class="card-progress"><div class="card-progress-bar" style="width:'+prog.pct+'%"></div></div>'+
     '<div class="card-footer">'+
-      '<span class="card-data">'+dataStr+'</span>'+
-      '<span class="card-vagas">'+(o.vagas?o.vagas+' vagas':'')+'</span>'+
+      '<span class="card-data">'+(o.data_entrega_prevista?'📅 '+fmtData(o.data_entrega_prevista):'')+'</span>'+
+      '<span class="card-vagas">'+(o.vagas?o.vagas+'v ':'')+prog.pct+'%</span>'+
     '</div>'+
   '</div>';
 }
+
 async function moverObra(obraId,novoStatus,oldStatus,evt){
-  // Verifica bloqueios
-  var bloqueio=BLOQUEIOS[novoStatus];
-  if(bloqueio){
-    var map=ENG.etapasMap[obraId]||{};
-    var faltam=bloqueio.filter(function(eid){return !map[eid]||!map[eid].concluida;});
-    if(faltam.length){
-      // Reverter drag visualmente
-      var fromContainer=document.getElementById('cards-'+oldStatus);
-      var toContainer=evt.to;
-      fromContainer.insertBefore(evt.item, fromContainer.children[evt.oldIndex]||null);
-      var labels=faltam.map(function(eid){var e=ETAPAS_DEF.find(function(x){return x.id===eid;}); return e?e.label:eid;});
-      showToast('⚠ Pendente: '+labels.join(', '),'error');
-      return;
-    }
+  var bloqueados=checkBloqueio(obraId,novoStatus);
+  if(bloqueados.length){
+    var fromC=document.getElementById('cards-'+oldStatus);
+    fromC.insertBefore(evt.item,fromC.children[evt.oldIndex]||null);
+    showToast('⚠ Pendente: '+bloqueados.map(function(e){return e.label;}).join(', '),'error');
+    return;
   }
-  // Salva no banco
   var{error}=await supaPatch('ecm_obras','id=eq.'+obraId,{status:novoStatus});
   if(error){showToast('Erro ao mover obra.','error');return;}
-  // Atualiza local
   var o=ENG.obras.find(function(x){return x.id===obraId;});
   if(o) o.status=novoStatus;
-  // Histórico
   var col=COLUNAS.find(function(c){return c.id===novoStatus;});
-  await supaPost('ecm_obra_historico',{obra_id:obraId,tipo:'status',descricao:(ENG.perfil.nome||'Usuário')+' moveu para '+( col?col.label:novoStatus),usuario_nome:ENG.perfil.nome});
-  // Atualiza contadores
-  COLUNAS.forEach(function(c){
-    var cnt=document.querySelector('#cards-'+c.id+' .obra-card');
-    var el=document.querySelector('#col-'+c.id+' .col-count');
-    if(el) el.textContent=document.getElementById('cards-'+c.id).querySelectorAll('.obra-card').length;
-  });
-  showToast('Obra movida para '+( col?col.label:novoStatus),'success');
+  await supaPost('ecm_obra_historico',{obra_id:obraId,tipo:'status',descricao:(ENG.perfil.nome||'Usuário')+' moveu para '+(col?col.label:novoStatus),usuario_nome:ENG.perfil.nome});
+  COLUNAS.forEach(function(c){var el=document.querySelector('#col-'+c.id+' .col-count');if(el)el.textContent=document.getElementById('cards-'+c.id).querySelectorAll('.obra-card').length;});
+  showToast('Obra movida para '+(col?col.label:novoStatus),'success');
 }
 
 // ════════════════════════════════════════════
 // NOVA OBRA
 // ════════════════════════════════════════════
 function novaObra(statusInicial){
-  var prodOpts=PRODUTOS.map(function(p){return '<option value="'+p+'">'+p+'</option>';}).join('');
+  _extrasNova=[];
+  var tipoOpts=ENG.tipos.map(function(t){return '<option value="'+t.id+'">'+esc(t.nome)+'</option>';}).join('');
   var colOpts=COLUNAS.map(function(c){return '<option value="'+c.id+'"'+(c.id===(statusInicial||'contrato')?' selected':'')+'>'+c.label+'</option>';}).join('');
+  var unOpts='<option value="">— Sem unidade —</option>'+ENG.unidades.map(function(u){return '<option value="'+u.id+'">'+esc(u.nome)+(u.estado?' ('+u.estado+')':'')+'</option>';}).join('');
+  var bonusHtml=PRODUTOS_BONUS.map(function(p,i){
+    return '<label class="bonus-chip" id="bc_'+i+'">'+
+      '<input type="checkbox" id="nb_'+i+'" value="'+esc(p)+'" onchange="toggleBonus('+i+')">'+
+      esc(p)+
+    '</label>';
+  }).join('');
   openModal('Nova Obra',
     '<div class="form-grid">'+
     '<div class="fg full"><label>Nome da Obra *</label><input id="no_nome" placeholder="Ex: Residencial Rio Negro"></div>'+
     '<div class="fg"><label>Cliente *</label><input id="no_cliente" placeholder="Nome do condomínio/cliente"></div>'+
-    '<div class="fg"><label>Produto *</label><select id="no_produto"><option value="">Selecione...</option>'+prodOpts+'</select></div>'+
+    '<div class="fg"><label>Etapa Inicial</label><select id="no_status">'+colOpts+'</select></div>'+
     '<div class="fg"><label>Vagas</label><input type="number" id="no_vagas" placeholder="Ex: 120" min="0"></div>'+
     '<div class="fg"><label>Valor do Contrato (R$)</label><input type="number" id="no_valor" placeholder="0,00" min="0" step="0.01"></div>'+
-    '<div class="fg"><label>Etapa Inicial</label><select id="no_status">'+colOpts+'</select></div>'+
     '<div class="fg"><label>Líder de Obra</label><input id="no_lider" placeholder="Nome do líder"></div>'+
     '<div class="fg"><label>Responsável Engenharia</label><input id="no_resp" placeholder="Nome do engenheiro"></div>'+
+    '<div class="fg"><label>Unidade</label><select id="no_unidade">'+unOpts+'</select></div>'+
     '<div class="fg"><label>Data Prevista de Início</label><input type="date" id="no_inicio"></div>'+
     '<div class="fg"><label>Data Prevista de Entrega</label><input type="date" id="no_entrega"></div>'+
+    '<div class="fg full"><label>Tipo de Cobertura *</label>'+
+    '<select id="no_tipo" onchange="previewTipo(\'no_preview\')"><option value="">Selecione o tipo...</option>'+tipoOpts+'</select>'+
+    '<div id="no_preview"></div></div>'+
+    '<div class="fg full"><label>Serviços Extras (bonificações)</label>'+
+    '<div class="bonus-grid">'+bonusHtml+'</div></div>'+
+    '<div class="fg full"><label>Itens Extras / Serviços Adicionais</label>'+
+    '<div id="extrasNova" style="margin-top:4px"></div>'+
+    '<button class="btn btn-ghost btn-sm" style="margin-top:8px" onclick="addExtraNova()">+ Adicionar item extra</button></div>'+
     '<div class="fg full"><label>Observações</label><textarea id="no_obs" placeholder="Informações adicionais..."></textarea></div>'+
     '</div>',
     '<button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>'+
     '<button class="btn btn-primary" onclick="salvarNovaObra()">Criar Obra</button>'
   );
 }
-function novaObraNaColuna(status){ novaObra(status); }
+function novaObraNaColuna(status){novaObra(status);}
+
+function previewTipo(containerId){
+  var tipoId=document.getElementById('no_tipo')?.value||document.getElementById('eo_tipo')?.value;
+  var el=document.getElementById(containerId);
+  if(!el) return;
+  if(!tipoId){el.innerHTML='';return;}
+  var etapas=ENG.tipoEtapasMap[tipoId]||[];
+  if(!etapas.length){el.innerHTML='<div style="font-size:12px;color:var(--text-3);margin-top:8px">Tipo sem etapas configuradas ainda.</div>';return;}
+  el.innerHTML='<div class="preview-etapas">'+etapas.map(function(e){
+    return '<div class="preview-etapa-row">'+
+      '<div class="preview-dot'+(e.obrigatorio?' obrig':'')+'"></div>'+
+      '<span style="flex:1">'+esc(e.label)+'</span>'+
+      '<span style="font-size:10px;color:var(--text-3)">'+esc(e.grupo)+'</span>'+
+      (e.obrigatorio?'<span style="font-size:9px;color:#dc2626;font-weight:700">obrig.</span>':'')+
+    '</div>';
+  }).join('')+'</div>';
+}
+
+function toggleBonus(i){
+  var cb=document.getElementById('nb_'+i);
+  var lbl=document.getElementById('bc_'+i);
+  if(lbl) lbl.classList.toggle('selected',cb&&cb.checked);
+}
+
+function addExtraNova(){_extrasNova.push({id:'ex_'+Date.now()+'_'+Math.random().toString(36).slice(2),label:''});renderExtrasNova();}
+function removeExtraNova(id){_extrasNova=_extrasNova.filter(function(e){return e.id!==id;});renderExtrasNova();}
+function renderExtrasNova(){
+  var el=document.getElementById('extrasNova'); if(!el) return;
+  el.innerHTML=_extrasNova.map(function(ex,i){
+    return '<div class="extra-item"><input class="extra-inp" placeholder="Ex: Ar condicionado, Portão automático..." value="'+esc(ex.label)+'" oninput="_extrasNova['+i+'].label=this.value"><button class="btn btn-ghost btn-sm" style="color:#dc2626;border-color:#fca5a5;flex-shrink:0" onclick="removeExtraNova(\''+ex.id+'\')">✕</button></div>';
+  }).join('');
+}
+
+function getBonusSelecionados(){
+  var bonus=[];
+  PRODUTOS_BONUS.forEach(function(p,i){
+    var cb=document.getElementById('nb_'+i);
+    if(cb&&cb.checked) bonus.push({id:'bonus_'+i+'_'+Date.now(),label:p});
+  });
+  return bonus;
+}
 
 async function salvarNovaObra(){
   var nome=(document.getElementById('no_nome').value||'').trim();
   var cliente=(document.getElementById('no_cliente').value||'').trim();
-  var produto=document.getElementById('no_produto').value;
+  var tipoId=document.getElementById('no_tipo').value;
   if(!nome){showToast('Informe o nome da obra.','error');return;}
   if(!cliente){showToast('Informe o cliente.','error');return;}
-  var vagas=parseInt(document.getElementById('no_vagas').value)||0;
-  var valor=parseFloat(document.getElementById('no_valor').value)||0;
-  var status=document.getElementById('no_status').value||'contrato';
-  var lider=(document.getElementById('no_lider').value||'').trim();
-  var resp=(document.getElementById('no_resp').value||'').trim();
-  var inicio=document.getElementById('no_inicio').value||null;
-  var entrega=document.getElementById('no_entrega').value||null;
-  var obs=(document.getElementById('no_obs').value||'').trim();
-  var{data,error}=await supaPost('ecm_obras',{nome,cliente,produto,vagas,valor_contrato:valor,status,lider_obra:lider,responsavel_eng:resp,data_inicio:inicio,data_entrega_prevista:entrega,observacoes:obs,ativo:true});
+  if(!tipoId){showToast('Selecione o tipo de cobertura.','error');return;}
+  var bonus=getBonusSelecionados();
+  var extrasValidos=_extrasNova.filter(function(e){return e.label.trim();}).map(function(e){return{id:e.id,label:e.label.trim()};});
+  var itensExtras=bonus.concat(extrasValidos);
+  var tipo=ENG.tipos.find(function(t){return t.id===tipoId;});
+  var{data,error}=await supaPost('ecm_obras',{
+    nome,cliente,
+    produto:tipo?tipo.nome:'',
+    tipo_cobertura_id:tipoId,
+    vagas:parseInt(document.getElementById('no_vagas').value)||0,
+    valor_contrato:parseFloat(document.getElementById('no_valor').value)||0,
+    status:document.getElementById('no_status').value||'contrato',
+    lider_obra:(document.getElementById('no_lider').value||'').trim(),
+    responsavel_eng:(document.getElementById('no_resp').value||'').trim(),
+    data_inicio:document.getElementById('no_inicio').value||null,
+    data_entrega_prevista:document.getElementById('no_entrega').value||null,
+    observacoes:(document.getElementById('no_obs').value||'').trim(),
+    unidade_id:document.getElementById('no_unidade').value||null,
+    itens_extras:itensExtras,ativo:true,
+  });
   if(error){showToast('Erro: '+error,'error');return;}
-  // Histórico
   if(data&&data.id) await supaPost('ecm_obra_historico',{obra_id:data.id,tipo:'criacao',descricao:'Obra criada por '+(ENG.perfil.nome||'usuário'),usuario_nome:ENG.perfil.nome});
-  closeModal();
-  showToast('Obra criada!','success');
-  await renderKanban();
+  closeModal();showToast('Obra criada!','success');await renderKanban();
 }
 
 // ════════════════════════════════════════════
-// MODAL OBRA (detalhe)
+// MODAL OBRA
 // ════════════════════════════════════════════
 var _obraTab='resumo';
-async function abrirObra(id){
-  _obraAtualId=id;
-  _obraTab='resumo';
-  document.getElementById('obraModal').classList.add('open');
-  await renderObraModal(id,'resumo');
-}
-function closeObraModal(){
-  document.getElementById('obraModal').classList.remove('open');
-  _obraAtualId=null;
-}
+async function abrirObra(id){_obraAtualId=id;_obraTab='resumo';document.getElementById('obraModal').classList.add('open');await renderObraModal(id,'resumo');}
+function closeObraModal(){document.getElementById('obraModal').classList.remove('open');_obraAtualId=null;}
+
 async function renderObraModal(id,tab){
   _obraTab=tab;
-  var o=ENG.obras.find(function(x){return x.id===id;});
-  if(!o) return;
+  var o=ENG.obras.find(function(x){return x.id===id;}); if(!o) return;
   var col=COLUNAS.find(function(c){return c.id===o.status;})||{};
+  var tipo=ENG.tipos.find(function(t){return t.id===o.tipo_cobertura_id;});
   document.getElementById('obraModalTitle').textContent=o.nome;
-  document.getElementById('obraModalSub').innerHTML='<span class="badge bg-blue">'+esc(o.cliente||'—')+'</span>&nbsp;<span class="badge bg-gray">'+(col.label||o.status)+'</span>';
-  var tabs=[
-    {id:'resumo',label:'Resumo'},
-    {id:'etapas',label:'Etapas / Checklist'},
-    {id:'diario',label:'Diário de Obra'},
-    {id:'historico',label:'Histórico'},
-  ];
-  document.getElementById('obraTabs').innerHTML=tabs.map(function(t){
-    return '<div class="modal-tab'+(t.id===tab?' active':'')+'" onclick="renderObraModal(\''+id+'\',\''+t.id+'\')">'+t.label+'</div>';
-  }).join('');
-  var body=document.getElementById('obraBody');
-  var footer=document.getElementById('obraFooter');
-  if(tab==='resumo') renderResumoTab(o,body,footer);
-  else if(tab==='etapas') await renderEtapasTab(o,body,footer);
-  else if(tab==='diario') await renderDiarioTab(o,body,footer);
-  else if(tab==='historico') await renderHistoricoTab(o,body,footer);
+  document.getElementById('obraModalSub').innerHTML='<span class="badge bg-blue">'+esc(o.cliente||'—')+'</span>&nbsp;<span class="badge bg-gray">'+(col.label||o.status)+'</span>'+(tipo?'&nbsp;<span class="badge bg-green">'+esc(tipo.nome)+'</span>':'');
+  var tabs=[{id:'resumo',label:'Resumo'},{id:'etapas',label:'Checklist'},{id:'diario',label:'Diário'},{id:'quantitativos',label:'Quantitativos'},{id:'historico',label:'Histórico'}];
+  document.getElementById('obraTabs').innerHTML=tabs.map(function(t){return '<div class="modal-tab'+(t.id===tab?' active':'')+'" onclick="renderObraModal(\''+id+'\',\''+t.id+'\')">'+t.label+'</div>';}).join('');
+  var body=document.getElementById('obraBody'),footer=document.getElementById('obraFooter');
+  if(tab==='resumo')           renderResumoTab(o,body,footer);
+  else if(tab==='etapas')      await renderEtapasTab(o,body,footer);
+  else if(tab==='diario')      await renderDiarioTab(o,body,footer);
+  else if(tab==='quantitativos') renderQuantitativosTab(o,body,footer);
+  else if(tab==='historico')   await renderHistoricoTab(o,body,footer);
 }
 
 function renderResumoTab(o,body,footer){
   var col=COLUNAS.find(function(c){return c.id===o.status;})||{};
-  var conc=getEtapasConcluidas(o.id);
-  var pct=Math.round(conc/ETAPAS_DEF.length*100);
+  var tipo=ENG.tipos.find(function(t){return t.id===o.tipo_cobertura_id;});
+  var prog=calcProgresso(o.id);
+  var tl=calcTimeline(o,prog.conc,prog.total);
+  var extras=o.itens_extras||[];
   body.innerHTML=
-  '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">'+
-    infoBox('Nome da Obra',o.nome)+
-    infoBox('Cliente',o.cliente||'—')+
-    infoBox('Produto',o.produto||'—')+
-    infoBox('Etapa Atual',col.label||o.status)+
-    infoBox('Vagas',(o.vagas||0)+' vagas')+
-    infoBox('Valor do Contrato','R$ '+fmtMoeda(o.valor_contrato||0))+
-    infoBox('Líder de Obra',o.lider_obra||'—')+
-    infoBox('Resp. Engenharia',o.responsavel_eng||'—')+
+  '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px">'+
+    infoBox('Nome da Obra',o.nome)+infoBox('Cliente',o.cliente||'—')+
+    infoBox('Tipo de Cobertura',tipo?tipo.nome:'—')+infoBox('Etapa Atual',col.label||o.status)+
+    infoBox('Vagas',(o.vagas||0)+' vagas')+infoBox('Valor do Contrato','R$ '+fmtMoeda(o.valor_contrato||0))+
+    infoBox('Líder de Obra',o.lider_obra||'—')+infoBox('Resp. Engenharia',o.responsavel_eng||'—')+
     infoBox('Data de Início',o.data_inicio?fmtData(o.data_inicio):'—')+
     infoBox('Previsão de Entrega',o.data_entrega_prevista?fmtData(o.data_entrega_prevista):'—')+
   '</div>'+
-  '<div style="margin-bottom:16px">'+
-    '<div style="font-size:12px;font-weight:600;color:var(--text-2);margin-bottom:8px;">Progresso das Etapas — '+pct+'% ('+conc+'/'+ETAPAS_DEF.length+')</div>'+
-    '<div style="height:8px;background:#e5e7eb;border-radius:4px;overflow:hidden">'+
-      '<div style="height:100%;width:'+pct+'%;background:var(--verde);border-radius:4px;transition:width .3s"></div>'+
-    '</div>'+
-  '</div>'+
-  (o.observacoes?'<div style="background:var(--bg);border-radius:10px;padding:14px"><div style="font-size:11px;font-weight:600;color:var(--text-3);margin-bottom:6px">OBSERVAÇÕES</div><div style="font-size:13px;color:var(--text)">'+esc(o.observacoes)+'</div></div>':'');
+  (extras.length?'<div style="background:var(--bg);border-radius:9px;padding:12px;margin-bottom:16px"><div style="font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Serviços Extras</div><div style="font-size:13px;color:var(--text)">'+extras.map(function(e){return '• '+esc(e.label);}).join('<br>')+'</div></div>':'')+
+  '<div><div style="font-size:12px;font-weight:600;color:var(--text-2);margin-bottom:6px;display:flex;align-items:center;gap:10px">Progresso Operacional — '+prog.pct+'% ('+prog.conc+'/'+prog.total+')'+(tl?'<span class="timeline-badge tl-'+tl.status+'">'+tl.label+'</span>':'')+'</div>'+
+  '<div style="height:8px;background:#e5e7eb;border-radius:4px;overflow:hidden"><div style="height:100%;width:'+prog.pct+'%;background:var(--verde);border-radius:4px;transition:width .3s"></div></div></div>'+
+  (o.observacoes?'<div style="background:var(--bg);border-radius:10px;padding:14px;margin-top:16px"><div style="font-size:11px;font-weight:600;color:var(--text-3);margin-bottom:6px">OBSERVAÇÕES</div><div style="font-size:13px;color:var(--text)">'+esc(o.observacoes)+'</div></div>':'');
   footer.innerHTML=
     '<button class="btn btn-ghost" onclick="editarObra(\''+o.id+'\')">✏️ Editar</button>'+
     '<button class="btn btn-ghost btn-sm" style="color:#dc2626;border-color:#fca5a5" onclick="confirmarExcluirObra(\''+o.id+'\',\''+esc(o.nome)+'\')">🗑️</button>'+
@@ -749,83 +842,86 @@ function renderResumoTab(o,body,footer){
 
 async function renderEtapasTab(o,body,footer){
   var{data:ets}=await supaGet('ecm_obra_etapas','obra_id=eq.'+o.id);
-  var etMap={};
-  (ets||[]).forEach(function(e){etMap[e.etapa_id]=e;});
+  var etMap={};(ets||[]).forEach(function(e){etMap[e.etapa_id]=e;});
   ENG.etapasMap[o.id]=etMap;
-
+  var allEts=getAllEtapasObra(o);
   var grupos={};
-  ETAPAS_DEF.forEach(function(e){
-    if(!grupos[e.grupo]) grupos[e.grupo]=[];
-    grupos[e.grupo].push(e);
-  });
+  allEts.forEach(function(e){if(!grupos[e.grupo])grupos[e.grupo]=[];grupos[e.grupo].push(e);});
   var html='';
   Object.keys(grupos).forEach(function(g){
-    html+='<div class="etapa-group"><div class="etapa-group-title">'+g+'</div>';
+    var naoOp=GRUPOS_NAO_OP.indexOf(g)!==-1;
+    html+='<div class="etapa-group"><div class="etapa-group-title">'+g+(naoOp?' <span style="font-weight:400;font-size:10px">(não conta no %)</span>':'')+'</div>';
     grupos[g].forEach(function(e){
-      var reg=etMap[e.id];
-      var done=reg&&reg.concluida;
+      var reg=etMap[e.id],done=reg&&reg.concluida;
       var dataStr=done&&reg.concluida_em?'✓ '+fmtDataHora(reg.concluida_em):'';
       html+='<div class="etapa-item'+(done?' done':'')+'" onclick="toggleEtapa(\''+o.id+'\',\''+e.id+'\','+done+')">'+
         '<div class="etapa-cb"></div>'+
         '<div class="etapa-label">'+esc(e.label)+'</div>'+
+        (e.obrigatorio&&!naoOp?'<span class="etapa-obrig">bloqueante</span>':'')+
         '<div class="etapa-data">'+dataStr+'</div>'+
       '</div>';
     });
     html+='</div>';
   });
+  var extras=o.itens_extras||[];
+  if(extras.length){
+    html+='<div class="etapa-group"><div class="etapa-group-title">Serviços Extras</div>';
+    extras.forEach(function(ex){
+      var reg=etMap[ex.id],done=reg&&reg.concluida;
+      var dataStr=done&&reg.concluida_em?'✓ '+fmtDataHora(reg.concluida_em):'';
+      html+='<div class="etapa-item'+(done?' done':'')+'" onclick="toggleEtapa(\''+o.id+'\',\''+ex.id+'\','+done+')">'+
+        '<div class="etapa-cb"></div><div class="etapa-label">'+esc(ex.label)+'</div>'+
+        '<div class="etapa-data">'+dataStr+'</div></div>';
+    });
+    html+='</div>';
+  }
   body.innerHTML=html;
-  var conc=Object.values(etMap).filter(function(e){return e.concluida;}).length;
-  var pct=Math.round(conc/ETAPAS_DEF.length*100);
-  footer.innerHTML='<div style="flex:1;font-size:12px;color:var(--text-2)">'+conc+'/'+ETAPAS_DEF.length+' etapas concluídas ('+pct+'%)</div><button class="btn btn-primary" onclick="closeObraModal()">Fechar</button>';
+  var prog=calcProgresso(o.id);
+  footer.innerHTML='<div style="flex:1;font-size:12px;color:var(--text-2)">'+prog.conc+'/'+prog.total+' etapas operacionais ('+prog.pct+'%)</div><button class="btn btn-primary" onclick="closeObraModal()">Fechar</button>';
 }
 
 async function toggleEtapa(obraId,etapaId,jaDone){
   var novo=!jaDone;
   var{data:existente}=await supaGetOne('ecm_obra_etapas','obra_id=eq.'+obraId+'&etapa_id=eq.'+etapaId);
-  if(existente){
-    await supaPatch('ecm_obra_etapas','id=eq.'+existente.id,{concluida:novo,concluida_em:novo?new Date().toISOString():null});
-  } else {
-    await supaPost('ecm_obra_etapas',{obra_id:obraId,etapa_id:etapaId,concluida:novo,concluida_em:novo?new Date().toISOString():null});
-  }
-  // Histórico
-  var et=ETAPAS_DEF.find(function(e){return e.id===etapaId;});
-  if(et) await supaPost('ecm_obra_historico',{obra_id:obraId,tipo:'etapa',descricao:(novo?'✓ Concluiu: ':'○ Desconclui: ')+(et.label),usuario_nome:ENG.perfil.nome});
+  if(existente){await supaPatch('ecm_obra_etapas','id=eq.'+existente.id,{concluida:novo,concluida_em:novo?new Date().toISOString():null});}
+  else{await supaPost('ecm_obra_etapas',{obra_id:obraId,etapa_id:etapaId,concluida:novo,concluida_em:novo?new Date().toISOString():null});}
+  var o=ENG.obras.find(function(x){return x.id===obraId;})||{};
+  var allEts=getAllEtapasObra(o);
+  var et=allEts.find(function(e){return e.id===etapaId;})||((o.itens_extras||[]).find(function(e){return e.id===etapaId;}));
+  var lbl=et?et.label:etapaId;
+  await supaPost('ecm_obra_historico',{obra_id:obraId,tipo:'etapa',descricao:(novo?'✓ Concluiu: ':'○ Desconclui: ')+lbl,usuario_nome:ENG.perfil.nome});
   showToast(novo?'Etapa concluída!':'Etapa desmarcada.','success');
-  var o=ENG.obras.find(function(x){return x.id===obraId;});
   if(o) await renderObraModal(obraId,'etapas');
 }
 
+// ── DIÁRIO ──
 async function renderDiarioTab(o,body,footer){
   var{data:entradas}=await supaGet('ecm_obra_diario','obra_id=eq.'+o.id+'&order=data.desc');
   entradas=entradas||[];
   var html=entradas.length?entradas.map(function(d){
     return '<div class="diario-entry">'+
-      '<div class="diario-header">'+
-        '<span class="diario-data">'+fmtData(d.data)+'</span>'+
-        '<span class="diario-clima">'+esc(d.clima||'')+'</span>'+
-      '</div>'+
+      '<div class="diario-header"><span class="diario-data">'+fmtData(d.data)+'</span>'+
+      '<div style="display:flex;align-items:center;gap:8px"><span class="diario-clima">'+esc(d.clima||'')+'</span>'+
+      '<button class="btn btn-ghost btn-sm" onclick="editarEntradaDiario(\''+d.id+'\',\''+o.id+'\')">✏️</button></div></div>'+
       (d.atividades?'<div class="diario-ativ">'+esc(d.atividades)+'</div>':'')+
       (d.pendencias?'<div class="diario-pend">⚠ '+esc(d.pendencias)+'</div>':'')+
-      (d.proximos_passos?'<div style="font-size:12px;color:var(--text-2);margin-top:6px">Próximos passos: '+esc(d.proximos_passos)+'</div>':'')+
+      (d.proximos_passos?'<div style="font-size:12px;color:var(--text-2);margin-top:6px">Próximos: '+esc(d.proximos_passos)+'</div>':'')+
     '</div>';
   }).join(''):'<div class="empty">Nenhuma entrada no diário ainda.</div>';
   body.innerHTML=html;
-  footer.innerHTML='<button class="btn btn-ghost" onclick="novaEntradaDiario(\''+o.id+'\')">＋ Adicionar Entrada</button><button class="btn btn-primary" onclick="closeObraModal()">Fechar</button>';
+  footer.innerHTML='<button class="btn btn-ghost" onclick="novaEntradaDiario(\''+o.id+'\')">＋ Adicionar</button><button class="btn btn-primary" onclick="closeObraModal()">Fechar</button>';
 }
-
 function novaEntradaDiario(obraId){
   var hoje=new Date().toISOString().split('T')[0];
   var climas=['☀️ Ensolarado','⛅ Nublado','🌧️ Chuvoso','🌪️ Ventoso'];
   var climaOpts=climas.map(function(c){return '<option value="'+c+'">'+c+'</option>';}).join('');
-  openModal('Novo Registro no Diário',
-    '<div class="form-grid">'+
-    '<div class="fg"><label>Data *</label><input type="date" id="d_data" value="'+hoje+'"></div>'+
+  openModal('Novo Registro',
+    '<div class="form-grid"><div class="fg"><label>Data *</label><input type="date" id="d_data" value="'+hoje+'"></div>'+
     '<div class="fg"><label>Clima</label><select id="d_clima"><option value="">Selecione...</option>'+climaOpts+'</select></div>'+
-    '<div class="fg full"><label>Equipe Presente</label><input id="d_equipe" placeholder="Nomes ou quantidade de pessoas"></div>'+
+    '<div class="fg full"><label>Equipe Presente</label><input id="d_equipe" placeholder="Nomes ou quantidade"></div>'+
     '<div class="fg full"><label>Atividades Realizadas *</label><textarea id="d_ativ" placeholder="Descreva o que foi feito hoje..."></textarea></div>'+
     '<div class="fg full"><label>Pendências</label><textarea id="d_pend" placeholder="O que ficou pendente?" style="min-height:60px"></textarea></div>'+
-    '<div class="fg full"><label>Próximos Passos</label><textarea id="d_prox" placeholder="O que deve ser feito amanhã?" style="min-height:60px"></textarea></div>'+
-    '</div>',
+    '<div class="fg full"><label>Próximos Passos</label><textarea id="d_prox" placeholder="O que deve ser feito amanhã?" style="min-height:60px"></textarea></div></div>',
     '<button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>'+
     '<button class="btn btn-primary" onclick="salvarDiario(\''+obraId+'\')">Salvar</button>'
   );
@@ -833,36 +929,90 @@ function novaEntradaDiario(obraId){
 async function salvarDiario(obraId){
   var data=document.getElementById('d_data').value;
   var ativ=(document.getElementById('d_ativ').value||'').trim();
-  if(!data){showToast('Informe a data.','error');return;}
-  if(!ativ){showToast('Descreva as atividades.','error');return;}
-  var{error}=await supaPost('ecm_obra_diario',{
-    obra_id:obraId, data, clima:document.getElementById('d_clima').value,
-    equipe:(document.getElementById('d_equipe').value||'').trim(),
-    atividades:ativ,
-    pendencias:(document.getElementById('d_pend').value||'').trim(),
-    proximos_passos:(document.getElementById('d_prox').value||'').trim(),
-  });
+  if(!data||!ativ){showToast('Data e atividades são obrigatórios.','error');return;}
+  var{error}=await supaPost('ecm_obra_diario',{obra_id:obraId,data,clima:document.getElementById('d_clima').value,equipe:(document.getElementById('d_equipe').value||'').trim(),atividades:ativ,pendencias:(document.getElementById('d_pend').value||'').trim(),proximos_passos:(document.getElementById('d_prox').value||'').trim()});
   if(error){showToast('Erro: '+error,'error');return;}
-  await supaPost('ecm_obra_historico',{obra_id:obraId,tipo:'diario',descricao:'Diário registrado por '+( ENG.perfil.nome||'usuário'),usuario_nome:ENG.perfil.nome});
-  closeModal();
-  showToast('Entrada salva!','success');
-  var o=ENG.obras.find(function(x){return x.id===obraId;});
-  if(o) await renderObraModal(obraId,'diario');
+  await supaPost('ecm_obra_historico',{obra_id:obraId,tipo:'diario',descricao:'Diário registrado por '+(ENG.perfil.nome||'usuário'),usuario_nome:ENG.perfil.nome});
+  closeModal();showToast('Entrada salva!','success');
+  var o=ENG.obras.find(function(x){return x.id===obraId;});if(o) await renderObraModal(obraId,'diario');
+}
+async function editarEntradaDiario(diarioId,obraId){
+  var{data:d}=await supaGetOne('ecm_obra_diario','id=eq.'+diarioId); if(!d){showToast('Não encontrado.','error');return;}
+  var climas=['☀️ Ensolarado','⛅ Nublado','🌧️ Chuvoso','🌪️ Ventoso'];
+  var climaOpts=climas.map(function(c){return '<option value="'+c+'"'+(c===d.clima?' selected':'')+'>'+c+'</option>';}).join('');
+  openModal('Editar Registro',
+    '<div class="form-grid"><div class="fg"><label>Data</label><input type="date" id="d_data" value="'+(d.data||'')+'"></div>'+
+    '<div class="fg"><label>Clima</label><select id="d_clima"><option value="">Selecione...</option>'+climaOpts+'</select></div>'+
+    '<div class="fg full"><label>Equipe</label><input id="d_equipe" value="'+esc(d.equipe||'')+'"></div>'+
+    '<div class="fg full"><label>Atividades *</label><textarea id="d_ativ">'+esc(d.atividades||'')+'</textarea></div>'+
+    '<div class="fg full"><label>Pendências</label><textarea id="d_pend" style="min-height:60px">'+esc(d.pendencias||'')+'</textarea></div>'+
+    '<div class="fg full"><label>Próximos Passos</label><textarea id="d_prox" style="min-height:60px">'+esc(d.proximos_passos||'')+'</textarea></div></div>',
+    '<button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>'+
+    '<button class="btn btn-primary" onclick="atualizarEntradaDiario(\''+diarioId+'\',\''+obraId+'\')">Salvar</button>'
+  );
+}
+async function atualizarEntradaDiario(diarioId,obraId){
+  var data=document.getElementById('d_data').value;
+  var ativ=(document.getElementById('d_ativ').value||'').trim();
+  if(!data||!ativ){showToast('Data e atividades são obrigatórios.','error');return;}
+  var{error}=await supaPatch('ecm_obra_diario','id=eq.'+diarioId,{data,clima:document.getElementById('d_clima').value,equipe:(document.getElementById('d_equipe').value||'').trim(),atividades:ativ,pendencias:(document.getElementById('d_pend').value||'').trim(),proximos_passos:(document.getElementById('d_prox').value||'').trim()});
+  if(error){showToast('Erro: '+error,'error');return;}
+  closeModal();showToast('Entrada atualizada!','success');
+  var o=ENG.obras.find(function(x){return x.id===obraId;});if(o) await renderObraModal(obraId,'diario');
 }
 
+// ── QUANTITATIVOS ──
+function renderQuantitativosTab(o,body,footer){
+  body.innerHTML=
+  '<div class="quant-inputs">'+
+    '<div class="fg"><label>Número de Pés</label><input type="number" id="qt_pes" value="'+(o.num_pes||0)+'" min="0" oninput="calcQuant()"></div>'+
+    '<div class="fg"><label>Número de Braços</label><input type="number" id="qt_bracos" value="'+(o.num_bracos||0)+'" min="0"></div>'+
+    '<div class="fg"><label>Número de Arcos</label><input type="number" id="qt_arcos" value="'+(o.num_arcos||0)+'" min="0"></div>'+
+    '<div class="fg"><label>Número de Telas</label><input type="number" id="qt_telas" value="'+(o.num_telas||0)+'" min="0"></div>'+
+  '</div>'+
+  '<div id="quantResult"></div>';
+  calcQuant();
+  footer.innerHTML='<button class="btn btn-ghost" onclick="salvarQuantitativos(\''+o.id+'\')">💾 Salvar</button><button class="btn btn-primary" onclick="closeObraModal()">Fechar</button>';
+}
+function calcQuant(){
+  var pes=parseInt(document.getElementById('qt_pes').value)||0;
+  var el=document.getElementById('quantResult'); if(!el) return;
+  if(pes===0){el.innerHTML='<div class="empty" style="padding:24px">Informe o número de pés para calcular as fundações.</div>';return;}
+  var vol_terra=pes*0.192,vol_emp=vol_terra*1.30,num_cac=Math.ceil(vol_emp/6);
+  var num_bet=Math.ceil(vol_terra/0.120),la=num_bet*6.4,lb=num_bet*7.6;
+  el.innerHTML='<div class="quant-result">'+
+    '<div class="quant-section">Escavação e Aterro</div>'+
+    qLine('Volume por buraco (40×40×120cm)','0,192 m³')+
+    qLine('Volume total de terra ('+pes+' pés)',vol_terra.toFixed(3)+' m³')+
+    qLine('Volume empolado (×1,30)',vol_emp.toFixed(3)+' m³')+
+    qLine('Caçambas (6m³ cada)',num_cac+' caçamba'+(num_cac!==1?'s':''))+
+    '<div class="quant-divider"></div>'+
+    '<div class="quant-section">Concreto de Fundação</div>'+
+    qLine('Volume de concreto',vol_terra.toFixed(3)+' m³')+
+    qLine('Betoneiras (120L cada)',num_bet+' betoneira'+(num_bet!==1?'s':''))+
+    qLine('Cimento',num_bet+' saco'+(num_bet!==1?'s':'')+' (1 por betoneira)')+
+    qLine('Areia',(la*0.018).toFixed(3)+' m³ — '+Math.ceil(la)+' latas (6,4/betoneira)')+
+    qLine('Brita',(lb*0.018).toFixed(3)+' m³ — '+Math.ceil(lb)+' latas (7,6/betoneira)')+
+  '</div>';
+}
+function qLine(l,v){return '<div class="quant-line"><span class="quant-label">'+l+'</span><span class="quant-val">'+v+'</span></div>';}
+async function salvarQuantitativos(obraId){
+  var pes=parseInt(document.getElementById('qt_pes').value)||0;
+  var bracos=parseInt(document.getElementById('qt_bracos').value)||0;
+  var arcos=parseInt(document.getElementById('qt_arcos').value)||0;
+  var telas=parseInt(document.getElementById('qt_telas').value)||0;
+  var{error}=await supaPatch('ecm_obras','id=eq.'+obraId,{num_pes:pes,num_bracos:bracos,num_arcos:arcos,num_telas:telas});
+  if(error){showToast('Erro: '+error,'error');return;}
+  var o=ENG.obras.find(function(x){return x.id===obraId;});
+  if(o){o.num_pes=pes;o.num_bracos=bracos;o.num_arcos=arcos;o.num_telas=telas;}
+  showToast('Quantitativos salvos!','success');
+}
+
+// ── HISTÓRICO ──
 async function renderHistoricoTab(o,body,footer){
   var{data:hist}=await supaGet('ecm_obra_historico','obra_id=eq.'+o.id+'&order=created_at.desc');
   hist=hist||[];
-  var html=hist.length?hist.map(function(h){
-    return '<div class="hist-item">'+
-      '<div class="hist-dot"></div>'+
-      '<div style="flex:1">'+
-        '<div class="hist-txt">'+esc(h.descricao||'')+'</div>'+
-        '<div class="hist-data">'+fmtDataHora(h.created_at)+'</div>'+
-      '</div>'+
-    '</div>';
-  }).join(''):'<div class="empty">Sem histórico ainda.</div>';
-  body.innerHTML='<div>'+html+'</div>';
+  body.innerHTML='<div>'+(hist.length?hist.map(function(h){return '<div class="hist-item"><div class="hist-dot"></div><div style="flex:1"><div class="hist-txt">'+esc(h.descricao||'')+'</div><div class="hist-data">'+fmtDataHora(h.created_at)+'</div></div></div>';}).join(''):'<div class="empty">Sem histórico ainda.</div>')+'</div>';
   footer.innerHTML='<button class="btn btn-primary" onclick="closeObraModal()">Fechar</button>';
 }
 
@@ -870,35 +1020,70 @@ async function renderHistoricoTab(o,body,footer){
 // EDITAR OBRA
 // ════════════════════════════════════════════
 function editarObra(id){
-  var o=ENG.obras.find(function(x){return x.id===id;});
-  if(!o) return;
-  var prodOpts=PRODUTOS.map(function(p){return '<option value="'+p+'"'+(p===o.produto?' selected':'')+'>'+p+'</option>';}).join('');
+  var o=ENG.obras.find(function(x){return x.id===id;}); if(!o) return;
+  _extrasEdit=(o.itens_extras||[]).filter(function(e){return PRODUTOS_BONUS.indexOf(e.label)===-1;}).map(function(e){return{id:e.id||'ex_'+Date.now(),label:e.label||''};});
+  var tipoOpts=ENG.tipos.map(function(t){return '<option value="'+t.id+'"'+(t.id===o.tipo_cobertura_id?' selected':'')+'>'+esc(t.nome)+'</option>';}).join('');
   var colOpts=COLUNAS.map(function(c){return '<option value="'+c.id+'"'+(c.id===o.status?' selected':'')+'>'+c.label+'</option>';}).join('');
+  var unOpts='<option value="">— Sem unidade —</option>'+ENG.unidades.map(function(u){return '<option value="'+u.id+'"'+(u.id===o.unidade_id?' selected':'')+'>'+esc(u.nome)+(u.estado?' ('+u.estado+')':'')+'</option>';}).join('');
+  var bonusHtml=PRODUTOS_BONUS.map(function(p,i){
+    var sel=(o.itens_extras||[]).some(function(e){return e.label===p;});
+    return '<label class="bonus-chip'+(sel?' selected':'')+'" id="ebc_'+i+'">'+
+      '<input type="checkbox" id="enb_'+i+'" value="'+esc(p)+'"'+(sel?' checked':'')+' onchange="toggleEditBonus('+i+')">'+esc(p)+'</label>';
+  }).join('');
   openModal('Editar Obra — '+esc(o.nome),
     '<div class="form-grid">'+
     '<div class="fg full"><label>Nome *</label><input id="eo_nome" value="'+esc(o.nome)+'"></div>'+
     '<div class="fg"><label>Cliente *</label><input id="eo_cliente" value="'+esc(o.cliente||'')+'"></div>'+
-    '<div class="fg"><label>Produto</label><select id="eo_produto"><option value="">Selecione...</option>'+prodOpts+'</select></div>'+
+    '<div class="fg"><label>Etapa</label><select id="eo_status">'+colOpts+'</select></div>'+
     '<div class="fg"><label>Vagas</label><input type="number" id="eo_vagas" value="'+(o.vagas||0)+'"></div>'+
     '<div class="fg"><label>Valor do Contrato (R$)</label><input type="number" id="eo_valor" value="'+(o.valor_contrato||0)+'" step="0.01"></div>'+
-    '<div class="fg"><label>Etapa</label><select id="eo_status">'+colOpts+'</select></div>'+
     '<div class="fg"><label>Líder de Obra</label><input id="eo_lider" value="'+esc(o.lider_obra||'')+'"></div>'+
     '<div class="fg"><label>Resp. Engenharia</label><input id="eo_resp" value="'+esc(o.responsavel_eng||'')+'"></div>'+
+    '<div class="fg"><label>Unidade</label><select id="eo_unidade">'+unOpts+'</select></div>'+
     '<div class="fg"><label>Data de Início</label><input type="date" id="eo_inicio" value="'+(o.data_inicio||'')+'"></div>'+
     '<div class="fg"><label>Previsão de Entrega</label><input type="date" id="eo_entrega" value="'+(o.data_entrega_prevista||'')+'"></div>'+
+    '<div class="fg full"><label>Tipo de Cobertura</label>'+
+    '<select id="eo_tipo" onchange="previewTipo(\'eo_preview\')"><option value="">Selecione...</option>'+tipoOpts+'</select>'+
+    '<div id="eo_preview"></div></div>'+
+    '<div class="fg full"><label>Serviços Extras (bonificações)</label><div class="bonus-grid">'+bonusHtml+'</div></div>'+
+    '<div class="fg full"><label>Itens Extras Adicionais</label>'+
+    '<div id="extrasEdit" style="margin-top:4px"></div>'+
+    '<button class="btn btn-ghost btn-sm" style="margin-top:8px" onclick="addExtraEdit()">+ Adicionar item extra</button></div>'+
     '<div class="fg full"><label>Observações</label><textarea id="eo_obs">'+esc(o.observacoes||'')+'</textarea></div>'+
     '</div>',
     '<button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>'+
     '<button class="btn btn-primary" onclick="salvarEdicaoObra(\''+id+'\')">Salvar</button>'
   );
+  setTimeout(function(){renderExtrasEdit();previewTipo('eo_preview');},60);
 }
+
+function toggleEditBonus(i){var cb=document.getElementById('enb_'+i);var lbl=document.getElementById('ebc_'+i);if(lbl)lbl.classList.toggle('selected',cb&&cb.checked);}
+function addExtraEdit(){_extrasEdit.push({id:'ex_'+Date.now()+'_'+Math.random().toString(36).slice(2),label:''});renderExtrasEdit();}
+function removeExtraEdit(id){_extrasEdit=_extrasEdit.filter(function(e){return e.id!==id;});renderExtrasEdit();}
+function renderExtrasEdit(){
+  var el=document.getElementById('extrasEdit');if(!el)return;
+  el.innerHTML=_extrasEdit.map(function(ex,i){
+    return '<div class="extra-item"><input class="extra-inp" placeholder="Ex: Ar condicionado..." value="'+esc(ex.label)+'" oninput="_extrasEdit['+i+'].label=this.value"><button class="btn btn-ghost btn-sm" style="color:#dc2626;border-color:#fca5a5;flex-shrink:0" onclick="removeExtraEdit(\''+ex.id+'\')">✕</button></div>';
+  }).join('');
+}
+function getEditBonusSelecionados(){
+  var bonus=[];
+  PRODUTOS_BONUS.forEach(function(p,i){var cb=document.getElementById('enb_'+i);if(cb&&cb.checked)bonus.push({id:'bonus_'+i,label:p});});
+  return bonus;
+}
+
 async function salvarEdicaoObra(id){
   var nome=(document.getElementById('eo_nome').value||'').trim();
   var cliente=(document.getElementById('eo_cliente').value||'').trim();
   if(!nome||!cliente){showToast('Nome e cliente são obrigatórios.','error');return;}
+  var tipoId=document.getElementById('eo_tipo').value;
+  var tipo=ENG.tipos.find(function(t){return t.id===tipoId;});
+  var bonus=getEditBonusSelecionados();
+  var extrasValidos=_extrasEdit.filter(function(e){return e.label.trim();}).map(function(e){return{id:e.id,label:e.label.trim()};});
   var{error}=await supaPatch('ecm_obras','id=eq.'+id,{
-    nome, cliente,
-    produto:document.getElementById('eo_produto').value,
+    nome,cliente,
+    produto:tipo?tipo.nome:'',
+    tipo_cobertura_id:tipoId||null,
     vagas:parseInt(document.getElementById('eo_vagas').value)||0,
     valor_contrato:parseFloat(document.getElementById('eo_valor').value)||0,
     status:document.getElementById('eo_status').value,
@@ -907,22 +1092,121 @@ async function salvarEdicaoObra(id){
     data_inicio:document.getElementById('eo_inicio').value||null,
     data_entrega_prevista:document.getElementById('eo_entrega').value||null,
     observacoes:(document.getElementById('eo_obs').value||'').trim(),
+    unidade_id:document.getElementById('eo_unidade').value||null,
+    itens_extras:bonus.concat(extrasValidos),
   });
   if(error){showToast('Erro: '+error,'error');return;}
-  closeModal();
-  showToast('Obra atualizada!','success');
-  await loadObras();
-  closeObraModal();
-  navigate(_obraTab==='resumo'?'kanban':'kanban');
-  await renderKanban();
+  closeModal();showToast('Obra atualizada!','success');
+  await loadObras();closeObraModal();navigate('kanban');await renderKanban();
 }
 
 async function confirmarExcluirObra(id,nome){
   if(!confirm('Excluir a obra "'+nome+'"? Esta ação não pode ser desfeita.')) return;
   await supaDelete('ecm_obras','id=eq.'+id);
-  closeObraModal();
-  showToast('Obra excluída.','success');
-  await renderKanban();
+  closeObraModal();showToast('Obra excluída.','success');await renderKanban();
+}
+
+// ════════════════════════════════════════════
+// CONFIGURAÇÕES — tipos de cobertura
+// ════════════════════════════════════════════
+async function renderConfig(){
+  var el=document.getElementById('configContent');
+  el.innerHTML='<div class="empty">Carregando...</div>';
+  await loadTipos();
+  var tiposHtml=ENG.tipos.map(function(t){
+    var nEts=(ENG.tipoEtapasMap[t.id]||[]).length;
+    return '<div class="config-tipo-card">'+
+      '<div style="flex:1"><div class="config-tipo-nome">'+esc(t.nome)+'</div>'+
+      '<div class="config-tipo-sub">'+nEts+' etapa'+(nEts!==1?'s':'')+' operacional'+(nEts!==1?'is':'')+' configurada'+(nEts!==1?'s':'')+'</div></div>'+
+      '<span class="badge '+(t.ativo?'bg-green':'bg-gray')+'">'+(t.ativo?'Ativo':'Inativo')+'</span>'+
+      '<button class="btn btn-ghost btn-sm" onclick="abrirEditTipo(\''+t.id+'\')">✏️ Editar</button>'+
+      '<button class="btn btn-ghost btn-sm" style="color:#dc2626;border-color:#fca5a5" onclick="excluirTipo(\''+t.id+'\',\''+esc(t.nome)+'\')">🗑️</button>'+
+    '</div>';
+  }).join('');
+  el.innerHTML=
+  '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">'+
+    '<div><div style="font-size:16px;font-weight:700;color:var(--text)">Tipos de Cobertura</div>'+
+    '<div style="font-size:12px;color:var(--text-2);margin-top:2px">Configure o checklist operacional de cada tipo. Etapas de Contrato e Financiamento são fixas para todos.</div></div>'+
+    '<button class="btn btn-primary" onclick="abrirNovoTipo()">＋ Novo Tipo</button>'+
+  '</div>'+
+  '<div style="display:flex;flex-direction:column;gap:10px;margin-top:20px">'+(tiposHtml||'<div class="empty">Nenhum tipo cadastrado ainda.</div>')+'</div>';
+}
+
+function abrirNovoTipo(){
+  openModal('Novo Tipo de Cobertura',
+    '<div class="form-grid"><div class="fg full"><label>Nome do Tipo *</label><input id="nt_nome" placeholder="Ex: Sombrite Garagem, Telha Galvalume..."></div></div>',
+    '<button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>'+
+    '<button class="btn btn-primary" onclick="salvarNovoTipo()">Criar</button>'
+  );
+}
+async function salvarNovoTipo(){
+  var nome=(document.getElementById('nt_nome').value||'').trim();
+  if(!nome){showToast('Informe o nome do tipo.','error');return;}
+  var{error}=await supaPost('ecm_tipos_cobertura',{nome,ativo:true,ordem:ENG.tipos.length+1});
+  if(error){showToast('Erro: '+error,'error');return;}
+  closeModal();showToast('Tipo criado!','success');await renderConfig();
+}
+
+async function excluirTipo(id,nome){
+  if(!confirm('Excluir o tipo "'+nome+'"? Obras existentes perderão o vínculo com este tipo.')) return;
+  await supaDelete('ecm_tipos_cobertura','id=eq.'+id);
+  showToast('Tipo excluído.','success');await renderConfig();
+}
+
+function abrirEditTipo(tipoId){
+  _editTipoId=tipoId;
+  _editTipoEtapas=(ENG.tipoEtapasMap[tipoId]||[]).map(function(e){return Object.assign({},e);});
+  var t=ENG.tipos.find(function(x){return x.id===tipoId;})||{};
+  openModal('Editar Tipo: '+esc(t.nome),buildEditTipoBody(),
+    '<button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>'+
+    '<button class="btn btn-primary" onclick="salvarEditTipo()">Salvar Tudo</button>'
+  );
+}
+
+function buildEditTipoBody(){
+  var rows=_editTipoEtapas.map(function(e,i){
+    var grupoOpts=GRUPOS_OP.map(function(g){return '<option value="'+g+'"'+(g===e.grupo?' selected':'')+'>'+g+'</option>';}).join('');
+    var colOpts=COLUNAS_OP.map(function(c){var col=COLUNAS.find(function(x){return x.id===c;});return '<option value="'+c+'"'+(c===e.coluna?' selected':'')+'>'+(col?col.label:c)+'</option>';}).join('');
+    return '<div class="etapa-edit-row">'+
+      '<input class="etapa-edit-inp" placeholder="Nome da etapa..." value="'+esc(e.label)+'" oninput="_editTipoEtapas['+i+'].label=this.value">'+
+      '<select class="etapa-edit-sel" onchange="_editTipoEtapas['+i+'].grupo=this.value">'+grupoOpts+'</select>'+
+      '<select class="etapa-edit-sel" onchange="_editTipoEtapas['+i+'].coluna=this.value">'+colOpts+'</select>'+
+      '<label class="obrig-toggle" title="Bloqueante: impede avanço de coluna se não concluída">'+
+        '<input type="checkbox"'+(e.obrigatorio?' checked':'')+' onchange="_editTipoEtapas['+i+'].obrigatorio=this.checked"> Bloqueante</label>'+
+      '<button class="btn btn-ghost btn-sm" style="color:#dc2626;border-color:#fca5a5;flex-shrink:0" onclick="removeEditEtapa('+i+')">✕</button>'+
+    '</div>';
+  }).join('');
+  return '<div style="font-size:12px;color:var(--text-2);margin-bottom:12px">Etapas exclusivas deste tipo (além das fixas de Contrato e Financiamento). <strong>Bloqueante</strong> impede a obra de avançar de coluna se não estiver concluída.</div>'+
+    '<div style="display:grid;grid-template-columns:1fr 130px 130px auto auto;gap:8px;margin-bottom:8px;padding:0 0 4px;border-bottom:1px solid var(--border)">'+
+      '<span style="font-size:10px;font-weight:700;color:var(--text-3)">ETAPA</span>'+
+      '<span style="font-size:10px;font-weight:700;color:var(--text-3)">GRUPO</span>'+
+      '<span style="font-size:10px;font-weight:700;color:var(--text-3)">COLUNA</span>'+
+      '<span style="font-size:10px;font-weight:700;color:var(--text-3)">TIPO</span>'+
+      '<span></span>'+
+    '</div>'+
+    '<div id="editEtapasRows">'+rows+'</div>'+
+    '<button class="btn btn-ghost btn-sm" style="margin-top:10px" onclick="addEditEtapa()">+ Adicionar etapa</button>';
+}
+
+function addEditEtapa(){
+  _editTipoEtapas.push({id:null,tipo_id:_editTipoId,label:'',grupo:'Execução',coluna:'instalacao',ordem:_editTipoEtapas.length+1,obrigatorio:false});
+  document.getElementById('gmBody').innerHTML=buildEditTipoBody();
+}
+function removeEditEtapa(i){
+  _editTipoEtapas.splice(i,1);
+  document.getElementById('gmBody').innerHTML=buildEditTipoBody();
+}
+
+async function salvarEditTipo(){
+  var validas=_editTipoEtapas.filter(function(e){return e.label.trim();});
+  if(!validas.length&&!confirm('Salvar o tipo sem etapas operacionais?')) return;
+  // Apaga etapas existentes e recria
+  await supaDelete('ecm_tipo_etapas','tipo_id=eq.'+_editTipoId);
+  for(var i=0;i<validas.length;i++){
+    var e=validas[i];
+    await supaPost('ecm_tipo_etapas',{tipo_id:_editTipoId,label:e.label.trim(),grupo:e.grupo,coluna:e.coluna,ordem:i+1,obrigatorio:!!e.obrigatorio});
+  }
+  closeModal();showToast('Tipo salvo!','success');await renderConfig();
 }
 
 // ════════════════════════════════════════════
@@ -933,28 +1217,20 @@ function openModal(title,body,footer){
   document.getElementById('gmBody').innerHTML=body;
   document.getElementById('gmFooter').innerHTML=footer||'';
   document.getElementById('genericModal').classList.add('open');
-  setTimeout(function(){var f=document.querySelector('#gmBody input:not([disabled])');if(f)f.focus();},100);
+  setTimeout(function(){var f=document.querySelector('#gmBody input:not([type=checkbox]):not([disabled])');if(f)f.focus();},100);
 }
 function closeModal(){document.getElementById('genericModal').classList.remove('open');}
 document.getElementById('genericModal').addEventListener('click',function(e){if(e.target===e.currentTarget)closeModal();});
 document.getElementById('obraModal').addEventListener('click',function(e){if(e.target===e.currentTarget)closeObraModal();});
 
 // ════════════════════════════════════════════
-// TOAST
+// TOAST + UTILS
 // ════════════════════════════════════════════
 var _tt;
-function showToast(msg,type){
-  var el=document.getElementById('toast');
-  el.textContent=msg;el.className='show '+(type||'');
-  clearTimeout(_tt);_tt=setTimeout(function(){el.className='';},3500);
-}
-
-// ════════════════════════════════════════════
-// UTILS
-// ════════════════════════════════════════════
+function showToast(msg,type){var el=document.getElementById('toast');el.textContent=msg;el.className='show '+(type||'');clearTimeout(_tt);_tt=setTimeout(function(){el.className='';},3500);}
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-function fmtMoeda(v){return (v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});}
-function fmtData(s){if(!s)return'—';var d=new Date(s+'T12:00:00');return d.toLocaleDateString('pt-BR');}
+function fmtMoeda(v){return(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function fmtData(s){if(!s)return'—';return new Date(s+'T12:00:00').toLocaleDateString('pt-BR');}
 function fmtDataHora(s){if(!s)return'—';return new Date(s).toLocaleString('pt-BR');}
 function infoBox(label,val){return '<div style="background:var(--bg);border-radius:9px;padding:12px"><div style="font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">'+label+'</div><div style="font-size:13px;font-weight:600;color:var(--text)">'+esc(String(val||'—'))+'</div></div>';}
 
@@ -971,15 +1247,14 @@ document.getElementById('loginEmail').addEventListener('keydown',function(e){if(
       SUPA_TOKEN=sess.access_token;
       var{data:perfil}=await supaGetOne('ecm_perfis','id=eq.'+sess.id);
       if(perfil){
-        ENG.user={id:sess.id,email:sess.email};
-        ENG.perfil=perfil;
+        ENG.user={id:sess.id,email:sess.email};ENG.perfil=perfil;
         document.getElementById('sbAv').textContent=(perfil.nome||'?')[0].toUpperCase();
         document.getElementById('sbNome').textContent=perfil.nome||'—';
         document.getElementById('sbRole').textContent=perfil.cargo||perfil.perfil||'—';
         document.getElementById('loginScreen').style.display='none';
         document.getElementById('appShell').style.display='block';
-        navigate('dashboard');
-        return;
+        await loadTipos();
+        navigate('dashboard');return;
       }
       localStorage.removeItem('ecm_session');SUPA_TOKEN=null;
     }

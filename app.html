@@ -539,10 +539,16 @@ var DB = {
           if(DB_CACHE[t].length) supaSet(t,DB_CACHE[t]);
         }
       });
-    }));
+    })).then(function(){
+      atualizarWzCatalogo();
+    });
   },
   get:function(k){return DB_CACHE[k]||[];},
-  set:function(k,v){DB_CACHE[k]=v;supaSet(k,v);},
+  set:function(k,v){
+    DB_CACHE[k]=v;
+    supaSet(k,v);
+    if(k==='catalogo') atualizarWzCatalogo();
+  },
   pedidos:function(){return this.get('pedidos');},
   savePedidos:function(p){this.set('pedidos',p);},
   filiais:function(){return this.get('filiais');},
@@ -796,6 +802,62 @@ var WZ_CATALOGO=[
   {desc:'SUPORTE DUPLO PARA BICICLETAS',ma:'0,00',mb:'0,00',mc:'0,00',un:'UNID'},
   {desc:'DEIXAR EM BRANCO (EDITÁVEL)',ma:'0,00',mb:'0,00',mc:'0,00',un:'INS UNID'}
 ];
+
+function atualizarWzCatalogo() {
+  var catDb = DB.catalogo();
+  if (!catDb || !catDb.length) return;
+  var defaultDims = {
+    'CHUMBADOR PARA PILAR MA': { ma: '—', mb: '—', mc: '—' },
+    'PILAR SOMBRITE MA': { ma: '2,40', mb: '0,00', mc: '0,00' },
+    'PILAR SOMBRITE MT': { ma: '2,20', mb: '0,00', mc: '0,00' },
+    'BRAÇO SOMBRITE SIMPLES': { ma: '4,30', mb: '0,00', mc: '0,00' },
+    'ARCOS DE 1VG': { ma: '1,20', mb: '0,00', mc: '0,00' },
+    'ARCOS DE 2VG': { ma: '1,50', mb: '0,00', mc: '0,00' },
+    'ARCOS DE 3VG': { ma: '1,80', mb: '0,00', mc: '0,00' },
+    'ESTRELA 1VG': { ma: '1,20', mb: '0,00', mc: '0,00' },
+    'ESTRELA 2VG': { ma: '1,50', mb: '0,00', mc: '0,00' },
+    'ESTRELA 3VG': { ma: '1,80', mb: '0,00', mc: '0,00' },
+    'TELA COMPLETA SOMBRITE 1 VG': { ma: '2,50', mb: '5,00', mc: '0,00' },
+    'TELA COMPLETA SOMBRITE 2 VG': { ma: '4,80', mb: '5,00', mc: '0,00' },
+    'TELA COMPLETA SOMBRITE 3 VG': { ma: '7,20', mb: '5,00', mc: '0,00' },
+    'TELA COMPLETA SOMBRITE 4 VG': { ma: '9,60', mb: '5,00', mc: '0,00' },
+    'TELA COMPLETA SOMBRITE TAM ESPECIAL': { ma: '0,00', mb: '0,00', mc: '0,00' },
+    'PILAR LISO': { ma: '2,40', mb: '0,00', mc: '0,00' },
+    'BASE PVC CHUMBAÇÃO DIRETA': { ma: '—', mb: '—', mc: '—' },
+    'BASE PVC PARAFUSADO': { ma: '—', mb: '—', mc: '—' },
+    'BRAÇO PVC': { ma: '0,00', mb: '0,00', mc: '0,00' },
+    'BRAÇO PVC PAINEL SOLAR': { ma: '0,00', mb: '0,00', mc: '0,00' },
+    'BASE PVC': { ma: '0,00', mb: '0,00', mc: '0,00' },
+    'TERÇAS PARA TELHA GALVALUME': { ma: '0,00', mb: '0,00', mc: '0,00' },
+    'TERÇAS PARA TELHA ISOTÉRMICA': { ma: '0,00', mb: '0,00', mc: '0,00' },
+    'TERÇAS PARA TELHA': { ma: '0,00', mb: '0,00', mc: '0,00' },
+    'TERÇAS PARA PAINEL SOLAR': { ma: '0,00', mb: '0,00', mc: '0,00' },
+    'SUPORTE DUPLO PARA BICICLETAS': { ma: '0,00', mb: '0,00', mc: '0,00' },
+    'DEIXAR EM BRANCO (EDITÁVEL)': { ma: '0,00', mb: '0,00', mc: '0,00' }
+  };
+
+  WZ_CATALOGO = catDb.map(function(item) {
+    var dims = defaultDims[item.desc] || { ma: '0,00', mb: '0,00', mc: '0,00' };
+    return {
+      desc: item.desc,
+      un: item.un || 'PÇ',
+      ma: dims.ma,
+      mb: dims.mb,
+      mc: dims.mc
+    };
+  });
+
+  var temEmBranco = WZ_CATALOGO.some(function(item) { return item.desc === 'DEIXAR EM BRANCO (EDITÁVEL)'; });
+  if (!temEmBranco) {
+    WZ_CATALOGO.push({
+      desc: 'DEIXAR EM BRANCO (EDITÁVEL)',
+      un: 'INS UNID',
+      ma: '0,00',
+      mb: '0,00',
+      mc: '0,00'
+    });
+  }
+}
 
 function renderNovoPedido(){
   WZ={step:1,cliente:{},dim:{tipo:'Sombrite',mod2vMA:0,mod3vMA:0,mod2vMT:0,mod3vMT:0,vagas:0,align:1,semParam:false,vagasTelha:0,fixacaoTelha:'Solo'},dir:{},itens:[],prazos:prazoesPadrao()};
