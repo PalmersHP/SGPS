@@ -2615,9 +2615,7 @@ function imprimirPedido(id,idxsFiltro){
     var statusCell='<td style="text-align:center"><span style="font-size:7pt;font-weight:700;padding:1px 5px;border-radius:8px;'+statusStyle+'">'+statusLabel+'</span></td>';
     return'<tr>'+statusCell+'<td>'+it.desc+'</td><td style="text-align:center">'+it.ma+'</td><td style="text-align:center">'+it.mb+'</td><td style="text-align:center">'+it.mc+'</td><td style="text-align:center">'+it.un+'</td><td style="text-align:center;font-weight:700">'+it.qtd+'</td></tr>';
   }).join('');
-  var prazosHtml=!isOS?(p.prazos||[]).map(function(pr){
-    return'<tr><td>'+pr.grupo+'</td><td style="text-align:center">'+pr.prazo+'</td><td>Da data do pedido</td></tr>';
-  }).join(''):'';
+
   var ftBox=function(label,val){
     return'<div style="flex:1;border:1.5px solid #9ACD32;border-radius:6px;padding:6px 10px;min-width:0">'+
       '<div style="font-size:7pt;font-weight:700;color:#9ACD32;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px">'+label+'</div>'+
@@ -2638,9 +2636,7 @@ function imprimirPedido(id,idxsFiltro){
         ftBox('Tela',p.cor_tela)+
         ftBox('Chumbação',p.chumbacao)+
         ftBox('Pilares',p.pilares)+
-      '</div>'+
-      '<div class="pr-sec">Prazo Previsto para Entrega das Peças</div>'+
-      '<table><thead><tr><th>Conjunto</th><th>Prazo</th><th>Referência</th></tr></thead><tbody>'+prazosHtml+'</tbody></table>';
+      '</div>';
   var osNome=isOS?osNomeArquivo(p):'';
   var titulo=isOS?'ORDEM DE SERVIÇO':'Pedido de Materiais Sombrear Indústria';
   document.getElementById('printArea').innerHTML=
