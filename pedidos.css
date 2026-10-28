@@ -1,0 +1,42 @@
+.pedido-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.pedido-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin-bottom:20px}
+.pedido-summary>div{padding:14px 16px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:9px}
+.pedido-summary small{display:block;color:#64748b;font-size:11px;margin-bottom:5px}
+.pedido-summary strong{font-size:15px;color:#1e293b}
+.pedido-help{font-size:12px;color:#64748b;line-height:1.7;margin:10px 0}
+.pedido-notice{padding:14px 16px;border:1px solid #fde68a;background:#fffbeb;border-radius:9px;margin-bottom:18px;font-size:12px;line-height:1.7}
+.pedido-options{border-top:1px solid #e2e8f0;margin-top:20px;padding-top:16px}
+.pedido-options summary{cursor:pointer;font-size:13px;font-weight:600;color:#475569;margin-bottom:14px}
+.pedido-steps{display:flex;gap:16px;margin:0 0 22px;color:#94a3b8;font-size:13px}
+.pedido-steps .active{color:#6FAE2E;font-weight:700}
+.pedido-table td{vertical-align:middle}
+.pedido-table .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.pedido-table .saldo{color:#6FAE2E;font-weight:700;background:#f4faec}
+.pedido-table small{display:block;font-size:10px;color:#64748b;margin-top:3px}
+.pedido-table input,.pedido-table select{padding:7px;border:1px solid #dbe2ea;border-radius:6px;font:inherit;font-size:12px;background:#fff;max-width:100%}
+.pedido-table input[data-line-field]{width:70px}
+.pedido-table input[data-line-field=qtd]{width:80px}
+.pedido-table select[data-line-field=desc]{min-width:230px;width:100%}
+.pedido-table .pedido-custom{display:block;width:100%;min-width:220px;margin-top:6px}
+.pedido-tag{display:inline-block;font-size:10px;padding:3px 7px;background:#edf4e5;color:#4d7c0f;border-radius:5px;margin-top:4px}
+.pedido-muted{color:#94a3b8}
+.pedido-stage{min-width:130px;max-width:165px}
+.pedido-grid{display:grid;grid-template-columns:1.4fr 1fr;gap:20px;align-items:start}
+.pedido-remessa{padding:16px 0;border-bottom:1px solid #e2e8f0}
+.pedido-remessa:first-child{padding-top:0}
+.pedido-remessa:last-child{border-bottom:0;padding-bottom:0}
+.pedido-remessa header{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}
+.pedido-remessa ul{font-size:12px;line-height:1.8;padding-left:20px;margin:10px 0;color:#475569}
+.pedido-history{list-style:none;padding:0;margin:0}
+.pedido-history li{border-left:2px solid #dbe9c9;padding:0 0 16px 14px;font-size:12px;line-height:1.6}
+.pedido-history small{display:block;color:#94a3b8}
+.pedido-modal{max-width:1050px!important}
+.pedido-modal .modal-body{max-height:65vh;overflow-y:auto}
+.pedido-modal .fg{margin-bottom:0}
+.pedido-total{text-align:right;font-size:14px;font-weight:700;margin-top:16px}
+.pedido-item-name{min-width:200px}
+.pedido-inline-error{color:#b91c1c;font-size:12px;line-height:1.7;margin:12px 0}
+.pedido-footer{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:20px}
+.pedido-empty{text-align:center;padding:28px!important;color:#64748b}
+.pedido-form .form-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+@media(max-width:900px){.pedido-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.pedido-grid{grid-template-columns:1fr}.pedido-actions{width:100%}.pedido-form .form-grid{grid-template-columns:1fr}.pedido-modal .modal-body{padding:14px}.pedido-steps{gap:10px;font-size:12px}.topbar{padding:0 14px}.tb-title{max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.tb-name{display:none}#content{padding:16px}.view .card-hdr{flex-wrap:wrap;gap:8px}}

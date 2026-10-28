@@ -264,6 +264,7 @@ tbody tr:last-child td{border-bottom:none}
   #main{margin-left:0}
 }
 </style>
+<link rel="stylesheet" href="pedidos.css">
 </head>
 <body>
 
@@ -340,6 +341,8 @@ tbody tr:last-child td{border-bottom:none}
 <!-- PRINT AREA -->
 <div id="printArea"></div>
 
+<script src="pedidos-core.js"></script>
+<script src="pedidos-ui.js"></script>
 <script>
 // ════════════════════════════════════════════
 // SEED DATA
@@ -457,12 +460,7 @@ function renderCalcSummaryTelha(vagas,fixacao){
     '<div class="calc-item"><div class="cv">'+(fixacao||'Solo')+'</div><div class="cl">Fixação</div></div>'+
   '</div>';
 }
-function wzCalcTelha(){
-  var v=parseInt(document.getElementById('w_vagas_t').value)||0;
-  var fix=document.getElementById('w_fix_t').value||'Solo';
-  WZ.dim.vagasTelha=v;WZ.dim.fixacaoTelha=fix;
-  document.getElementById('wzCalcBoxT').innerHTML=renderCalcSummaryTelha(v,fix);
-}
+
 
 function gerarItens(vagas,mod2vMA,mod3vMA,mod2vMT,mod3vMT,align,mult){
   var modMA=mod2vMA+mod3vMA, modMT=mod2vMT+mod3vMT, modTotal=modMA+modMT;
@@ -509,9 +507,8 @@ var SUPA_HDR={'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type
 
 function supaGet(k){
   return fetch(SUPA_URL+'/rest/v1/sgps_store?key=eq.'+k+'&select=value',{headers:SUPA_HDR})
-    .then(function(r){return r.json();})
-    .then(function(rows){return rows&&rows.length?rows[0].value:null;})
-    .catch(function(){return null;});
+    .then(function(r){if(!r.ok)throw new Error('Não foi possível consultar o servidor.');return r.json();})
+    .then(function(rows){if(!Array.isArray(rows))throw new Error('Resposta inválida do servidor.');return rows.length?rows[0].value:null;});
 }
 function supaSet(k,v){
   return fetch(SUPA_URL+'/rest/v1/sgps_store',{
@@ -531,13 +528,8 @@ var DB = {
     var tables=['filiais','pedidos','usuarios','catalogo'];
     return Promise.all(tables.map(function(t){
       return supaGet(t).then(function(d){
-        if(d&&d.length){
-          DB_CACHE[t]=d; // dados existentes no Supabase
-        } else {
-          // Primeira vez ou tabela vazia — sobe o seed
-          DB_CACHE[t]=SEED[t]||[];
-          if(DB_CACHE[t].length) supaSet(t,DB_CACHE[t]);
-        }
+        if(!Array.isArray(d))throw new Error('Dados indisponíveis: '+t);
+        DB_CACHE[t]=d; // Carregar a tela nunca sobrescreve dados com exemplos.
       });
     })).then(function(){
       atualizarWzCatalogo();
@@ -639,7 +631,7 @@ function showToast(msg,type){
 // ════════════════════════════════════════════
 var ROUTES_FILIAL=[
   {hash:'filial-dashboard',label:'📊 Dashboard',title:'Dashboard'},
-  {hash:'filial-novo-pedido',label:'➕ Novo Pedido',title:'Novo Pedido'},
+  {hash:'filial-novo-pedido',label:'➕ Novo Condomínio',title:'Novo Condomínio / Pedido'},
   {hash:'filial-pedidos',label:'📋 Meus Pedidos',title:'Meus Pedidos'},
   {hash:'filial-equipe',label:'👥 Minha Equipe',title:'Minha Equipe'},
   {hash:'filial-precos',label:'💰 Preços',title:'Tabela de Preços'},
@@ -697,9 +689,10 @@ function navigate(hash){
     n.classList.toggle('active',n.getAttribute('data-hash')===hash);
   });
   var routes=USER.role==='sede'?ROUTES_SEDE:ROUTES_FILIAL;
-  var route=routes.find(function(r){return r.hash===hash;})||{title:''};
+  var route=routes.find(function(r){return r.hash===hash;})||{title:hash.endsWith('-pedido')?'Pedido do condomínio':''};
   document.getElementById('pageTitle').textContent=route.title;
   renderView(hash);
+  if(/^(filial|sede)-(dashboard|pedidos|pedido|aprovacoes)$/.test(hash))PedidosUI.refresh(hash);
 }
 
 function renderView(hash){
@@ -771,8 +764,6 @@ function renderFilialDash(){
 // ════════════════════════════════════════════
 // WIZARD STATE
 // ════════════════════════════════════════════
-var WZ={step:1,cliente:{},dim:{tipo:'Sombrite',vagasTelha:0,fixacaoTelha:'Solo'},dir:{},itens:[],prazos:prazoesPadrao()};
-var WZ_CHARTS={};
 var WZ_CATALOGO=[
   {desc:'CHUMBADOR PARA PILAR MA',ma:'—',mb:'—',mc:'—',un:'PÇ'},
   {desc:'PILAR SOMBRITE MA',ma:'2,40',mb:'0,00',mc:'0,00',un:'PÇ'},
@@ -859,354 +850,7 @@ function atualizarWzCatalogo() {
   }
 }
 
-function renderNovoPedido(){
-  WZ={step:1,cliente:{},dim:{tipo:'Sombrite',mod2vMA:0,mod3vMA:0,mod2vMT:0,mod3vMT:0,vagas:0,align:1,semParam:false,vagasTelha:0,fixacaoTelha:'Solo'},dir:{},itens:[],prazos:prazoesPadrao()};
-  renderWizard();
-}
-
-function renderWizard(){
-  var steps=['Dados do Cliente','Dimensionamento','Diretrizes','Revisão'];
-  var stepsHtml=steps.map(function(s,i){
-    var cls=i+1<WZ.step?'done':i+1===WZ.step?'active':'';
-    return '<div class="wz-step '+cls+'"><div class="wz-num">'+(i+1<WZ.step?'✓':i+1)+'</div><div class="wz-lbl">'+s+'</div></div>';
-  }).join('');
-
-  var panels='';
-
-  // Step 1
-  panels+='<div class="wz-panel'+(WZ.step===1?' active':'')+'">'+
-  '<div class="card"><div class="card-hdr"><h2>👤 Dados do Cliente / Condomínio</h2></div><div class="card-body">'+
-  '<div class="form-grid">'+
-  '<div class="fg"><label>Nome do Condomínio *</label><input type="text" id="w_cliente" value="'+esc(WZ.cliente.nome||'')+'" placeholder="Ex: Residencial das Flores"></div>'+
-  '<div class="fg"><label>CNPJ</label><input type="text" id="w_cnpj" value="'+esc(WZ.cliente.cnpj||'')+'" placeholder="00.000.000/0001-00"></div>'+
-  '<div class="fg" style="grid-column:1/-1"><label>Endereço Completo</label><input type="text" id="w_end" value="'+esc(WZ.cliente.end||'')+'" placeholder="Rua, número, bairro — Cidade/UF"></div>'+
-  '<div class="fg"><label>Telefone de Contato</label><input type="text" id="w_tel" value="'+esc(WZ.cliente.tel||'')+'" placeholder="(00) 00000-0000"></div>'+
-  '<div class="fg"><label>Síndico Responsável</label><input type="text" id="w_sindico" value="'+esc(WZ.cliente.sindico||'')+'" placeholder="Nome completo"></div>'+
-  '<div class="fg"><label>E-mail</label><input type="email" id="w_email" value="'+esc(WZ.cliente.email||'')+'" placeholder="condo@email.com.br"></div>'+
-  '</div></div></div></div>';
-
-  // Step 2
-  var d=WZ.dim;
-  var tipoAtual=d.tipo||'Sombrite';
-  var calc=calcularPecas(d);
-  var tipoCards=[
-    {id:'Sombrite',icon:'🌿',label:'Sombrite',sub:'Tela sombrite + estrutura metálica'},
-    {id:'Telha',icon:'🏠',label:'Telha',sub:'Telha em solo ou em laje'},
-    {id:'Carport',icon:'🚗',label:'Carport',sub:'Cobertura para veículos'}
-  ].map(function(t){
-    var active=tipoAtual===t.id;
-    return '<div class="tipo-card'+(active?' active':'')+'" onclick="wzSetTipo(\''+t.id+'\')">'+
-      '<div class="tipo-icon">'+t.icon+'</div>'+
-      '<div class="tipo-label">'+t.label+'</div>'+
-      '<div class="tipo-sub">'+t.sub+'</div>'+
-      (active?'<div class="tipo-check">✓</div>':'')+
-    '</div>';
-  }).join('');
-
-  var sombriteForm=tipoAtual==='Sombrite'?
-    '<div class="form-grid" style="margin-bottom:16px">'+
-    '<div class="fg"><label>Qtd Total de Vagas *</label><input type="number" id="w_vagas" min="0" value="'+(d.vagas||0)+'" oninput="wzCalc()"><button class="btn btn-outline btn-sm" style="margin-top:6px" onclick="wzSugerir()">✨ Sugerir Distribuição</button></div>'+
-    '<div class="fg"><label>Alinhamentos (Sequências)</label><input type="number" id="w_align" min="1" value="'+(d.align||1)+'" oninput="wzCalc()" '+(d.semParam?'disabled':'')+'>'+
-    '<div style="display:flex;align-items:center;gap:7px;margin-top:6px"><input type="checkbox" id="w_semParam" '+(d.semParam?'checked':'')+' onchange="wzToggleAlign()" style="width:16px;height:16px;accent-color:var(--verde)"><label for="w_semParam" style="font-size:12px;cursor:pointer;text-transform:none;letter-spacing:0">Sem parâmetro (auto: 1 por 4 módulos)</label></div></div>'+
-    '</div>'+
-    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">'+
-    '<div class="mod-group"><h4>📦 Módulos MA — Médio Apoio</h4><div class="form-grid"><div class="fg"><label>2V — MA</label><input type="number" id="w_m2ma" min="0" value="'+(d.mod2vMA||0)+'" oninput="wzCalc()"></div><div class="fg"><label>3V — MA</label><input type="number" id="w_m3ma" min="0" value="'+(d.mod3vMA||0)+'" oninput="wzCalc()"></div></div></div>'+
-    '<div class="mod-group"><h4>📦 Módulos MT — Médio Topo</h4><div class="form-grid"><div class="fg"><label>2V — MT</label><input type="number" id="w_m2mt" min="0" value="'+(d.mod2vMT||0)+'" oninput="wzCalc()"></div><div class="fg"><label>3V — MT</label><input type="number" id="w_m3mt" min="0" value="'+(d.mod3vMT||0)+'" oninput="wzCalc()"></div></div></div>'+
-    '</div>'+
-    '<div class="calc-summary" id="wzCalcBox">'+renderCalcSummary(calc)+'</div>'
-  :tipoAtual==='Telha'?
-    '<div class="form-grid" style="margin-bottom:16px">'+
-    '<div class="fg"><label>Qtd Total de Vagas *</label><input type="number" id="w_vagas_t" min="0" value="'+(d.vagasTelha||0)+'" oninput="wzCalcTelha()"></div>'+
-    '<div class="fg"><label>Tipo de Fixação</label><select id="w_fix_t" onchange="wzCalcTelha()">'+
-      '<option'+((!d.fixacaoTelha||d.fixacaoTelha==='Solo')?' selected':'')+'>Solo</option>'+
-      '<option'+(d.fixacaoTelha==='Laje'?' selected':'')+'>Laje</option>'+
-    '</select></div>'+
-    '</div>'+
-    '<div class="calc-summary" id="wzCalcBoxT">'+renderCalcSummaryTelha(d.vagasTelha||0,d.fixacaoTelha||'Solo')+'</div>'
-  :
-    '<div class="em-breve-box">'+
-      '<div class="em-breve-icon">🚗</div>'+
-      '<div class="em-breve-title">Carport — Em desenvolvimento</div>'+
-      '<div class="em-breve-desc">O cálculo automático para <strong>Carport</strong> estará disponível em breve.<br>Você já pode avançar e preencher os demais dados do pedido.</div>'+
-      '<div class="em-breve-badge">🔧 Em breve</div>'+
-    '</div>';
-
-  panels+='<div class="wz-panel'+(WZ.step===2?' active':'')+'">'+
-  '<div class="card"><div class="card-hdr"><h2>📐 Dimensionamento</h2></div><div class="card-body">'+
-  '<div class="tipo-selector-label">Tipo de cobertura vendida</div>'+
-  '<div class="tipo-grid">'+tipoCards+'</div>'+
-  '<div class="tipo-divider"></div>'+
-  sombriteForm+
-  '</div></div></div>';
-
-  // Step 3
-  var dir=WZ.dir;
-  var dirCards3=tipoAtual==='Telha'?
-    dirCard('Cor da Estrutura','w_estrutura',['Estrutura Branca','Estrutura Preta'],dir.estrutura)
-  :
-    dirCard('Informação 1 — Cor da Estrutura','w_estrutura',['Estrutura Branca','Estrutura Preta','Estrutura Cor Especial (Descrever)'],dir.estrutura)+
-    dirCard('Informação 2 — Cor da Tela','w_tela',['Tela Prata','Tela Verde','Tela Azul','Tela Vermelha','Tela Bege','Tela Cor Especial (Descrever)'],dir.tela)+
-    dirCard('Informação 3 — Tipo de Chumbação','w_chumb',['Chumbação Direta em Solo','Chumbação em Laje','Chumbação por Chumbador'],dir.chumb)+
-    dirCard('Informação 4 — Pilares','w_pilares',['Tipo Direto','Pilares com Chapa'],dir.pilares);
-  panels+='<div class="wz-panel'+(WZ.step===3?' active':'')+'">'+
-  '<div class="card"><div class="card-hdr"><h2>⚙️ Diretrizes Técnicas</h2></div><div class="card-body">'+
-  '<div class="dir-grid">'+dirCards3+
-  '</div></div></div></div>';
-
-  // Step 4
-  var catOpts=WZ_CATALOGO.map(function(c){return'<option value="'+c.desc+'">'+c.desc+'</option>';}).join('');
-  var itensHtml=WZ.itens.length===0?
-    '<tr><td colspan="9" style="text-align:center;padding:32px 20px;color:#94a3b8;font-style:italic">Nenhuma peça lançada ainda. Use o botão "+ Lançar Peça" acima.</td></tr>':
-    WZ.itens.map(function(it,i){
-      var opts='<option value="">— selecione a peça —</option>'+WZ_CATALOGO.map(function(c){
-        return'<option value="'+c.desc+'"'+(c.desc===it.desc?' selected':'')+'>'+c.desc+'</option>';
-      }).join('');
-      var pu=lookupPreco(it.desc);
-      return'<tr data-item-row="'+i+'">'+
-        '<td><select data-peca-sel style="width:100%;min-width:200px;padding:4px 6px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px" onchange="wzSelectPeca('+i+',this.value)">'+opts+'</select></td>'+
-        '<td><input type="text" value="'+it.ma+'" data-ma style="width:58px;padding:3px 6px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px" onchange="WZ.itens['+i+'].ma=this.value"></td>'+
-        '<td><input type="text" value="'+it.mb+'" data-mb style="width:58px;padding:3px 6px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px" onchange="WZ.itens['+i+'].mb=this.value"></td>'+
-        '<td><input type="text" value="'+it.mc+'" data-mc style="width:58px;padding:3px 6px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px" onchange="WZ.itens['+i+'].mc=this.value"></td>'+
-        '<td data-un style="font-size:11px;text-align:center;white-space:nowrap">'+it.un+'</td>'+
-        '<td><input type="number" value="'+it.qtd+'" min="0" style="width:70px;padding:4px 6px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;text-align:center" onchange="wzUpdateRowTotal('+i+',this.value)"></td>'+
-        '<td id="row-pu-'+i+'" style="text-align:right;font-size:12px;color:#64748b;white-space:nowrap;padding:0 8px">'+fmtMoeda(pu)+'</td>'+
-        '<td id="row-total-'+i+'" style="text-align:right;font-size:13px;font-weight:700;color:#1e293b;white-space:nowrap;padding:0 8px">'+fmtMoeda(pu*(it.qtd||0))+'</td>'+
-        '<td><button onclick="wzRemoveItem('+i+')" style="background:none;border:none;color:#ef4444;font-size:16px;cursor:pointer;padding:2px 6px" title="Remover">✕</button></td>'+
-      '</tr>';
-    }).join('');
-
-  var prazosHtml=WZ.prazos.map(function(p,i){
-    var opts=['10 dias','15 dias','20 dias','25 dias','30 dias','35 dias','40 dias','45 dias','60 dias','75 dias','90 dias','Da data do pagamento'].map(function(o){return'<option'+(o===p.prazo?' selected':'')+'>'+o+'</option>';}).join('');
-    return '<div class="prazo-row"><span class="prazo-label">'+p.grupo+'</span><select class="prazo-select" onchange="WZ.prazos['+i+'].prazo=this.value">'+opts+'</select></div>';
-  }).join('');
-
-  // Resumo financeiro — renderizado live via wzUpdateResumo()
-  var resumoFinanceiro='';
-
-  var sugerirBtn=WZ._calcItens?
-    '<button class="btn btn-outline btn-sm" style="font-size:12px" onclick="wzAplicarCalcSugerido()">💡 Usar Cálculo Automático</button>':'';
-  panels+='<div class="wz-panel'+(WZ.step===4?' active':'')+'">'+
-  '<div class="card"><div class="card-hdr" style="flex-wrap:wrap;gap:8px">'+
-    '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'+
-      '<h2 style="margin:0">📋 Lançamento de Peças</h2>'+
-      '<button class="btn btn-primary btn-sm" onclick="wzAddItem()" style="font-size:13px;padding:6px 14px">+ Lançar Peça</button>'+
-      sugerirBtn+
-    '</div>'+
-    '<span style="font-size:12px;color:#64748b">Selecione a peça, preencha as medidas e a quantidade</span>'+
-  '</div><div class="card-body">'+
-  '<div class="tbl-wrap"><table class="rev-tbl"><thead><tr><th style="min-width:220px">Peça</th><th>Med A</th><th>Med B</th><th>Med C</th><th>Unid.</th><th>Qtde</th><th style="text-align:right">Preço Unit.</th><th style="text-align:right">Total</th><th style="width:32px"></th></tr></thead><tbody>'+itensHtml+'</tbody></table></div>'+
-  '<div id="wzResumoFin"></div>'+
-  '<div class="sec-title" style="margin-top:20px">Prazos Previstos para Entrega</div>'+
-  '<div class="prazo-grid">'+prazosHtml+'</div>'+
-  '</div></div></div>';
-
-  document.getElementById('view-filial-novo-pedido').innerHTML=
-  '<div class="page-hdr"><div><h1>Novo Pedido de Fabricação</h1><p>Preencha os dados para enviar à Sede.</p></div></div>'+
-  '<div class="wizard-steps">'+stepsHtml+'</div>'+
-  panels+
-  '<div style="display:flex;justify-content:space-between;margin-top:16px">'+
-    (WZ.step>1?'<button class="btn btn-ghost" onclick="wzPrev()">← Anterior</button>':'<span></span>')+
-    (WZ.step<4?'<button class="btn btn-primary" onclick="wzNext()">Próximo →</button>':
-               '<button class="btn btn-primary" style="font-size:15px;padding:12px 28px" onclick="wzEnviar()">📤 Enviar Pedido para a Sede</button>')+
-  '</div>';
-  if(WZ.step===4)wzUpdateResumo();
-}
-
-function dirCard(label,id,opts,val){
-  var optsHtml=opts.map(function(o){return'<option'+(o===val?' selected':'')+'>'+o+'</option>';}).join('');
-  return '<div class="dir-card"><label>'+label+'</label><select id="'+id+'">'+optsHtml+'</select></div>';
-}
-
-function renderCalcSummary(c){
-  if(!c.modTotal)return'<h4 style="color:#94a3b8">Insira os módulos para ver o cálculo.</h4>';
-  return'<h4>📐 Resumo Calculado</h4><div class="calc-grid">'+
-    '<div class="calc-item"><div class="cv">'+c.modTotal+'</div><div class="cl">Módulos</div></div>'+
-    '<div class="calc-item"><div class="cv">'+c.qtdPes+'</div><div class="cl">Pés</div></div>'+
-    '<div class="calc-item"><div class="cv">'+c.qtdBracos+'</div><div class="cl">Braços</div></div>'+
-    '<div class="calc-item"><div class="cv">'+(c.mod2v*4+c.mod3v*4)+'</div><div class="cl">Arcos</div></div>'+
-    '<div class="calc-item"><div class="cv">'+(c.mod2v*2+c.mod3v*2)+'</div><div class="cl">Estrelas</div></div>'+
-    '<div class="calc-item"><div class="cv">'+(WZ.dim.vagas||0)*12.5+'</div><div class="cl">Área m²</div></div>'+
-  '</div>';
-}
-
-function calcularPecas(d){
-  var mod2vMA=d.mod2vMA||0,mod3vMA=d.mod3vMA||0,mod2vMT=d.mod2vMT||0,mod3vMT=d.mod3vMT||0;
-  var modMA=mod2vMA+mod3vMA,modMT=mod2vMT+mod3vMT,modTotal=modMA+modMT;
-  var mod2v=mod2vMA+mod2vMT,mod3v=mod3vMA+mod3vMT;
-  var align=d.semParam?Math.max(1,Math.ceil(modTotal/4)):Math.max(1,d.align||1);
-  var qtdPes=modTotal+align,qtdBracos=modTotal+align;
-  var ratioMT=modTotal>0?modMT/modTotal:0;
-  return{modTotal:modTotal,mod2v:mod2v,mod3v:mod3v,qtdPes:qtdPes,qtdBracos:qtdBracos,pesMA:Math.round(qtdPes*(1-ratioMT)),pesMT:Math.round(qtdPes*ratioMT),align:align};
-}
-
-function wzCalc(){
-  WZ.dim.vagas=parseInt(document.getElementById('w_vagas').value)||0;
-  WZ.dim.mod2vMA=parseInt(document.getElementById('w_m2ma').value)||0;
-  WZ.dim.mod3vMA=parseInt(document.getElementById('w_m3ma').value)||0;
-  WZ.dim.mod2vMT=parseInt(document.getElementById('w_m2mt').value)||0;
-  WZ.dim.mod3vMT=parseInt(document.getElementById('w_m3mt').value)||0;
-  WZ.dim.align=parseInt(document.getElementById('w_align').value)||1;
-  var calc=calcularPecas(WZ.dim);
-  document.getElementById('wzCalcBox').innerHTML=renderCalcSummary(calc);
-}
-
-function wzToggleAlign(){
-  WZ.dim.semParam=document.getElementById('w_semParam').checked;
-  var inp=document.getElementById('w_align');
-  inp.disabled=WZ.dim.semParam;inp.style.opacity=WZ.dim.semParam?'.4':'1';
-  wzCalc();
-}
-
-function wzSugerir(){
-  var vagas=parseInt(document.getElementById('w_vagas').value)||0;
-  if(!vagas){showToast('Informe a quantidade de vagas primeiro.','error');return;}
-  var tot=Math.round(vagas/2.5);
-  var m2v=Math.round(tot*.2),m3v=tot-m2v;
-  document.getElementById('w_m2ma').value=m2v;
-  document.getElementById('w_m3ma').value=m3v;
-  document.getElementById('w_m2mt').value=0;
-  document.getElementById('w_m3mt').value=0;
-  WZ.dim.mod2vMA=m2v;WZ.dim.mod3vMA=m3v;WZ.dim.mod2vMT=0;WZ.dim.mod3vMT=0;
-  wzCalc();
-}
-
-function wzNext(){
-  if(WZ.step===1){
-    var nome=document.getElementById('w_cliente').value.trim();
-    if(!nome){showToast('Informe o nome do condomínio.','error');return;}
-    WZ.cliente={nome:nome,cnpj:document.getElementById('w_cnpj').value,end:document.getElementById('w_end').value,tel:document.getElementById('w_tel').value,sindico:document.getElementById('w_sindico').value,email:document.getElementById('w_email').value};
-  }
-  if(WZ.step===2){
-    var tipo=WZ.dim.tipo||'Sombrite';
-    if(tipo==='Sombrite'){
-      wzCalc();
-      if(!WZ.dim.vagas){showToast('Informe a quantidade de vagas.','error');return;}
-      var d=WZ.dim,calc=calcularPecas(d);
-      var itensCalc=gerarItens(d.vagas,d.mod2vMA,d.mod3vMA,d.mod2vMT,d.mod3vMT,calc.align,1);
-      WZ._calcItens=itensCalc;
-      WZ.itens=[];
-    } else if(tipo==='Telha'){
-      wzCalcTelha();
-      if(!WZ.dim.vagasTelha){showToast('Informe a quantidade de vagas.','error');return;}
-      WZ.dim.vagas=WZ.dim.vagasTelha;
-      var itensCalcT=gerarItensTelha(WZ.dim.vagasTelha,WZ.dim.fixacaoTelha||'Solo');
-      WZ._calcItens=itensCalcT;
-      WZ.itens=[];
-    } else {
-      WZ._calcItens=null;
-      WZ.itens=[];
-    }
-  }
-  if(WZ.step===3){
-    var tipoDir=WZ.dim.tipo||'Sombrite';
-    if(tipoDir==='Telha'){
-      WZ.dir={estrutura:document.getElementById('w_estrutura').value,tela:'—',chumb:WZ.dim.fixacaoTelha||'Solo',pilares:'—'};
-    } else {
-      WZ.dir={estrutura:document.getElementById('w_estrutura').value,tela:document.getElementById('w_tela').value,chumb:document.getElementById('w_chumb').value,pilares:document.getElementById('w_pilares').value};
-    }
-  }
-  WZ.step++;
-  renderWizard();
-}
-
-function wzPrev(){WZ.step--;renderWizard();}
-
-function wzSetTipo(t){WZ.dim.tipo=t;renderWizard();}
-
-function wzAplicarCalcSugerido(){
-  if(!WZ._calcItens){showToast('Nenhum cálculo disponível.','error');return;}
-  WZ.itens=WZ._calcItens.filter(function(it){return (it.qtd||0)>0;}).map(function(it){return Object.assign({},it);});
-  renderWizard();
-  showToast('Peças calculadas lançadas automaticamente.','success');
-}
-function wzAddItem(){
-  WZ.itens.push({desc:'',ma:'0,00',mb:'0,00',mc:'0,00',un:'PÇ',qtd:1});
-  renderWizard();
-  setTimeout(function(){
-    var sels=document.querySelectorAll('[data-peca-sel]');
-    if(sels.length)sels[sels.length-1].focus();
-  },60);
-}
-function wzRemoveItem(i){
-  WZ.itens.splice(i,1);
-  renderWizard();
-}
-function wzSelectPeca(i,val){
-  var cat=WZ_CATALOGO.find(function(c){return c.desc===val;});
-  if(cat){
-    WZ.itens[i]=Object.assign({},WZ.itens[i],{desc:cat.desc,ma:cat.ma,mb:cat.mb,mc:cat.mc,un:cat.un});
-    var row=document.querySelector('[data-item-row="'+i+'"]');
-    if(row){
-      row.querySelector('[data-ma]').value=cat.ma;
-      row.querySelector('[data-mb]').value=cat.mb;
-      row.querySelector('[data-mc]').value=cat.mc;
-      row.querySelector('[data-un]').textContent=cat.un;
-    }
-    var pu=lookupPreco(cat.desc);
-    var puEl=document.getElementById('row-pu-'+i);
-    var totEl=document.getElementById('row-total-'+i);
-    if(puEl)puEl.textContent=fmtMoeda(pu);
-    if(totEl)totEl.textContent=fmtMoeda(pu*(WZ.itens[i].qtd||0));
-  } else {
-    WZ.itens[i].desc=val;
-  }
-  wzUpdateResumo();
-}
-
-function wzUpdateRowTotal(i,val){
-  WZ.itens[i].qtd=parseInt(val)||0;
-  var pu=lookupPreco(WZ.itens[i].desc);
-  var el=document.getElementById('row-total-'+i);
-  if(el)el.textContent=fmtMoeda(pu*WZ.itens[i].qtd);
-  wzUpdateResumo();
-}
-
-function wzUpdateResumo(){
-  var el=document.getElementById('wzResumoFin');
-  if(!el)return;
-  var pricing=calcTotalPedido(WZ.itens.filter(function(it){return (it.qtd||0)>0;}));
-  if(pricing.subtotal<=0){el.innerHTML='';return;}
-  el.innerHTML=
-    '<div style="background:linear-gradient(135deg,#f0fae0,#e8f5cc);border:1px solid #c6e870;border-radius:10px;padding:16px 20px;margin-top:16px">'+
-    '<div style="font-size:11px;font-weight:700;color:#6FAE2E;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">💰 Resumo Financeiro</div>'+
-    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;max-width:500px">'+
-    '<div style="background:#fff;border-radius:8px;padding:10px;text-align:center">'+
-      '<div style="font-size:18px;font-weight:700;color:#334155">'+fmtMoeda(pricing.subtotal)+'</div>'+
-      '<div style="font-size:10px;color:#64748b;text-transform:uppercase;margin-top:2px">Subtotal Peças</div>'+
-    '</div>'+
-    '<div style="background:var(--verde);border-radius:8px;padding:10px;text-align:center">'+
-      '<div style="font-size:20px;font-weight:700;color:#fff">'+fmtMoeda(pricing.total)+'</div>'+
-      '<div style="font-size:10px;color:rgba(255,255,255,.8);text-transform:uppercase;margin-top:2px">Total do Pedido</div>'+
-    '</div>'+
-    '</div></div>';
-}
-
-function wzEnviar(){
-  var id=uid();
-  var calc=calcularPecas(WZ.dim);
-  var filObj=DB.filiais().find(function(f){return f.id===USER.filial_id;})||{};
-  var pricing=calcTotalPedido(WZ.itens);
-  var itensComPreco=WZ.itens.filter(function(it){return (it.qtd||0)>0;}).map(function(it){
-    var pu=lookupPreco(it.desc);
-    return Object.assign({},it,{preco_unit:pu,subtotal:pu*(it.qtd||0),item_status:'aguardando'});
-  });
-  var pedido={
-    id:id,filial_id:USER.filial_id,filial_nome:USER.filial_nome,
-    status:'aguardando',tipo:WZ.dim.tipo||'Sombrite',
-    cliente:WZ.cliente.nome,cnpj:WZ.cliente.cnpj,endereco:WZ.cliente.end,
-    contato:WZ.cliente.tel,sindico:WZ.cliente.sindico,email:WZ.cliente.email,
-    vagas:WZ.dim.vagas,cor_estrutura:WZ.dir.estrutura,cor_tela:WZ.dir.tela,
-    chumbacao:WZ.dir.chumb,pilares:WZ.dir.pilares,
-    subtotal_pecas:pricing.subtotal,frete:0,valor:pricing.total,
-    criado:hoje(),atualizado:hoje(),obs:'',
-    itens:itensComPreco,prazos:WZ.prazos,
-    log:[{status:'aguardando',data:hoje(),user:USER.nome}]
-  };
-  DB.addPedido(pedido);
-  buildSidebar();
-  showToast('Pedido enviado para a Sede com sucesso!','success');
-  setTimeout(function(){location.hash='filial-pedidos';},800);
-}
+function renderNovoPedido(){PedidosUI.novo();}
 
 // ════════════════════════════════════════════
 // VIEW: MEUS PEDIDOS (filial)
@@ -1256,72 +900,7 @@ function verPedidoFilial(id){
 // ════════════════════════════════════════════
 // VIEW: DETALHE PEDIDO (filial)
 // ════════════════════════════════════════════
-function renderView_filialPedido(){
-  var p=DB.getPedido(window._pedidoId);
-  if(!p){document.getElementById('view-filial-pedido').innerHTML='<p>Pedido não encontrado.</p>';return;}
-  var filObj=DB.filiais().find(function(f){return f.id===p.filial_id;})||{};
-  var pricing=calcTotalPedido(p.itens||[]);
-  var itensHtml=(p.itens||[]).filter(function(it){return it.qtd>0;}).map(function(it){
-    var pu=lookupPreco(it.desc);
-    var sub=pu*(it.qtd||0);
-    var puCell=pu>0?fmtMoeda(pu):'<span style="color:#94a3b8">—</span>';
-    var subCell=sub>0?'<strong>'+fmtMoeda(sub)+'</strong>':'<span style="color:#94a3b8">—</span>';
-    return'<tr><td>'+it.desc+'</td><td style="text-align:center">'+it.ma+'</td><td style="text-align:center">'+it.mb+'</td><td style="text-align:center">'+it.mc+'</td><td style="text-align:center">'+it.un+'</td><td style="text-align:center;font-weight:700">'+it.qtd+'</td><td style="text-align:right">'+puCell+'</td><td style="text-align:right">'+subCell+'</td></tr>';
-  }).join('');
-  var tlHtml=(p.log||[]).map(function(l,i){
-    var isLast=i===p.log.length-1;
-    return'<div class="tl-item '+(isLast?'current':'done')+'"><div class="tl-dot">'+(isLast?'●':'✓')+'</div>'+
-    '<div class="tl-title">'+badge(l.status)+'</div>'+
-    '<div class="tl-sub">'+fmtDate(l.data)+' • '+l.user+'</div></div>';
-  }).join('');
-  var canConfirm=p.status==='pronto_envio'||p.status==='em_transito';
-  var canEdit=p.status!=='entregue'&&p.status!=='concluido'&&p.status!=='cancelado';
-  var prazosHtml=(p.prazos||[]).map(function(pr){
-    return'<div class="prazo-row"><span class="prazo-label">'+pr.grupo+'</span><strong style="font-size:13px;color:#1e293b">'+pr.prazo+'</strong></div>';
-  }).join('');
-
-  document.getElementById('view-filial-pedido').innerHTML=
-  '<div class="page-hdr">'+
-    '<div><button class="btn btn-ghost btn-sm" onclick="history.back()" style="margin-bottom:8px">← Voltar</button><h1>'+p.cliente+'</h1><p>Pedido #'+p.id+' • Criado em '+fmtDate(p.criado)+'</p></div>'+
-    '<div style="display:flex;gap:10px">'+
-      (canConfirm?'<button class="btn btn-approve" onclick="confirmarRecebimento(\''+p.id+'\')">✅ Confirmar Recebimento</button>':'')+
-      (canEdit?'<button class="btn btn-outline" onclick="editarItensPedido(\''+p.id+'\')">✏️ Editar Itens</button>':'')+
-      '<button class="btn btn-outline" onclick="imprimirPedido(\''+p.id+'\')">📄 Imprimir / PDF</button>'+
-    '</div>'+
-  '</div>'+
-  '<div style="display:grid;grid-template-columns:1fr 1.5fr;gap:20px;align-items:start">'+
-    '<div>'+
-    '<div class="card"><div class="card-hdr"><h2>Status do Pedido</h2></div><div class="card-body">'+
-    '<div style="margin-bottom:16px">'+badge(p.status)+'</div>'+
-    '<div class="timeline">'+tlHtml+'</div>'+
-    '</div></div>'+
-    '<div class="card" style="margin-top:0"><div class="card-hdr"><h2>Diretrizes Técnicas</h2></div><div class="card-body">'+
-    '<div class="info-row"><div class="info-key">Estrutura</div><div class="info-val">'+p.cor_estrutura+'</div></div>'+
-    '<div class="info-row"><div class="info-key">Tela</div><div class="info-val">'+p.cor_tela+'</div></div>'+
-    '<div class="info-row"><div class="info-key">Chumbação</div><div class="info-val">'+p.chumbacao+'</div></div>'+
-    '<div class="info-row"><div class="info-key">Pilares</div><div class="info-val">'+p.pilares+'</div></div>'+
-    '</div></div>'+
-    '</div>'+
-    '<div>'+
-    '<div class="card"><div class="card-hdr"><h2>Dados do Cliente</h2></div><div class="card-body">'+
-    '<div class="info-row"><div class="info-key">Condomínio</div><div class="info-val">'+p.cliente+'</div></div>'+
-    '<div class="info-row"><div class="info-key">CNPJ</div><div class="info-val">'+p.cnpj+'</div></div>'+
-    '<div class="info-row"><div class="info-key">Endereço</div><div class="info-val">'+p.endereco+'</div></div>'+
-    '<div class="info-row"><div class="info-key">Contato</div><div class="info-val">'+p.contato+'</div></div>'+
-    '<div class="info-row"><div class="info-key">Síndico</div><div class="info-val">'+p.sindico+'</div></div>'+
-    '<div class="info-row"><div class="info-key">E-mail</div><div class="info-val">'+p.email+'</div></div>'+
-    '<div class="info-row"><div class="info-key">Vagas</div><div class="info-val"><strong>'+p.vagas+'</strong></div></div>'+
-    '<div class="info-row"><div class="info-key">Tipo</div><div class="info-val">'+p.tipo+'</div></div>'+
-    '</div></div>'+
-    '<div class="card"><div class="card-hdr"><h2>Ficha de Fabricação</h2></div><div class="card-body" style="padding:0">'+
-    '<div class="tbl-wrap"><table><thead><tr><th>Descrição</th><th>Med.A</th><th>Med.B</th><th>Med.C</th><th>Unid.</th><th>Qtde</th><th style="text-align:right">V. Unit.</th><th style="text-align:right">Subtotal</th></tr></thead><tbody>'+itensHtml+'</tbody>'+
-    (pricing.subtotal>0?'<tfoot><tr><td colspan="6" style="text-align:right;font-size:12px;color:#64748b;padding:8px 12px">Subtotal Peças</td><td></td><td style="text-align:right;padding:8px 12px;font-weight:700;color:#1e293b">'+fmtMoeda(pricing.subtotal)+'</td></tr>'+
-    '<tr style="background:#6FAE2E"><td colspan="7" style="text-align:right;font-weight:700;color:#fff;padding:10px 12px;font-size:13px">TOTAL DO PEDIDO</td><td style="text-align:right;font-weight:700;color:#fff;padding:10px 12px;font-size:14px">'+fmtMoeda(pricing.total)+'</td></tr></tfoot>':'')+'</table></div>'+
-    '</div></div>'+
-    '<div class="card"><div class="card-hdr"><h2>Prazos de Entrega</h2></div><div class="card-body"><div class="prazo-grid">'+prazosHtml+'</div></div></div>'+
-    '</div>'+
-  '</div>';
-}
+function renderView_filialPedido(){PedidosUI.detail(window._pedidoId,'filial');}
 
 function confirmarRecebimento(id){
   var p=DB.getPedido(id);
@@ -1375,14 +954,7 @@ function renderSedeDash(){
   },100);
 }
 
-function aprovarRapido(id){
-  var p=DB.getPedido(id);
-  p.log.push({status:'aprovado',data:hoje(),user:USER.nome});
-  p.log.push({status:'em_fabricacao',data:hoje(),user:USER.nome});
-  DB.updatePedido(id,{status:'em_fabricacao',log:p.log});
-  buildSidebar();showToast('Pedido aprovado! Status: Em Fabricação.','success');
-  renderSedeDash();
-}
+function aprovarRapido(id){return PedidosUI.approve(id);}
 
 // ════════════════════════════════════════════
 // VIEW: SEDE — TODOS OS PEDIDOS
@@ -1429,14 +1001,7 @@ function renderAprovacoes(){
   '<div class="card"><div class="card-body" style="padding:0"><div class="tbl-wrap"><table><thead><tr><th>Filial</th><th>Condomínio</th><th>Vagas</th><th>Tipo</th><th>Data</th><th>Ações</th></tr></thead><tbody>'+rows+'</tbody></table></div></div></div>';
 }
 
-function aprovarPedido(id){
-  var p=DB.getPedido(id);
-  p.log.push({status:'aprovado',data:hoje(),user:USER.nome});
-  p.log.push({status:'em_fabricacao',data:hoje(),user:USER.nome});
-  DB.updatePedido(id,{status:'em_fabricacao',log:p.log});
-  buildSidebar();showToast('Pedido aprovado! Em fabricação.','success');
-  renderAprovacoes();
-}
+function aprovarPedido(id){return PedidosUI.approve(id);}
 
 function gerarOS(id){
   var p=DB.getPedido(id);
@@ -1543,133 +1108,7 @@ function marcarTodosOSF(id){
   renderView_sedePedido();
 }
 
-function renderView_sedePedido(){
-  var p=DB.getPedido(window._pedidoId);
-  if(!p){document.getElementById('view-sede-pedido').innerHTML='<p>Pedido não encontrado.</p>';return;}
-  var pricing=calcTotalPedido(p.itens||[]);
-  var osfAtivo=!!window._osfAtivo;
-
-  var itensHtml=(p.itens||[]).map(function(it,idx){
-    if(!it.qtd||it.qtd<=0)return'';
-    var pu=lookupPreco(it.desc);
-    var sub=pu*(it.qtd||0);
-    var puCell=pu>0?fmtMoeda(pu):'<span style="color:#94a3b8">—</span>';
-    var subCell=sub>0?'<strong>'+fmtMoeda(sub)+'</strong>':'<span style="color:#94a3b8">—</span>';
-    var st=normalizeItemStatus(it);
-    var sc=ITEM_STATUS_STYLE[st]||ITEM_STATUS_STYLE.aguardando;
-    var optsHtml=ITEM_STATUS_FLOW.map(function(s){
-      return'<option value="'+s+'"'+(s===st?' selected':'')+'>'+ITEM_STATUS_LABELS[s]+'</option>';
-    }).join('');
-    var statusCell='<td style="padding:4px 6px">'+
-      '<select onchange="setItemStatus(\''+p.id+'\','+idx+',this.value)" '+
-        'style="'+sc+';border-radius:10px;padding:3px 6px;font-size:11px;font-weight:700;cursor:pointer;outline:none;width:130px;appearance:auto">'+
-        optsHtml+
-      '</select></td>';
-    var isElegivel=['aprovado','em_fabricacao','pronto_envio'].indexOf(st)>=0;
-    var cbCell='';
-    if(osfAtivo){
-      cbCell=isElegivel
-        ?'<td style="text-align:center;padding:4px"><input type="checkbox" id="osfcb_'+idx+'" '+(window._osfSel[idx]?'checked':'')+' onchange="toggleOSFItem('+idx+')" style="width:16px;height:16px;cursor:pointer;accent-color:#6FAE2E"></td>'
-        :'<td style="text-align:center;padding:4px;color:#cbd5e1;font-size:12px">—</td>';
-    }
-    return'<tr>'+(osfAtivo?cbCell:'')+statusCell+'<td>'+it.desc+'</td>'+
-      '<td style="text-align:center">'+it.ma+'</td><td style="text-align:center">'+it.mb+'</td><td style="text-align:center">'+it.mc+'</td>'+
-      '<td style="text-align:center">'+it.un+'</td><td style="text-align:center;font-weight:700;color:var(--verde-d)">'+it.qtd+'</td>'+
-      '<td style="text-align:right">'+puCell+'</td><td style="text-align:right">'+subCell+'</td></tr>';
-  }).join('');
-
-  // Progresso geral dos itens
-  var totalIt=(p.itens||[]).filter(function(it){return it.qtd>0;}).length;
-  var conclIt=(p.itens||[]).filter(function(it){return it.qtd>0&&normalizeItemStatus(it)==='concluido';}).length;
-  var pct=totalIt>0?Math.round(conclIt/totalIt*100):0;
-  var progresso='<div style="margin:8px 0 12px">'+
-    '<div style="display:flex;justify-content:space-between;font-size:11px;color:#64748b;margin-bottom:4px">'+
-      '<span>Progresso dos Itens</span><span><strong>'+conclIt+'</strong>/'+totalIt+' concluídos ('+pct+'%)</span>'+
-    '</div>'+
-    '<div style="background:#e2e8f0;border-radius:4px;height:6px">'+
-      '<div style="background:#6FAE2E;height:6px;border-radius:4px;width:'+pct+'%"></div>'+
-    '</div></div>';
-
-  var nextStatus=STATUS_NEXT[p.status];
-  var acoes='';
-  if(p.status==='aguardando'){
-    acoes='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">'+
-      '<button class="btn btn-approve btn-sm" onclick="gerarOS(\''+p.id+'\')">📋 OS de Serviço</button>'+
-      '<button class="btn btn-outline btn-sm" onclick="aprovarTodosItens(\''+p.id+'\')">✓ Aprovar Todos</button>'+
-      '<button class="btn btn-danger btn-sm" onclick="devolverPedido(\''+p.id+'\')">↩ Devolver</button>'+
-      '<button class="btn btn-outline btn-sm" onclick="editarPedidoNaAprovacao(\''+p.id+'\')">✏️ Editar</button>'+
-    '</div>';
-  }else if(nextStatus){
-    acoes='<button class="btn btn-primary btn-sm" style="margin-top:8px" onclick="avancarStatus(\''+p.id+'\',\''+nextStatus+'\')">Avançar → '+STATUS_LABELS[nextStatus]+'</button>';
-  }
-
-  var prazosHtml=(p.prazos||[]).map(function(pr){
-    return'<div class="prazo-row"><span class="prazo-label">'+pr.grupo+'</span><strong style="font-size:13px;color:#1e293b">'+pr.prazo+'</strong></div>';
-  }).join('');
-
-  var nSel=Object.keys(window._osfSel).filter(function(k){return window._osfSel[k];}).length;
-  var osfBarra=osfAtivo
-    ?'<div style="background:#f0fdf4;border:1.5px solid #86efac;border-radius:8px;padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">'+
-        '<span style="font-size:12px;color:#16a34a;font-weight:700">🔧 Selecione os itens para a OS de Fabricação</span>'+
-        '<button class="btn btn-sm" style="background:none;border:1px solid #86efac;color:#16a34a" onclick="marcarTodosOSF(\''+p.id+'\')">Selecionar Todos</button>'+
-        '<button id="osfConfirmarBtn" class="btn btn-approve btn-sm" onclick="confirmarOSFabricacao(\''+p.id+'\')">Gerar OS de Fabricação ('+nSel+' item'+(nSel!==1?'s':'')+')' +'</button>'+
-        '<button class="btn btn-outline btn-sm" onclick="cancelarOSFabricacao()">Cancelar</button>'+
-      '</div>'
-    :'';
-
-  var thCb=osfAtivo?'<th style="width:36px;text-align:center">☑</th>':'';
-  var tdColspan=osfAtivo?9:8;
-
-  document.getElementById('view-sede-pedido').innerHTML=
-  '<div class="page-hdr">'+
-    '<div><button class="btn btn-ghost btn-sm" onclick="history.back()" style="margin-bottom:8px">← Voltar</button>'+
-      '<h1>'+p.cliente+'</h1>'+
-      '<p>'+p.filial_nome+' • Pedido #'+p.id+' • '+fmtDate(p.criado)+'</p>'+
-    '</div>'+
-    '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
-      '<button class="btn btn-outline btn-sm" onclick="imprimirPedido(\''+p.id+'\')">📄 OS de Serviço</button>'+
-      '<button class="btn btn-sm" style="background:#f0fdf4;border:1.5px solid #86efac;color:#16a34a;font-weight:600" onclick="iniciarOSFabricacao()">🔧 OS de Fabricação</button>'+
-      '<button class="btn btn-sm" style="background:#fef2f2;border:1px solid #fecaca;color:#dc2626;font-weight:600" onclick="excluirPedido(\''+p.id+'\',\''+esc(p.cliente)+'\')">🗑️ Excluir</button>'+
-    '</div>'+
-  '</div>'+
-  '<div class="card" style="margin-bottom:20px">'+
-    '<div class="card-hdr"><h2>Ficha de Fabricação</h2>'+
-      '<div style="font-size:11px;color:#64748b">Altere o status de cada item conforme o andamento da produção</div>'+
-    '</div>'+
-    '<div class="card-body">'+
-      osfBarra+
-      '<div class="tbl-wrap"><table><thead><tr>'+thCb+
-        '<th style="min-width:140px">Status</th><th>Descrição do Item</th>'+
-        '<th>Med.A</th><th>Med.B</th><th>Med.C</th><th>Unid.</th><th>Qtde</th>'+
-        '<th style="text-align:right">V. Unit.</th><th style="text-align:right">Subtotal</th>'+
-      '</tr></thead><tbody>'+itensHtml+'</tbody>'+
-      (pricing.subtotal>0?'<tfoot><tr style="background:#6FAE2E">'+
-        '<td colspan="'+tdColspan+'" style="text-align:right;font-weight:700;color:#fff;padding:10px 12px;font-size:13px">TOTAL DO PEDIDO</td>'+
-        '<td style="text-align:right;font-weight:700;color:#fff;padding:10px 12px;font-size:14px">'+fmtMoeda(pricing.total)+'</td>'+
-      '</tr></tfoot>':'')+'</table></div>'+
-    '</div>'+
-  '</div>'+
-  '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;align-items:start">'+
-    '<div class="card"><div class="card-hdr"><h2>Pedido</h2></div><div class="card-body">'+
-      '<div style="margin-bottom:8px">'+badge(p.status)+'</div>'+
-      progresso+
-      acoes+
-    '</div></div>'+
-    '<div class="card"><div class="card-hdr"><h2>Diretrizes</h2></div><div class="card-body">'+
-      '<div class="info-row"><div class="info-key">Estrutura</div><div class="info-val">'+p.cor_estrutura+'</div></div>'+
-      '<div class="info-row"><div class="info-key">Tela</div><div class="info-val">'+p.cor_tela+'</div></div>'+
-      '<div class="info-row"><div class="info-key">Chumbação</div><div class="info-val">'+p.chumbacao+'</div></div>'+
-      '<div class="info-row"><div class="info-key">Pilares</div><div class="info-val">'+p.pilares+'</div></div>'+
-    '</div></div>'+
-    '<div class="card"><div class="card-hdr"><h2>Cliente</h2></div><div class="card-body">'+
-      '<div class="info-row"><div class="info-key">Condomínio</div><div class="info-val">'+p.cliente+'</div></div>'+
-      '<div class="info-row"><div class="info-key">Endereço</div><div class="info-val">'+p.endereco+'</div></div>'+
-      '<div class="info-row"><div class="info-key">Síndico</div><div class="info-val">'+p.sindico+'</div></div>'+
-      '<div class="info-row"><div class="info-key">Vagas</div><div class="info-val"><strong>'+p.vagas+'</strong> ('+p.tipo+')</div></div>'+
-    '</div></div>'+
-    '<div class="card"><div class="card-hdr"><h2>Prazos</h2></div><div class="card-body"><div class="prazo-grid">'+prazosHtml+'</div></div></div>'+
-  '</div>';
-}
+function renderView_sedePedido(){PedidosUI.detail(window._pedidoId,'sede');}
 
 function iniciarOSFabricacao(){
   window._osfAtivo=true;
@@ -1771,7 +1210,10 @@ function editarItensPedido(id){
   if(!p)return;
   var catOpts=WZ_CATALOGO.map(function(c){return'<option value="'+c.desc+'">'+c.desc+'</option>';}).join('');
   var itensHtml=(p.itens||[]).map(function(it,i){
-    if(it.item_status==='aprovado'){
+    var st=normalizeItemStatus(it);
+    if(st!=='aguardando'){
+      var sc=ITEM_STATUS_STYLE[st]||ITEM_STATUS_STYLE.aprovado;
+      var label=ITEM_STATUS_LABELS[st]||st;
       return'<tr style="background:#f8fafc;opacity:.7">'+
         '<td style="padding:6px 8px;font-size:12px;color:#475569">🔒 '+esc(it.desc)+'</td>'+
         '<td style="padding:6px 8px;text-align:center;font-size:12px">'+esc(it.ma||'')+'</td>'+
@@ -1779,7 +1221,7 @@ function editarItensPedido(id){
         '<td style="padding:6px 8px;text-align:center;font-size:12px">'+esc(it.mc||'')+'</td>'+
         '<td style="padding:6px 8px;text-align:center;font-size:12px">'+esc(it.un||'')+'</td>'+
         '<td style="padding:6px 8px;text-align:center;font-size:12px;font-weight:700">'+it.qtd+'</td>'+
-        '<td style="padding:6px 8px;text-align:center"><span style="font-size:10px;background:#dcfce7;color:#16a34a;border-radius:8px;padding:2px 8px;font-weight:700">Aprovado</span></td>'+
+        '<td style="padding:6px 8px;text-align:center"><span style="'+sc+';font-size:10px;border-radius:8px;padding:2px 8px;font-weight:700">'+label+'</span></td>'+
         '<td></td>'+
       '</tr>';
     }
@@ -1854,7 +1296,7 @@ function salvarItensFilial(id){
       item_status:'aguardando'
     });
   });
-  var approvedItems=(p.itens||[]).filter(function(it){return it.item_status==='aprovado';});
+  var approvedItems=(p.itens||[]).filter(function(it){return normalizeItemStatus(it)!=='aguardando';});
   var finalItens=approvedItems.concat(novosItens);
   DB.updatePedido(id,{itens:finalItens});
   closeModal();
@@ -2726,7 +2168,7 @@ function openModal(title,body,footer){
   document.getElementById('modalFooter').innerHTML=footer||'';
   document.getElementById('modalOverlay').classList.add('open');
 }
-function closeModal(){document.getElementById('modalOverlay').classList.remove('open');}
+function closeModal(){document.getElementById('modalOverlay').classList.remove('open');document.getElementById('modalBox').classList.remove('pedido-modal');}
 
 // ════════════════════════════════════════════
 // HELPERS
