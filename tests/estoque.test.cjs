@@ -20,6 +20,28 @@ const transfer=(s,from,to,qtd,id)=>E.transfer(s,from,to,[{key:row(s,from).key,qt
 function receive(s,id,ctx=filial){return E.receive(s,id,ctx,meta('receber-'+id));}
 function physical(s){return E.locations(s).reduce((sum,l)=>sum+E.balances(s,l.id).reduce((n,b)=>n+b.disponivel+b.instalado+b.em_transito_saida,0),0);}
 
+test('cadastro real da sede GO não gera segundo estoque; DF mantém seu depósito',()=>{
+  const reais=[{id:'f1',nome:'Sombrear DF',cidade:'Brasília - DF',ativo:true},{id:'f1777747114528',nome:'Sombrear GO',cidade:'Goiânia',ativo:true}];
+  const initial=clone(reais),s=E.fromRecords([],reais,cat);
+  assert.deepEqual(s.estoques.map(e=>[e.id,e.nome]),[['estoque-go','Estoque Sombrear GO'],['estoque-filial-f1','Estoque Sombrear DF']]);
+  assert.deepEqual(reais,initial);
+  assert.deepEqual(E.fromRecords(E.toRecords(s),reais,cat).estoques,s.estoques);
+  const normalized=E.fromRecords([],[reais[0],{...reais[1],nome:'  sômbréar   go  '}],cat);
+  assert.deepEqual(normalized.estoques,s.estoques);
+});
+test('estoque GO já persistido e seus movimentos são preservados sem mesclar saldos',()=>{
+  const go={id:'f1777747114528',nome:'Sombrear GO',ativo:true},id='estoque-filial-'+go.id;
+  let s=E.fromRecords([],[{...go,nome:'Cadastro anterior GO'}],cat);
+  s=E.addStock(s,id,[piece(7)],{...filial,filial_id:go.id},meta('entrada-antiga-go','Saldo já conferido'));
+  const records=E.toRecords(s),before=clone(records),reloaded=E.fromRecords(records,[go],cat);
+  assert.deepEqual(records,before);
+  assert.deepEqual(reloaded.estoques,s.estoques);
+  assert.deepEqual(reloaded.movimentos,s.movimentos);
+  assert.equal(row(reloaded,id).disponivel,7);
+  assert.equal(E.balances(reloaded,'estoque-go').length,0);
+  assert.deepEqual(E.toRecords(reloaded),records);
+});
+
 test('pasta nasce vazia e não produz estoque ao lançar ou aceitar demanda',()=>{
   const initial=empty();let s=create(initial);
   assert.equal(initial.pastas.length,0);assert.equal(s.pastas[0].itens.length,0);

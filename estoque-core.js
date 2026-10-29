@@ -135,6 +135,9 @@
     if(new Set(state.movimentos.map(function(m){return m.id;})).size!==state.movimentos.length)fail('Há movimentações duplicadas no histórico.');
     if(!state.estoques.some(function(e){return e.id==='estoque-go';}))state.estoques.unshift({id:'estoque-go',tipo:'estoque',nome:'Estoque Sombrear GO',filial_id:null,ativo:true});
     (filiais||[]).forEach(function(f){
+      // GO already has the central warehouse. Keep any persisted warehouse as-is,
+      // but do not generate a second one from the sede's filial registration.
+      if(canonical(f.nome)==='SOMBREAR GO')return;
       var id='estoque-filial-'+f.id;
       if(!state.estoques.some(function(e){return e.id===id;}))state.estoques.push({id:id,tipo:'estoque',nome:'Estoque '+text(f.nome||f.id),filial_id:f.id,ativo:f.ativo!==false});
     });

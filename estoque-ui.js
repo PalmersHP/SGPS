@@ -4,7 +4,6 @@
   var h=function(value){return String(value==null?'':value).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});};
   var num=function(value){return Number(value||0).toLocaleString('pt-BR',{maximumFractionDigits:3});};
   var labels={pasta_criada:'Pasta criada',criacao_pasta:'Pasta criada',solicitacao:'Peças solicitadas',demanda:'Peças solicitadas',demanda_adicionada:'Peças solicitadas',aceite:'Peças aceitas pela sede',aprovacao:'Peças aceitas pela sede',demanda_aprovada:'Peças aceitas pela sede',entrada:'Entrada de peças',entrada_estoque:'Entrada de peças',transferencia:'Remanejamento enviado',recebimento:'Recebimento confirmado',conferencia_inicial:'Estoque inicial conferido',saldo_inicial:'Estoque inicial conferido',instalacao:'Instalação conferida no fechamento',conferencia_fechamento:'Conferência de fechamento',finalizacao:'Obra finalizada',obra_finalizada:'Obra finalizada',reabertura:'Obra reaberta'};
-  labels.aceite='Peças aceitas pela sede';
   function app(){return window.EstoqueApp;}
   function state(){return app().getState();}
   function context(){return app().context();}
@@ -17,7 +16,7 @@
   }
   function button(action,label,primary,attrs){return '<button type="button" class="btn '+(primary?'btn-primary':'btn-outline')+'" data-e-action="'+h(action)+'" '+(attrs||'')+'>'+label+'</button>';}
   function field(label,id,value,extra){return '<div class="fg"><label for="'+id+'">'+h(label)+'</label><input id="'+id+'" value="'+h(value)+'" '+(extra||'')+'></div>';}
-  function visible(loc){return loc&&(isSede()||loc.filial_id===USER.filial_id);}
+  function visible(loc){return loc&&(isSede()||loc.id==='estoque-go'||loc.filial_id===USER.filial_id);}
   function owned(loc){return loc&&(isSede()?loc.id==='estoque-go':loc.filial_id===USER.filial_id&&loc.id!=='estoque-go');}
   function inactive(loc){return loc.tipo==='condominio'&&loc.pasta&&(loc.pasta.inativo||loc.pasta.status==='cancelado');}
   function writable(loc){return visible(loc)&&loc.ativo!==false&&!loc.finalizada&&!inactive(loc);}

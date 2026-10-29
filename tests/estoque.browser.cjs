@@ -17,7 +17,7 @@ const catalog=[
 const legacy={id:'legado',filial_id:'df',filial_nome:'Sombrear DF',cliente:'Condomínio anterior',status:'em_fabricacao',tipo:'Sombrite',vagas:10,cor_estrutura:'Branca',cor_tela:'Prata',criado:'2026-10-20',itens:[{desc:catalog[0].desc,ma:'2,40',mb:'0,00',mc:'0,00',un:'PÇ',qtd:20,item_status:'aprovado'}],log:[],prazos:[]};
 const store={
   usuarios:[{id:'u1',email:'sede@sombrear.com.br',senha:'Sombrear2026',role:'sede',nome:'Teste Sede',ativo:true},{id:'u2',email:'df@sombrear.com.br',senha:'Sombrear2026',role:'filial',nome:'Teste Filial',filial_id:'df',filial_nome:'Sombrear DF',ativo:true}],
-  filiais:[{id:'df',nome:'Sombrear DF',cidade:'Brasília',ativo:true}],catalogo:catalog,pedidos:[clone(legacy)]
+  filiais:[{id:'df',nome:'Sombrear DF',cidade:'Brasília',ativo:true},{id:'go',nome:'Sombrear GO',cidade:'Goiânia',ativo:true}],catalogo:catalog,pedidos:[clone(legacy)]
 };
 const archivedOrders=clone(store.pedidos);
 const records=()=>store.pastas_estoques||store.pedidos;
@@ -113,6 +113,18 @@ async function main(){
   const balance=(id)=>evaluate(`Estoque.balances(EstoqueApp.getState(),${JSON.stringify(id)})`);
   const history=(id)=>evaluate(`Estoque.history(EstoqueApp.getState(),${JSON.stringify(id)})`);
   const modalClosed=()=>waitFor("!document.getElementById('modalOverlay').classList.contains('open')",'modal fechado');
+  async function checkStockCards(role){
+    await waitFor("document.querySelector('.view.active .estoque-stock-grid')",'cards dos estoques');
+    const cards=await evaluate("Array.from(document.querySelectorAll('.view.active .estoque-stock-grid .estoque-location-card')).map(c=>({name:c.querySelector('h2').textContent,id:c.querySelector('[data-e-action=\"open\"]').dataset.id}))");
+    assert.deepEqual(cards.map(c=>c.id).sort(),['estoque-filial-df','estoque-go'],'há somente os estoques físicos DF e GO para '+role);
+    assert.equal(cards.filter(c=>/Sombrear GO/i.test(c.name)).length,1,'card GO não duplica o cadastro da sede');
+    if(role==='filial'){
+      await click('.view.active [data-e-action="open"][data-id="estoque-go"]');
+      await waitFor("document.querySelector('.view.active h1')?.textContent==='Estoque Sombrear GO'",'filial consulta estoque GO');
+      assert.equal(await evaluate("document.querySelector('.view.active [data-e-action=\"add-items\"],.view.active [data-e-action=\"transfer\"],.view.active [data-e-action=\"receive\"]')===null"),true,'filial pode consultar GO sem ações de alteração');
+      await action('list');await waitFor("document.querySelector('.view.active .estoque-stock-grid')",'retorno às pastas');
+    }
+  }
   const fillKey=(attribute,key,value)=>evaluate(`(()=>{const e=Array.from(document.querySelectorAll('[${attribute}]')).find(e=>e.getAttribute(${JSON.stringify(attribute)})===${JSON.stringify(key)});if(!e)throw new Error('Campo não encontrado: '+${JSON.stringify(attribute)});e.value=${JSON.stringify(String(value))};e.dispatchEvent(new Event('input',{bubbles:true}));})()`);
   async function folder(name,vagas,colors){
     await evaluate('EstoqueApp.createFolder()');
@@ -175,7 +187,7 @@ async function main(){
     await modalClosed();assert.equal(patches,before+1);
     assert.equal((await state()).movimentos.filter(m=>m.tipo==='recebimento'&&m.referencia_id===moveId).length,1);
   }
-  await login('filial');
+  await login('filial');await checkStockCards('filial');
   const pid=await folder('Condomínio Riacho 33',130);
   await demand(pid,80,true);
   const secondId=await folder('Condomínio Parque 10',20);
@@ -205,7 +217,7 @@ async function main(){
     assert.equal(row.solicitado,item.qtd);assert.equal(row.disponivel,0);
   }
   console.log('OK: seleção no catálogo herda estrutura Preta e tela Verde da pasta, sem cores padrão indevidas.');
-  await login('sede');await shot('estoque-home');
+  await login('sede');await checkStockCards('sede');await shot('estoque-home');
   for(const id of [pid,secondId]){await open(id);await action('approve');await waitFor(`Estoque.balances(EstoqueApp.getState(),${JSON.stringify(id)})[0].aprovado>0`,'demanda aprovada');}
   const go='estoque-go',df='estoque-filial-df';
   await open(go);await click('[data-e-action="add-items"][data-mode="estoque"]');
@@ -231,7 +243,9 @@ async function main(){
   assert.match((await balance(go)).find(b=>b.disponivel===26).peca.cor,/preta/i);
   assert.equal(Number(String((await balance(go)).find(b=>b.disponivel===15).peca.ma).replace(',','.')),3);
   console.log('OK: GO recebe peças prontas por variante; transferência atômica reserva origem e aguarda confirmação do destino.');
-  await login('filial');await receive(pid,firstMove);
+  await login('filial');await checkStockCards('filial');
+  console.log('OK: DF e GO cadastradas geram somente um estoque GO; filial consulta GO sem adicionar ou remanejar.');
+  await receive(pid,firstMove);
   assert.equal((await balance(pid))[0].disponivel,80);
   assert.equal((await balance(pid))[0].em_transito_entrada,0);
   const between=await transfer(pid,secondId,key,10);
