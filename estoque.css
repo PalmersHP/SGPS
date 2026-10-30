@@ -120,3 +120,28 @@
 @media(max-width:900px){.estoque-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.estoque-section-header{align-items:flex-start}.estoque-modal .modal-body{padding:16px}.estoque-main-actions .btn{flex:1 1 auto}.estoque-view .page-hdr h1{font-size:19px}.estoque-event-heading{display:block}.estoque-event-heading time{display:block}.estoque-stock-grid{grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}}
 @media(max-width:560px){.estoque-stock-grid,.estoque-folder-grid{grid-template-columns:minmax(0,1fr)}.estoque-location-card{padding:17px}.estoque-filters{width:100%}.estoque-filters input,.estoque-filters select{width:100%}.estoque-summary{gap:8px}.estoque-summary>div{padding:12px}.estoque-summary strong{font-size:13px}.estoque-transfer header>.btn{width:100%}.estoque-modal .modal-footer .btn{flex:1 1 140px}.estoque-modal .form-grid{grid-template-columns:minmax(0,1fr)}.estoque-table th,.estoque-table td{padding:10px 12px}.estoque-card-stats{gap:24px}.estoque-notice{padding:14px}.estoque-actions{width:100%}}
 @media print{.estoque-print .estoque-table{font-size:10px}.estoque-print .estoque-table th,.estoque-print .estoque-table td{padding:6px 5px}.estoque-print .estoque-piece{min-width:0}.estoque-print .estoque-history>li{break-inside:avoid}.estoque-print details>*{display:block!important}.estoque-print .estoque-history summary{display:none!important}.estoque-print .estoque-history ul{display:block!important}.estoque-print .estoque-event-heading{display:block}.estoque-print .estoque-event-heading time{display:block}.estoque-print .estoque-history>li:before{display:none}.estoque-print .estoque-history>li{border-left:0;padding-left:0}.estoque-print .tbl-wrap{overflow:visible}.estoque-print .estoque-help{font-size:10px}}
+
+/* Lista de trabalho: todas as solicitações com saldo pendente de envio. */
+@page sombrear-pendencias{size:A4 portrait;margin:12mm}
+@media print{
+  body:has(#printArea .estoque-pending-print){display:block;height:auto;overflow:visible;background:#fff}
+  #printArea:has(.estoque-pending-print){page:sombrear-pendencias;padding:0;width:100%;box-sizing:border-box;background:#fff}
+  .estoque-pending-print{font:10pt/1.4 Arial,sans-serif;color:#111}
+  .estoque-pending-print .estoque-print-heading{margin-bottom:8px;padding-bottom:8px;break-inside:avoid;break-after:avoid}
+  .estoque-pending-print h1{font-size:17pt;margin:0;text-align:right}
+  .estoque-pending-print-meta,.estoque-pending-print-help{font-size:9pt;margin:6px 0}
+  .estoque-pending-print-request{margin-top:18px;break-inside:auto}
+  .estoque-pending-print h2{font-size:12pt;margin:0 0 4px}
+  .estoque-pending-print-context p{font-size:9pt;margin:0 0 8px;overflow-wrap:anywhere}
+  .estoque-pending-print .estoque-table{table-layout:fixed;font-size:9pt;break-after:avoid}
+  .estoque-pending-print .estoque-table thead{display:table-header-group}
+  .estoque-pending-print .estoque-table tr{break-inside:avoid}
+  .estoque-pending-print .estoque-table th,.estoque-pending-print .estoque-table td{padding:7px 5px;white-space:normal;overflow-wrap:anywhere}
+  .estoque-pending-print .estoque-table th{background:#edf2e6!important;color:#111!important;border-top:1px solid #777;border-bottom:1px solid #777}
+  .estoque-pending-print .estoque-table .estoque-pending-print-context th{background:#fff!important;border:0;padding:0 0 8px;text-transform:none;letter-spacing:normal;font-weight:400}
+  .estoque-pending-print .estoque-piece strong{font-size:9pt}
+  .estoque-pending-print .estoque-table small{font-size:8.5pt;color:#333}
+  .estoque-pending-print-qty{font-weight:700}
+  .estoque-pending-print-notes{break-inside:avoid;break-before:avoid;font-size:9pt;margin-top:8px}
+  .estoque-pending-print-notes p{margin:7px 0}
+}

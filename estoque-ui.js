@@ -92,7 +92,21 @@
   }
   function requestsPage(){
     if(!isSede())return;activeId=null;var s=state(),list=pendingRequests(s),el=document.getElementById('view-sede-aprovacoes');if(!el)return;
-    el.innerHTML='<section class="estoque-view"><div class="page-hdr"><div><h1>Solicitações pendentes</h1><p>Envie as peças disponíveis no estoque GO. O restante continua pendente até o próximo envio.</p></div>'+button('refresh','↻ Atualizar')+'</div>'+(!list.length?'<div class="estoque-empty"><strong>Nenhuma solicitação pendente.</strong><p>Novos lançamentos das filiais aparecerão aqui.</p></div>':'<div class="card estoque-requests">'+list.map(function(r){return requestCard(s,r,'',true);}).join('')+'</div>')+'</section>';
+    el.innerHTML='<section class="estoque-view"><div class="page-hdr"><div><h1>Solicitações pendentes</h1><p>Envie as peças disponíveis no estoque GO. O restante continua pendente até o próximo envio.</p></div><div class="estoque-actions">'+button('refresh','↻ Atualizar')+button('print-pending','Imprimir pendências',true,list.length?'':'disabled')+'</div></div>'+(!list.length?'<div class="estoque-empty"><strong>Nenhuma solicitação pendente.</strong><p>Novos lançamentos das filiais aparecerão aqui.</p></div>':'<div class="card estoque-requests">'+list.map(function(r){return requestCard(s,r,'',true);}).join('')+'</div>')+'</section>';
+  }
+  function printPending(){
+    if(!isSede())return;
+    var list=pendingRequests(state()),area=document.getElementById('printArea');
+    if(!area)return;
+    if(!list.length){showToast('Não há solicitações pendentes para imprimir.','info');return;}
+    var locations=new Set(list.map(function(r){return r.pasta_id;}));
+    area.innerHTML='<div class="estoque-print estoque-pending-print"><div class="estoque-print-heading">'+(typeof LOGO_URI==='string'?'<img src="'+h(LOGO_URI)+'" alt="Sombrear" style="height:40px">':'')+'<h1>Solicitações pendentes</h1></div><p class="estoque-pending-print-meta">Emitido em '+h(dateTime(new Date().toISOString()))+' · '+h(USER.nome)+'</p><p>'+list.length+' solicitações · '+locations.size+' condomínios</p><p class="estoque-pending-print-help">Lista de trabalho da sede. Quantidades ainda pendentes de envio na emissão deste documento.</p>'+list.map(function(r,index){
+      var items=r.itens.filter(function(it){return it.pendente>0;});
+      return '<section class="estoque-pending-print-request" data-print-request="'+h(r.id)+'"><table class="estoque-table"><colgroup><col style="width:48%"><col style="width:8%"><col style="width:14%"><col style="width:14%"><col style="width:16%"></colgroup><thead><tr class="estoque-pending-print-context"><th colspan="5"><h2>'+h(r.condominio)+'</h2><p>'+h(r.filial_nome||'')+' · Solicitação '+(index+1)+' · '+h(dateTime(r.data))+(r.usuario_nome?' · '+h(r.usuario_nome):'')+'</p></th></tr><tr><th>Peça / medidas / cores</th><th>Unid.</th><th class="estoque-num">Solicitado</th><th class="estoque-num">Enviado</th><th class="estoque-num">Falta enviar</th></tr></thead><tbody>'+items.map(function(it){return '<tr data-print-item="'+h(it.key)+'"><td class="estoque-piece">'+piece(it.peca)+'</td><td>'+h(it.peca.un)+'</td><td class="estoque-num">'+num(it.solicitado)+'</td><td class="estoque-num">'+num(it.enviado)+'</td><td class="estoque-num estoque-pending-print-qty" data-print-pending="'+h(it.pendente)+'">'+num(it.pendente)+'</td></tr>';}).join('')+'</tbody></table><div class="estoque-pending-print-notes"><p>Responsável: ________________________________ &nbsp; Prazo: ____/____/________</p><p>Observações: __________________________________________________________</p></div></section>';
+    }).join('')+'</div>';
+    var previousTitle=document.title;
+    document.title='Sombrear - Solicitações pendentes';
+    try{window.print();}finally{document.title=previousTitle;}
   }
   function focusRequestCard(){
     if(!requestFocus)return;var id=requestFocus;requestFocus=null;
@@ -255,6 +269,7 @@
     else if(action==='confirm-finalize')finalize();
     else if(action==='report')openReport();
     else if(action==='print-report')printReport();
+    else if(action==='print-pending')printPending();
     else if(action==='reopen')openReopen();
     else if(action==='save-reopen')reopen();
     else if(action==='cancel')close();

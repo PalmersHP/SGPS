@@ -4,7 +4,7 @@ const path=require('node:path');
 const os=require('node:os');
 const http=require('node:http');
 const assert=require('node:assert/strict');
-const {spawn}=require('node:child_process');
+const {spawn,execFileSync}=require('node:child_process');
 const root=path.resolve(__dirname,'..');
 const Core=require('../estoque-core.js');
 const profile=fs.mkdtempSync(path.join(os.tmpdir(),'sombrear-estoque-'));
@@ -222,6 +222,71 @@ async function main(){
     await modalClosed();assert.equal(patches,previous+1,'atendimento com clique duplo gera apenas um envio');
     return (await state()).movimentos.filter(m=>m.tipo==='transferencia'&&m.origem_id==='estoque-go'&&m.destino_id===request.pasta_id).at(-1).id;
   }
+  async function printPendingFixture(mainRequestId,mainKey){
+    const original=clone(records()),writesBefore=patches;
+    const ctxFilial={...store.usuarios[1],data:'2026-10-30',agora:'2026-10-30T12:00:00Z'};
+    const ctxSede={...store.usuarios[0],data:'2026-10-30',agora:'2026-10-30T12:01:00Z'};
+    let fixture=Core.fromRecords(original,store.filiais,store.catalogo);
+    const folderNames=[],pendingDescriptions=[],fullySent='ITEM QA TOTALMENTE ATENDIDO';
+    for(let i=1;i<=9;i++){
+      const id='print-fixture-'+i,name='Condomínio Impressão QA '+String(i).padStart(2,'0');
+      folderNames.push(name);
+      fixture=Core.createFolder(fixture,{id,cliente:name,vagas:10,cor_estrutura:'Branca',cor_tela:'Prata'},ctxFilial);
+      const items=i===1?[{desc:fullySent,catalogo_id:null,un:'PÇ',ma:'1,00',qtd:7},{desc:'ITEM QA AINDA PENDENTE',catalogo_id:null,un:'PÇ',ma:'4,60',qtd:9}]:Array.from({length:12},(_,n)=>({desc:'PEÇA QA '+String(i).padStart(2,'0')+'-'+String(n+1).padStart(2,'0'),catalogo_id:null,un:'PÇ',ma:'4,60',mb:'1,20',qtd:n+1}));
+      pendingDescriptions.push(...items.filter(it=>it.desc!==fullySent).map(it=>it.desc));
+      fixture=Core.addDemand(fixture,id,items,ctxFilial,{id:'print-request-'+i});
+      if(i===1){
+        const request=Core.requests(fixture,id)[0],fulfilled=request.itens.find(it=>it.peca.desc===fullySent);
+        fixture=Core.addStock(fixture,'estoque-go',[{...fulfilled.peca,qtd:7}],ctxSede,{id:'print-ready-piece'});
+        fixture=Core.dispatchRequest(fixture,request.id,[{key:fulfilled.key,qtd:7}],ctxSede,{id:'print-fulfilled-line'});
+      }
+    }
+    const expected=Core.requests(fixture).filter(r=>r.ativo&&r.itens.some(it=>it.pendente>0));
+    assert.ok(expected.length>6,'impressão exercita mais solicitações do que o resumo da página inicial');
+    const fixtureRecords=Core.toRecords(fixture);
+    store.pastas_estoques=fixtureRecords;version++;
+    try{
+      await evaluate('EstoqueApp.refresh(undefined,true)');await openRequests();
+      const titleBefore=await evaluate('document.title'),cacheBefore=await state();
+      await evaluate('window.pendingPrinted=false;window.print=()=>{window.pendingPrinted=true;}');
+      await action('print-pending');
+      assert.equal(await evaluate('window.pendingPrinted'),true,'botão aciona a impressão');
+      assert.equal(await evaluate('document.title'),titleBefore,'impressão restaura o título da aplicação');
+      const printed=await evaluate("(()=>{const root=document.querySelector('#printArea .estoque-pending-print');return {text:root.textContent,ids:Array.from(root.querySelectorAll('[data-print-request]')).map(e=>e.dataset.printRequest),rows:Array.from(root.querySelectorAll('[data-print-request]')).flatMap(section=>Array.from(section.querySelectorAll('[data-print-item]')).map(row=>({request:section.dataset.printRequest,key:row.dataset.printItem,pending:Number(row.querySelector('[data-print-pending]').dataset.printPending),cells:Array.from(row.querySelectorAll('td')).map(td=>td.textContent.trim())}))) };})()");
+      assert.deepEqual(printed.ids.slice().sort(),expected.map(r=>r.id).sort(),'todas as solicitações ativas pendentes são impressas');
+      const expectedRows=expected.flatMap(r=>r.itens.filter(it=>it.pendente>0).map(it=>({request:r.id,key:it.key,pending:it.pendente})));
+      assert.deepEqual(printed.rows.map(({request,key,pending})=>({request,key,pending})).sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b))),expectedRows.sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b))),'somente linhas com peças ainda faltando entram na impressão');
+      const partial=printed.rows.find(r=>r.request===mainRequestId&&r.key===mainKey);
+      assert.equal(partial.pending,50);assert.deepEqual(partial.cells.slice(-3),['100','50','50'],'impressão distingue solicitado, enviado e falta enviar');
+      assert.ok(!printed.text.includes(fullySent),'linha totalmente enviada fica fora da lista');
+      for(const label of ['Responsável','Prazo','Observações'])assert.ok(printed.text.includes(label),'espaço para '+label);
+      for(const name of folderNames)assert.ok(printed.text.includes(name));
+      assert.equal(patches,writesBefore,'imprimir não grava no banco');assert.deepEqual(records(),fixtureRecords);assert.deepEqual(await state(),cacheBefore);
+      const pdfResult=await send('Page.printToPDF',{printBackground:true,preferCSSPageSize:true,displayHeaderFooter:false},sessionId);
+      const pdfPath=path.join(os.tmpdir(),'sombrear-pendencias-equipe.pdf'),pdf=Buffer.from(pdfResult.data,'base64');
+      assert.equal(pdf.subarray(0,5).toString(),'%PDF-');fs.writeFileSync(pdfPath,pdf);
+      // PDFKit é nativo do macOS já usado pelo Chrome deste teste; não instala dependências.
+      const extractor="ObjC.import('Foundation');ObjC.import('PDFKit');function run(argv){var d=$.PDFDocument.alloc.initWithURL($.NSURL.fileURLWithPath(argv[0]));var pages=[];for(var i=0;i<Number(d.pageCount);i++){var page=d.pageAtIndex(i),box=page.boundsForBox(0);pages.push({width:box.size.width,height:box.size.height,text:ObjC.unwrap(page.string)||''});}return JSON.stringify({text:ObjC.unwrap(d.string),pages:pages});}";
+      const extracted=JSON.parse(execFileSync('/usr/bin/osascript',['-l','JavaScript','-e',extractor,pdfPath],{encoding:'utf8',maxBuffer:4*1024*1024}));
+      assert.ok(extracted.pages.length>1,'lista extensa gera PDF multipáginas');
+      for(const page of extracted.pages){assert.ok(Math.abs(page.width-595.28)<1&&Math.abs(page.height-841.89)<1,'todas as páginas têm formato A4 retrato');assert.ok(page.text.trim(),'nenhuma página vazia na impressão');}
+      const pdfText=extracted.text.replace(/\s+/g,' ');
+      for(const name of folderNames)assert.ok(pdfText.includes(name),'PDF contém '+name);
+      for(const description of pendingDescriptions)assert.ok(pdfText.includes(description),'PDF contém '+description);
+      assert.ok(!pdfText.includes(fullySent));assert.match(pdfText,/100\s+50\s+50/);
+      for(const label of ['Responsável','Prazo','Observações'])assert.ok(pdfText.includes(label),'PDF conserva área de '+label);
+      assert.equal(patches,writesBefore);assert.deepEqual(records(),fixtureRecords);
+      store.pastas_estoques=[];version++;
+      await evaluate('EstoqueApp.refresh(undefined,true)');
+      await waitFor("document.querySelector('.view.active [data-e-action=\"print-pending\"]')?.disabled",'impressão indisponível sem pendências');
+      await evaluate('window.pendingPrinted=false');await action('print-pending');
+      assert.equal(await evaluate('window.pendingPrinted'),false);assert.equal(patches,writesBefore);assert.deepEqual(records(),[]);
+      console.log('OK: Imprimir pendências inclui '+expected.length+' solicitações completas, exclui peças já enviadas e gera '+extracted.pages.length+' páginas A4 sem alterar dados. PDF: '+pdfPath);
+    }finally{
+      store.pastas_estoques=original;version++;
+      await evaluate('EstoqueApp.refresh(undefined,true)');await openRequests();
+    }
+  }
   await login('filial');await checkStockCards('filial');
   const pid=await folder('Condomínio Riacho 33',130);
   await demand(pid,100,true);
@@ -296,6 +361,7 @@ async function main(){
   assert.ok(await evaluate(`document.querySelector('.view.active [data-e-request="${mainRequest.id}"]')!==null`),'solicitação parcial continua na lista da sede');
   assert.equal(await evaluate(`document.querySelector('.view.active [data-e-request="${mainRequest.id}"] [data-e-request-value="pendente"]').textContent.trim()`),'50');
   await shot('estoque-solicitacao-parcial');
+  await printPendingFixture(mainRequest.id,key);
   await dispatchRequest(mainRequest.id,key,50,{expectError:true});await action('cancel');
   await open(go);await click('.view.active [data-e-action="add-items"][data-mode="estoque"]');
   await fill('[data-line="0"][data-line-field="desc"]',catalog[0].desc);
