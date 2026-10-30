@@ -51,7 +51,6 @@
   }
   function ensureLocation(state,id){var l=location(state,id);if(!l||l.tipo==='historico')fail('Local de estoque não encontrado.');return l;}
   function ensureOpen(state,id){var l=ensureLocation(state,id);if(!l.ativo)fail('Este local está inativo.');if(l.finalizada)fail('A obra está finalizada. Reabra antes de alterar o estoque.');return l;}
-  function ensureKnown(state,id){var l=ensureOpen(state,id);if(!l.conhecido)fail('Confira o estoque inicial do condomínio antes de movimentar peças.');return l;}
   function owns(ctx,l){return ctx&&ctx.role==='filial'&&!!ctx.filial_id&&l.filial_id===ctx.filial_id;}
   function actor(ctx){if(!ctx||['sede','filial'].indexOf(ctx.role)<0)fail('Perfil sem permissão para esta ação.');if(!validDay(ctx.data))fail('Informe a data da operação.');}
   function validDay(day){return /^\d{4}-\d{2}-\d{2}$/.test(day||'')&&Number.isFinite(Date.parse(day+'T00:00:00Z'))&&new Date(day+'T00:00:00Z').toISOString().slice(0,10)===day;}
@@ -75,6 +74,65 @@
   function pending(state,id){
     var received=receiptIds(state);
     return state.movimentos.filter(function(m){return m.tipo==='transferencia'&&!received.has(m.id)&&(!id||m.origem_id===id||m.destino_id===id);});
+  }
+  function requestLedger(state){
+    var requests=[],byId=new Map(),itemRequests=new Map(),active=new Set(),legacyTransfers=new Set(),received=receiptIds(state);
+    function add(id,p,items,data,user){
+      var rows=new Map();
+      items.forEach(function(it){
+        var pc=it.peca||piece(state,it,p),key=it.key||keyOf(pc),n=Number(it.qtd)||0;if(n<=0)return;
+        if(!rows.has(key))rows.set(key,{key:key,peca:copy(pc),solicitado:0,enviado:0,recebido:0,pendente:0});
+        rows.get(key).solicitado=round(rows.get(key).solicitado+n);
+      });
+      if(!rows.size)return;
+      var l=location(state,p.id),request={id:id,pasta_id:p.id,condominio:p.cliente||p.nome,filial_id:p.filial_id,filial_nome:p.filial_nome||'',data:data||p.criado,usuario_nome:user||'',status:'pendente',itens:Array.from(rows.values()),ativo:!!(l&&l.ativo&&!l.finalizada)};
+      request.itens.forEach(function(it){it.pendente=it.solicitado;});requests.push(request);byId.set(id,request);
+    }
+    state.movimentos.forEach(function(m){if(m.tipo==='demanda')(m.itens||[]).forEach(function(it){if(it.demanda_id)itemRequests.set(m.pasta_id+'|'+it.demanda_id,m.id);});});
+    state.pastas.forEach(function(p){
+      var id='solicitacao-legada:'+p.id;
+      add(id,p,(p.itens||[]).filter(function(it){return !itemRequests.has(p.id+'|'+it.id)&&it.item_status!=='cancelado';}),p.criado,p.criado_por||p.filial_nome);
+      active.add(id);
+    });
+    state.movimentos.forEach(function(m){if(m.tipo==='demanda'){var p=folder(state,m.pasta_id);if(p)add(m.id,p,m.itens||[],m.data,m.usuario_nome);}});
+    function credit(request,key,n,isReceived){
+      var row=request&&request.itens.find(function(it){return it.key===key;});if(!row)return 0;
+      n=round(Math.min(n,row.pendente));if(n<=0)return 0;
+      row.enviado=round(row.enviado+n);row.pendente=round(row.solicitado-row.enviado);if(isReceived)row.recebido=round(row.recebido+n);return n;
+    }
+    function allocate(pastaId,items,selected,isReceived,onlyActive){
+      var result=[];
+      items.forEach(function(it){
+        var remaining=Number(it.qtd)||0;
+        requests.forEach(function(r){
+          if(remaining<=0||r.pasta_id!==pastaId||(selected&&r.id!==selected)||(onlyActive&&!active.has(r.id)))return;
+          var n=credit(r,it.key,remaining,isReceived);if(n){result.push({solicitacao_id:r.id,key:it.key,qtd:n});remaining=round(remaining-n);}
+        });
+      });return result;
+    }
+    // Earlier remessas already represent an outbound shipment. Their synthetic
+    // transfer and any later receipt must not count a second shipment.
+    state.pastas.forEach(function(p){(p.remessas||[]).forEach(function(r,index){
+      var legacyId='legado:'+p.id+':'+(r.id||index);legacyTransfers.add(legacyId);
+      (r.itens||[]).forEach(function(it){
+        var original=(p.itens||[]).find(function(i){return i.id===it.item_id;}),pc=piece(state,Object.assign({},original||{},it),p);
+        var requestId=itemRequests.get(p.id+'|'+it.item_id)||'solicitacao-legada:'+p.id;
+        allocate(p.id,[{key:keyOf(pc),qtd:Number(it.qtd)||0}],requestId,!!r.recebido_em||received.has(legacyId),false);
+      });
+    });});
+    state.movimentos.forEach(function(m){
+      if(m.tipo==='demanda'){active.add(m.id);return;}
+      if(m.tipo!=='transferencia'||legacyTransfers.has(m.id))return;
+      if(Array.isArray(m.atendimentos)){
+        m.atendimentos.forEach(function(a){var r=byId.get(a.solicitacao_id);if(r&&r.pasta_id===m.destino_id)credit(r,a.key,Number(a.qtd)||0,received.has(m.id));});
+      }else{
+        // Replay older movements only against requests already present then.
+        // A new request never absorbs an earlier unallocated delivery.
+        allocate(m.destino_id,m.itens||[],null,received.has(m.id),true);
+      }
+    });
+    requests.forEach(function(r){var remaining=r.itens.some(function(it){return it.pendente>0;}),sent=r.itens.some(function(it){return it.enviado>0;});r.status=remaining?(sent?'parcial':'pendente'):'enviado';});
+    return {requests:requests,allocate:function(id,items,selected){return allocate(id,items,selected,false,false);}};
   }
   function balances(state,id){
     var l=ensureLocation(state,id),p=l.tipo==='condominio'?l.pasta:null,rows=new Map(),received=receiptIds(state);
@@ -113,9 +171,11 @@
   }
   function recalc(state,p){
     if(p.status_obra==='finalizada'){p.status='concluido';return;}
-    if((p.itens||[]).some(function(i){return i.qtd>0&&(!i.item_status||i.item_status==='aguardando');})){p.status='aguardando';return;}
-    if(pending(state,p.id).some(function(m){return m.destino_id===p.id;})){p.status='em_transito';return;}
-    p.status=(p.itens||[]).some(function(i){return i.qtd>0;})?'em_fabricacao':'rascunho';
+    var requests=requestLedger(state).requests.filter(function(r){return r.pasta_id===p.id;}),left=requests.some(function(r){return r.status!=='enviado';}),sent=requests.some(function(r){return r.itens.some(function(it){return it.enviado>0;});});
+    p.status_envio=left?(sent?'parcial':'pendente'):(requests.length?'enviado':'sem_solicitacao');
+    if(left){p.status='aguardando';return;}
+    if(pending(state,p.id).length){p.status='em_transito';return;}
+    p.status=requests.length?'entregue':'rascunho';
   }
   function demandItems(state,p,items,ctx,complement){
     if(!Array.isArray(items)||!items.length)fail('Selecione pelo menos uma peça.');
@@ -171,8 +231,8 @@
   };
   api.addDemand=function(input,pastaId,items,ctx,meta){
     var state=copy(input),p=ownFolder(state,pastaId,ctx),m=event(state,'demanda',ctx,meta,{pasta_id:pastaId});
-    var additions=demandItems(state,p,items,ctx,p.itens.length>0);p.itens=p.itens.concat(additions);priceFolder(p);recalc(state,p);
-    m.itens=additions.map(function(it){var pc=piece(state,it,p);return {key:keyOf(pc),peca:pc,qtd:it.qtd,demanda_id:it.id};});append(state,m);return state;
+    var additions=demandItems(state,p,items,ctx,p.itens.length>0);p.itens=p.itens.concat(additions);priceFolder(p);
+    m.itens=additions.map(function(it){var pc=piece(state,it,p);return {key:keyOf(pc),peca:pc,qtd:it.qtd,demanda_id:it.id};});append(state,m);recalc(state,p);return state;
   };
   api.approveDemand=function(input,pastaId,ctx,keys,meta){
     actor(ctx);if(ctx.role!=='sede')fail('Somente a sede pode aceitar as peças solicitadas.');
@@ -191,9 +251,9 @@
     var m=event(state,'entrada',ctx,meta,{destino_id:stockId,destino_nome:l.nome,itens:items.map(function(it){var pc=piece(state,it);if(!pc.desc)fail('Selecione a peça.');if(!pc.cor)fail('Informe a cor ou o acabamento da peça.');return {key:keyOf(pc),peca:pc,qtd:quantity(it.qtd,pc.un,false)};})});
     append(state,m);return state;
   };
-  api.transfer=function(input,from,to,entries,ctx,meta){
+  function transfer(input,from,to,entries,ctx,meta,requestId){
     actor(ctx);if(from===to)fail('Escolha um destino diferente da origem.');
-    var state=copy(input),origin=ensureKnown(state,from),dest=ensureOpen(state,to);
+    var state=copy(input),origin=ensureOpen(state,from),dest=ensureOpen(state,to);
     if(ctx.role==='sede'){if(from!=='estoque-go')fail('A sede remaneja peças a partir do estoque Sombrear GO.');}
     else if(!owns(ctx,origin)||!owns(ctx,dest)||from==='estoque-go'||to==='estoque-go')fail('A filial só pode remanejar entre seus condomínios e seu próprio estoque.');
     if(!Array.isArray(entries)||!entries.length)fail('Selecione pelo menos uma peça para remanejar.');
@@ -203,13 +263,25 @@
       var n=quantity(it.qtd,b.peca.un,false);if(n>b.disponivel)fail('A quantidade de '+b.peca.desc+' ultrapassa o estoque disponível de '+b.disponivel+'.');
       return {key:b.key,peca:copy(b.peca),qtd:n};
     })});
+    var ledger=requestLedger(state);
+    if(requestId){
+      var request=ledger.requests.find(function(r){return r.id===requestId&&r.pasta_id===to;});if(!request||!request.ativo)fail('Solicitação não encontrada ou condomínio encerrado.');
+      m.itens.forEach(function(it){var requested=request.itens.find(function(r){return r.key===it.key;});if(!requested||it.qtd>requested.pendente)fail('A quantidade enviada ultrapassa o saldo pendente desta solicitação.');});
+    }
+    m.atendimentos=ledger.allocate(to,m.itens,requestId);if(requestId)m.solicitacao_id=requestId;
     append(state,m);[folder(state,from),folder(state,to)].filter(Boolean).forEach(function(p){recalc(state,p);});return state;
+  }
+  api.transfer=function(input,from,to,entries,ctx,meta){return transfer(input,from,to,entries,ctx,meta);};
+  api.dispatchRequest=function(input,requestId,entries,ctx,meta){
+    actor(ctx);if(ctx.role!=='sede')fail('Somente a sede pode enviar peças de uma solicitação.');
+    var request=requestLedger(input).requests.find(function(r){return r.id===requestId;});if(!request)fail('Solicitação não encontrada.');
+    return transfer(input,'estoque-go',request.pasta_id,entries,ctx,meta,requestId);
   };
   api.receive=function(input,moveId,ctx,meta){
     actor(ctx);var state=copy(input),transfer=state.movimentos.find(function(m){return m.id===moveId&&m.tipo==='transferencia';});
     if(!transfer)fail('Remanejamento não encontrado.');
     if(receiptIds(state).has(moveId))fail('Já registrado. O recebimento deste remanejamento já foi confirmado.');
-    var dest=ensureKnown(state,transfer.destino_id);
+    var dest=ensureOpen(state,transfer.destino_id);
     if(dest.id==='estoque-go'?ctx.role!=='sede':!owns(ctx,dest))fail('Somente o responsável pelo destino pode confirmar o recebimento.');
     var m=event(state,'recebimento',ctx,meta,{referencia_id:moveId,origem_id:transfer.origem_id,origem_nome:transfer.origem_nome,destino_id:transfer.destino_id,destino_nome:transfer.destino_nome,itens:copy(transfer.itens),legado:!!transfer.legado});
     append(state,m);[folder(state,transfer.origem_id),folder(state,transfer.destino_id)].filter(Boolean).forEach(function(p){recalc(state,p);});return state;
@@ -228,7 +300,7 @@
     l.pasta.estoque_inicial_conferido=true;append(state,m);recalc(state,l.pasta);return state;
   };
   api.reconcile=function(input,pastaId,totals,ctx,meta){
-    var state=copy(input),p=ownFolder(state,pastaId,ctx);ensureKnown(state,pastaId);
+    var state=copy(input),p=ownFolder(state,pastaId,ctx);
     if(!Array.isArray(totals))fail('Informe as quantidades realmente instaladas.');
     var rows=balances(state,pastaId),seen=new Set(),m=event(state,'conferencia_fechamento',ctx,meta,{pasta_id:pastaId,itens:[]}),changed=false;
     totals.forEach(function(it){
@@ -247,10 +319,10 @@
   function buildReport(state,pastaId,when){
     var p=folder(state,pastaId);if(!p)fail('Pasta não encontrada.');
     var rows=balances(state,pastaId),items=rows.map(function(b){return {key:b.key,peca:copy(b.peca),solicitado:b.solicitado,aprovado:b.aprovado,recebido:b.entradas,enviado:b.saidas,instalado:b.instalado,disponivel:b.disponivel,em_transito_entrada:b.em_transito_entrada,em_transito_saida:b.em_transito_saida,diferenca:round(b.solicitado-b.instalado),historico_enviado:b.historico_enviado,historico_recebido:b.historico_recebido};});
-    return {pasta_id:p.id,condominio:p.cliente,filial_id:p.filial_id,filial_nome:p.filial_nome,cor_estrutura:p.cor_estrutura,cor_tela:p.cor_tela,vagas:p.vagas,gerado_em:when||p.finalizado_em||p.atualizado,finalizado_em:p.finalizado_em||null,finalizado_por:p.finalizado_por||null,conhecido:known(p),itens:items,movimentacoes:copy(state.movimentos.filter(function(m){return [m.pasta_id,m.origem_id,m.destino_id].indexOf(pastaId)>=0;})),totais:{linhas:items.length,solicitado:round(items.reduce(function(n,it){return n+it.solicitado;},0)),instalado:round(items.reduce(function(n,it){return n+it.instalado;},0)),disponivel:round(items.reduce(function(n,it){return n+it.disponivel;},0)),em_transito:round(items.reduce(function(n,it){return n+it.em_transito_entrada+it.em_transito_saida;},0))}};
+    return {pasta_id:p.id,condominio:p.cliente,filial_id:p.filial_id,filial_nome:p.filial_nome,cor_estrutura:p.cor_estrutura,cor_tela:p.cor_tela,vagas:p.vagas,gerado_em:when||p.finalizado_em||p.atualizado,finalizado_em:p.finalizado_em||null,finalizado_por:p.finalizado_por||null,conhecido:known(p),saldo_base:'movimentacoes_confirmadas',itens:items,movimentacoes:copy(state.movimentos.filter(function(m){return [m.pasta_id,m.origem_id,m.destino_id].indexOf(pastaId)>=0;})),totais:{linhas:items.length,solicitado:round(items.reduce(function(n,it){return n+it.solicitado;},0)),instalado:round(items.reduce(function(n,it){return n+it.instalado;},0)),disponivel:round(items.reduce(function(n,it){return n+it.disponivel;},0)),em_transito:round(items.reduce(function(n,it){return n+it.em_transito_entrada+it.em_transito_saida;},0))}};
   }
   api.finalize=function(input,pastaId,ctx,meta){
-    var state=copy(input),p=ownFolder(state,pastaId,ctx);ensureKnown(state,pastaId);
+    var state=copy(input),p=ownFolder(state,pastaId,ctx);
     if(!p.conferencia_fechamento)fail('Confira as peças realmente instaladas antes de finalizar a obra.');
     if(pending(state,pastaId).length)fail('Há peças em trânsito. Confirme os recebimentos pendentes antes de finalizar.');
     var rows=balances(state,pastaId);
@@ -258,6 +330,16 @@
     var m=event(state,'finalizacao',ctx,meta,{pasta_id:pastaId,itens:[]});
     p.status_obra='finalizada';p.status='concluido';p.finalizado_em=m.criado_em;p.finalizado_por=m.usuario_nome;
     append(state,m);p.relatorio_final=buildReport(state,pastaId,m.criado_em);return state;
+  };
+  api.closeWithRemaining=function(input,pastaId,ctx,meta){
+    ownFolder(input,pastaId,ctx);meta=meta||{};
+    if(pending(input,pastaId).length)fail('Há peças em trânsito. Confirme os recebimentos pendentes antes de finalizar.');
+    var rows=balances(input,pastaId),expected=meta.expected;
+    if(!Array.isArray(expected))fail('Confira a prévia das peças instaladas antes de finalizar.');
+    if(expected.length!==rows.length||new Set(expected.map(function(it){return it.key;})).size!==expected.length||rows.some(function(b){var e=expected.find(function(it){return it.key===b.key;});return !e||e.disponivel!==b.disponivel||e.instalado!==b.instalado;}))fail('O estoque mudou desde a prévia. Atualize e confira as quantidades antes de finalizar.');
+    if(rows.some(function(b){return b.disponivel<0||b.instalado<0;}))fail('O saldo do condomínio está inconsistente. Confira as movimentações antes de finalizar.');
+    var id=fresh(input,meta),state=api.reconcile(input,pastaId,rows.map(function(b){return {key:b.key,qtd:round(b.instalado+b.disponivel)};}),ctx,Object.assign({},meta,{id:id+':instalacao'}));
+    return api.finalize(state,pastaId,ctx,Object.assign({},meta,{id:id}));
   };
   api.reopen=function(input,pastaId,ctx,meta){
     actor(ctx);if(ctx.role!=='sede')fail('Somente a sede pode reabrir uma obra finalizada.');
@@ -273,6 +355,7 @@
   api.balances=balances;
   api.history=function(state,id){return copy(state.movimentos.filter(function(m){return !id||[m.pasta_id,m.origem_id,m.destino_id].indexOf(id)>=0;}));};
   api.pendingTransfers=function(state,id){return copy(pending(state,id));};
+  api.requests=function(state,id){return copy(requestLedger(state).requests.filter(function(r){return !id||r.pasta_id===id;}));};
   api.normalizeItem=normalizeItem;api.keyOf=keyOf;api.qty=quantity;
   if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.Estoque=api;
 })(typeof window!=='undefined'?window:globalThis);

@@ -1,6 +1,6 @@
 (function(){
   'use strict';
-  var activeId=null,modalDraft=null,working=false,homeSearch='',homeStatus='abertas';
+  var activeId=null,modalDraft=null,working=false,homeSearch='',homeStatus='abertas',requestFocus=null;
   var h=function(value){return String(value==null?'':value).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});};
   var num=function(value){return Number(value||0).toLocaleString('pt-BR',{maximumFractionDigits:3});};
   var labels={pasta_criada:'Pasta criada',criacao_pasta:'Pasta criada',solicitacao:'Peças solicitadas',demanda:'Peças solicitadas',demanda_adicionada:'Peças solicitadas',aceite:'Peças aceitas pela sede',aprovacao:'Peças aceitas pela sede',demanda_aprovada:'Peças aceitas pela sede',entrada:'Entrada de peças',entrada_estoque:'Entrada de peças',transferencia:'Remanejamento enviado',recebimento:'Recebimento confirmado',conferencia_inicial:'Estoque inicial conferido',saldo_inicial:'Estoque inicial conferido',instalacao:'Instalação conferida no fechamento',conferencia_fechamento:'Conferência de fechamento',finalizacao:'Obra finalizada',obra_finalizada:'Obra finalizada',reabertura:'Obra reaberta'};
@@ -55,8 +55,6 @@
   function statusTag(loc){
     if(loc.finalizada)return '<span class="estoque-tag estoque-tag-done">Obra finalizada</span>';
     if(inactive(loc))return '<span class="estoque-tag estoque-tag-muted">Arquivada</span>';
-    if(!loc.conhecido)return '<span class="estoque-tag estoque-tag-warning">Conferir estoque inicial</span>';
-    if(loc.pasta&&loc.pasta.conferencia_fechamento)return '<span class="estoque-tag estoque-tag-warning">Em fechamento</span>';
     return '<span class="estoque-tag">'+(loc.tipo==='estoque'?'Estoque disponível':'Obra em andamento')+'</span>';
   }
   function stockCard(s,loc){
@@ -64,8 +62,8 @@
     return '<article class="estoque-location-card estoque-warehouse"><div class="estoque-location-heading"><span class="estoque-location-icon" aria-hidden="true">▤</span><div><span class="estoque-eyebrow">Estoque da '+(loc.id==='estoque-go'?'sede':'filial')+'</span><h2>'+h(loc.nome)+'</h2></div></div><div class="estoque-card-stats"><div><strong>'+sumTypes(rows,'disponivel')+'</strong><span>tipos de peça em estoque</span></div><div><strong>'+pending.length+'</strong><span>remanejos em trânsito</span></div></div>'+(received?'<p class="estoque-attention">'+received+' recebimento(s) para conferir</p>':'<p class="estoque-help">'+(loc.id==='estoque-go'?'Peças prontas para abastecer as obras.':'Peças disponíveis para os condomínios da filial.')+'</p>')+button('open','Abrir estoque →',true,'data-id="'+h(loc.id)+'"')+'</article>';
   }
   function folderCard(s,loc){
-    var p=loc.pasta||pasta(s,loc.id)||{},rows=Estoque.balances(s,loc.id),pending=transfers(s,loc.id),unapproved=rows.filter(function(b){return b.solicitado>b.aprovado;}).length;
-    return '<article class="estoque-location-card" data-e-folder="'+h(loc.id)+'"><div class="estoque-location-heading"><span class="estoque-location-icon estoque-folder-icon" aria-hidden="true">▱</span><div><h3>'+h(loc.nome)+'</h3><p>'+h(p.filial_nome||'Condomínio')+'</p></div></div><div>'+statusTag(loc)+'</div><dl class="estoque-folder-info"><div><dt>Estrutura</dt><dd>'+h(p.cor_estrutura||'—')+'</dd></div><div><dt>Tela</dt><dd>'+h(p.cor_tela||'—')+'</dd></div><div><dt>Vagas</dt><dd>'+num(p.vagas)+'</dd></div></dl><div class="estoque-folder-summary"><span>'+(!loc.conhecido?'Saldo físico a conferir':sumTypes(rows,'disponivel')+' tipos em estoque')+'</span><span>'+pending.length+' em trânsito</span></div>'+(unapproved&&!loc.finalizada?'<p class="estoque-attention">'+unapproved+' tipo(s) aguardando aceite da sede</p>':'')+button('open','Abrir pasta →',false,'data-id="'+h(loc.id)+'"')+'</article>';
+    var p=loc.pasta||pasta(s,loc.id)||{},rows=Estoque.balances(s,loc.id),pending=transfers(s,loc.id),unfilled=Estoque.requests(s,loc.id).filter(function(r){return r.ativo&&r.status!=='enviado';}).length;
+    return '<article class="estoque-location-card" data-e-folder="'+h(loc.id)+'"><div class="estoque-location-heading"><span class="estoque-location-icon estoque-folder-icon" aria-hidden="true">▱</span><div><h3>'+h(loc.nome)+'</h3><p>'+h(p.filial_nome||'Condomínio')+'</p></div></div><div>'+statusTag(loc)+'</div><dl class="estoque-folder-info"><div><dt>Estrutura</dt><dd>'+h(p.cor_estrutura||'—')+'</dd></div><div><dt>Tela</dt><dd>'+h(p.cor_tela||'—')+'</dd></div><div><dt>Vagas</dt><dd>'+num(p.vagas)+'</dd></div></dl><div class="estoque-folder-summary"><span>'+(sumTypes(rows,'disponivel')+' tipos em estoque')+'</span><span>'+pending.length+' em trânsito</span></div>'+(unfilled&&!loc.finalizada?'<p class="estoque-attention">'+unfilled+' solicitação(ões) com envio pendente</p>':'')+button('open','Abrir pasta →',false,'data-id="'+h(loc.id)+'"')+'</article>';
   }
   function folderGrid(s){
     var query=homeSearch.trim().toLocaleLowerCase('pt-BR'),list=Estoque.locations(s).filter(function(l){return l.tipo==='condominio'&&visible(l);}).map(function(l){return locationData(s,l.id);});
@@ -75,23 +73,66 @@
   function home(){
     activeId=null;var s=state(),el=document.getElementById('view-'+USER.role+'-pedidos');if(!el)return;
     var stocks=Estoque.locations(s).filter(function(l){return l.tipo==='estoque'&&visible(l);});
-    el.innerHTML='<section class="estoque-view"><div class="page-hdr"><div><h1>Pastas e estoques</h1><p>Peças solicitadas, remanejamentos e saldo de cada obra em um só lugar.</p></div><div class="estoque-actions">'+button('refresh','↻ Atualizar')+(!isSede()?button('create-folder','+ Criar pasta do condomínio',true):'')+'</div></div><div class="estoque-stock-grid">'+stocks.map(function(l){return stockCard(s,l);}).join('')+'</div><div class="estoque-section-header"><div><h2>Pastas dos condomínios</h2><p>Abra uma pasta para lançar peças e acompanhar a obra.</p></div><div class="estoque-filters"><input type="search" id="e_folder_search" aria-label="Buscar condomínio" placeholder="Buscar condomínio..." value="'+h(homeSearch)+'"><select id="e_folder_status" aria-label="Filtrar situação da obra"><option value="abertas" '+(homeStatus==='abertas'?'selected':'')+'>Obras em andamento</option><option value="finalizadas" '+(homeStatus==='finalizadas'?'selected':'')+'>Obras finalizadas</option><option value="todas" '+(homeStatus==='todas'?'selected':'')+'>Todas as pastas</option></select></div></div><div class="estoque-folder-grid" id="e_folder_grid">'+folderGrid(s)+'</div></section>';
+    el.innerHTML='<section class="estoque-view"><div class="page-hdr"><div><h1>Pastas e estoques</h1><p>Peças solicitadas, remanejamentos e saldo de cada obra em um só lugar.</p></div><div class="estoque-actions">'+button('refresh','↻ Atualizar')+(!isSede()?button('create-folder','+ Criar pasta do condomínio',true):'')+'</div></div><div class="estoque-stock-grid">'+stocks.map(function(l){return stockCard(s,l);}).join('')+'</div>'+(isSede()?pendingRequestsSection(s,true):'')+'<div class="estoque-section-header"><div><h2>Pastas dos condomínios</h2><p>Abra uma pasta para lançar peças e acompanhar a obra.</p></div><div class="estoque-filters"><input type="search" id="e_folder_search" aria-label="Buscar condomínio" placeholder="Buscar condomínio..." value="'+h(homeSearch)+'"><select id="e_folder_status" aria-label="Filtrar situação da obra"><option value="abertas" '+(homeStatus==='abertas'?'selected':'')+'>Obras em andamento</option><option value="finalizadas" '+(homeStatus==='finalizadas'?'selected':'')+'>Obras finalizadas</option><option value="todas" '+(homeStatus==='todas'?'selected':'')+'>Todas as pastas</option></select></div></div><div class="estoque-folder-grid" id="e_folder_grid">'+folderGrid(s)+'</div></section>';
   }
   function summaryCell(label,value){return '<div><small>'+h(label)+'</small><strong>'+h(value)+'</strong></div>';}
+  function pendingRequests(s){return Estoque.requests(s).filter(function(r){return r.ativo&&r.itens.some(function(it){return it.pendente>0;});});}
+  function requestStatus(r){return '<span class="estoque-tag '+(r.status==='enviado'?'estoque-tag-done':'estoque-tag-warning')+'">'+({pendente:'Aguardando envio',parcial:'Envio parcial',enviado:'Enviada'}[r.status]||'Aguardando envio')+'</span>';}
+  function requestCard(s,r,title,showLocation){
+    var canSend=isSede()&&r.ativo&&r.itens.some(function(it){return it.pendente>0;}),awaiting=r.itens.some(function(it){return it.enviado>it.recebido;});
+    return '<article class="estoque-request" data-e-request="'+h(r.id)+'"><header><div><h3>'+h(showLocation?r.condominio:title)+'</h3><p>'+h(dateTime(r.data))+' · '+h(r.usuario_nome||r.filial_nome||'Filial')+(showLocation&&r.filial_nome&&r.filial_nome!==r.usuario_nome?' · '+h(r.filial_nome):'')+'</p></div><div class="estoque-actions">'+requestStatus(r)+(canSend?button('dispatch-request','Enviar peças',true,'data-id="'+h(r.id)+'"'):'')+(showLocation?button('request','Abrir pasta',false,'data-id="'+h(r.id)+'"'):'')+'</div></header><div class="tbl-wrap"><table class="estoque-table"><thead><tr><th>Peça / medidas / cores</th><th>Unid.</th><th class="estoque-num">Solicitado</th><th class="estoque-num">Enviado</th><th class="estoque-num">Recebido</th><th class="estoque-num">Falta enviar</th></tr></thead><tbody>'+r.itens.map(function(it){return '<tr data-e-request-row="'+h(it.key)+'"><td class="estoque-piece">'+piece(it.peca)+'</td><td>'+h(it.peca.un)+'</td><td class="estoque-num" data-e-request-value="solicitado">'+num(it.solicitado)+'</td><td class="estoque-num" data-e-request-value="enviado">'+num(it.enviado)+'</td><td class="estoque-num" data-e-request-value="recebido">'+num(it.recebido)+'</td><td class="estoque-num estoque-request-pending" data-e-request-value="pendente">'+num(it.pendente)+'</td></tr>';}).join('')+'</tbody></table></div>'+(awaiting?'<p class="estoque-help estoque-request-note">Há peças enviadas aguardando o CONFERIDO da filial.</p>':'')+'</article>';
+  }
+  function requestsSection(s,loc){
+    var list=Estoque.requests(s,loc.id);
+    return '<div class="card estoque-requests"><div class="card-hdr"><div><h2>Solicitações de peças</h2><p class="estoque-help">Cada lançamento mantém seu solicitado, enviado, recebido e saldo pendente.</p></div><span class="estoque-tag estoque-tag-muted">'+list.length+'</span></div><div class="estoque-table-body">'+(list.length?list.slice().reverse().map(function(r,i){return requestCard(s,r,'Solicitação '+(list.length-i),false);}).join(''):'<div class="estoque-empty"><strong>Nenhuma solicitação nesta pasta.</strong><p>A filial pode criar uma solicitação escolhendo as peças e as quantidades no catálogo.</p></div>')+'</div></div>';
+  }
+  function pendingRequestsSection(s,compact){
+    var list=pendingRequests(s),shown=compact?list.slice(0,6):list;
+    return '<div class="card estoque-pending-requests" id="e_requests_pending"><div class="card-hdr"><div><h2>Solicitações pendentes</h2><p class="estoque-help">'+list.length+' solicitação(ões) aguardando envio total ou parcial.</p></div>'+(compact?button('requests-page','Ver todas'):'')+'</div>'+(shown.length?'<div class="tbl-wrap"><table class="estoque-table"><thead><tr><th>Condomínio / filial</th><th>Solicitação</th><th>Pendências</th><th></th></tr></thead><tbody>'+shown.map(function(r){return '<tr><td><strong>'+h(r.condominio)+'</strong><small>'+h(r.filial_nome||'')+'</small></td><td>'+h(dateTime(r.data))+'<small>'+h(r.usuario_nome||'')+'</small></td><td>'+requestStatus(r)+'<small>'+r.itens.filter(function(it){return it.pendente>0;}).length+' tipo(s) de peça</small></td><td>'+button('request','Abrir solicitação →',false,'data-id="'+h(r.id)+'"')+'</td></tr>';}).join('')+'</tbody></table></div>':'<div class="card-body"><p class="estoque-help">Todas as solicitações ativas foram enviadas.</p></div>')+'</div>';
+  }
+  function requestsPage(){
+    if(!isSede())return;activeId=null;var s=state(),list=pendingRequests(s),el=document.getElementById('view-sede-aprovacoes');if(!el)return;
+    el.innerHTML='<section class="estoque-view"><div class="page-hdr"><div><h1>Solicitações pendentes</h1><p>Envie as peças disponíveis no estoque GO. O restante continua pendente até o próximo envio.</p></div>'+button('refresh','↻ Atualizar')+'</div>'+(!list.length?'<div class="estoque-empty"><strong>Nenhuma solicitação pendente.</strong><p>Novos lançamentos das filiais aparecerão aqui.</p></div>':'<div class="card estoque-requests">'+list.map(function(r){return requestCard(s,r,'',true);}).join('')+'</div>')+'</section>';
+  }
+  function focusRequestCard(){
+    if(!requestFocus)return;var id=requestFocus;requestFocus=null;
+    var container=document.getElementById('view-'+USER.role+'-pedido'),target=container&&Array.from(container.querySelectorAll('[data-e-request]')).find(function(el){return el.dataset.eRequest===id;});
+    if(target){target.classList.add('estoque-request-highlight');setTimeout(function(){if(target.isConnected)target.scrollIntoView({block:'start',behavior:'smooth'});},0);}
+  }
+  function openRequest(id){
+    var s=state(),r=Estoque.requests(s).find(function(entry){return entry.id===id;});
+    if(!r||!visible(locationData(s,r.pasta_id))){error('Solicitação não encontrada. Atualize a página.');return;}
+    requestFocus=id;open(r.pasta_id);
+  }
+  function openRequestDispatch(id){
+    if(!isSede())return;var s=state(),request=Estoque.requests(s).find(function(r){return r.id===id;});
+    if(!request||!request.ativo){error('Esta solicitação não está disponível para envio.');return;}
+    var stock=Estoque.balances(s,'estoque-go'),rows=request.itens.filter(function(it){return it.pendente>0;}).map(function(it){var b=stock.find(function(entry){return entry.key===it.key;});return Object.assign({},it,{disponivel:b?b.disponivel:0});});
+    if(!rows.length){error('Todas as peças desta solicitação já foram enviadas.');return;}
+    modalDraft={type:'request-dispatch',requestId:id,locationId:request.pasta_id,rows:rows,id:crypto.randomUUID()};
+    modal('Enviar peças — '+request.condominio,'<p class="estoque-help">Origem: Estoque Sombrear GO. Informe o que será enviado agora; as quantidades restantes continuam pendentes nesta solicitação.</p><div class="tbl-wrap"><table class="estoque-table estoque-input-table"><thead><tr><th>Peça / medidas / cores</th><th>Unid.</th><th class="estoque-num">Falta enviar</th><th class="estoque-num">Saldo GO</th><th>Enviar agora</th></tr></thead><tbody>'+rows.map(function(it){return '<tr><td class="estoque-piece">'+piece(it.peca)+'</td><td>'+h(it.peca.un)+'</td><td class="estoque-num">'+num(it.pendente)+'</td><td class="estoque-num">'+num(it.disponivel)+'</td><td><input type="number" min="0" max="'+Math.min(it.pendente,it.disponivel)+'" step="any" value="0" aria-label="Enviar '+h(it.peca.desc)+' desta solicitação" data-e-request-key="'+h(it.key)+'" '+(it.disponivel<=0?'disabled':'')+'>'+(it.disponivel<=0?'<small>Sem saldo no GO</small>':'')+'</td></tr>';}).join('')+'</tbody></table></div>'+field('Observações / transporte (opcional)','e_request_obs','','placeholder="Motorista, veículo ou observações do envio"')+inlineError(),button('cancel','Cancelar')+button('save-request-dispatch','Registrar envio',true));
+  }
+  async function saveRequestDispatch(){
+    var d=modalDraft;if(!d||d.type!=='request-dispatch')return;var entries=[];
+    try{document.querySelectorAll('[data-e-request-key]').forEach(function(input){var row=d.rows.find(function(it){return it.key===input.dataset.eRequestKey;}),qtd=numeric(input.value,row.peca.un);if(qtd>row.pendente)throw new Error('A quantidade de '+row.peca.desc+' supera o que falta enviar nesta solicitação.');if(qtd>row.disponivel)throw new Error('A quantidade de '+row.peca.desc+' supera o saldo disponível no GO.');if(qtd>0)entries.push({key:row.key,qtd:qtd});});}catch(e){error(e.message);return;}
+    if(!entries.length){error('Informe a quantidade de pelo menos uma peça para enviar.');return;}
+    var ctx=context(),meta={id:d.id,obs:document.getElementById('e_request_obs').value};
+    await commit(function(s){return Estoque.dispatchRequest(s,d.requestId,entries,ctx,meta);},function(){close();render();showToast('Envio registrado. Solicitação atualizada.','success');});
+  }
   function balanceTable(loc,rows){
     var folder=loc.tipo==='condominio',body=rows.map(function(b){
-      return '<tr><td class="estoque-piece">'+piece(b.peca)+'</td><td>'+h(b.peca.un)+'</td>'+(folder?'<td class="estoque-num">'+num(b.solicitado)+(b.solicitado>b.aprovado?'<small>'+num(b.solicitado-b.aprovado)+' aguardando aceite</small>':'')+'</td>':'')+'<td class="estoque-num estoque-available">'+(loc.conhecido?num(b.disponivel):'A conferir')+'</td><td class="estoque-num">'+num(b.em_transito_entrada)+(b.em_transito_saida?'<small>'+num(b.em_transito_saida)+' saindo</small>':'')+'</td>'+(folder?'<td class="estoque-num">'+(loc.conhecido?num(b.instalado):'A conferir')+'</td>':'')+'</tr>';
+      return '<tr><td class="estoque-piece">'+piece(b.peca)+'</td><td>'+h(b.peca.un)+'</td>'+(folder?'<td class="estoque-num">'+num(b.solicitado)+'</td>':'')+'<td class="estoque-num estoque-available">'+num(b.disponivel)+'</td><td class="estoque-num">'+num(b.em_transito_entrada)+(b.em_transito_saida?'<small>'+num(b.em_transito_saida)+' saindo</small>':'')+'</td>'+(folder?'<td class="estoque-num">'+num(b.instalado)+'</td>':'')+'</tr>';
     }).join('');
     return '<div class="tbl-wrap"><table class="estoque-table"><thead><tr><th>Peça / medidas / cores</th><th>Unid.</th>'+(folder?'<th class="estoque-num">Solicitado</th>':'')+'<th class="estoque-num">Em estoque</th><th class="estoque-num">A receber</th>'+(folder?'<th class="estoque-num">Instalado</th>':'')+'</tr></thead><tbody>'+body+'</tbody></table></div>';
   }
-  function canReceive(s,m){var dest=locationData(s,m.destino_id);return dest&&dest.conhecido&&writable(dest)&&owned(dest);}
+  function canReceive(s,m){var dest=locationData(s,m.destino_id);return dest&&writable(dest)&&owned(dest);}
   function transitSection(s,loc){
     var pending=transfers(s,loc.id);if(!pending.length)return '';
     var cards=pending.map(function(m){
       var incoming=m.destino_id===loc.id;
-      return '<article class="estoque-transfer"><header><div><span class="estoque-tag estoque-tag-warning">'+(incoming?'A receber':'Enviado · aguardando recebimento')+'</span><h3>'+h(name(s,m.origem_id))+' → '+h(name(s,m.destino_id))+'</h3><p>'+h(dateTime(m.criado_em||m.data))+' · '+h(m.usuario_nome||'')+'</p></div>'+(incoming&&canReceive(s,m)?button('receive','Conferir recebimento',true,'data-id="'+h(m.id)+'"'):'')+'</header><ul>'+movementItems(m)+'</ul>'+(m.obs?'<p class="estoque-help">'+h(m.obs)+'</p>':'')+'</article>';
+      return '<article class="estoque-transfer"><header><div><span class="estoque-tag estoque-tag-warning">'+(incoming?'A receber':'Enviado · aguardando recebimento')+'</span><h3>'+h(name(s,m.origem_id))+' → '+h(name(s,m.destino_id))+'</h3><p>'+h(dateTime(m.criado_em||m.data))+' · '+h(m.usuario_nome||'')+'</p></div>'+(incoming&&canReceive(s,m)?button('receive','CONFERIDO',true,'data-id="'+h(m.id)+'"'):'')+'</header><ul>'+movementItems(m)+'</ul>'+(m.obs?'<p class="estoque-help">'+h(m.obs)+'</p>':'')+'</article>';
     }).join('');
-    return '<div class="card estoque-transit"><div class="card-hdr"><h2>Remanejamentos em trânsito</h2><span class="estoque-tag estoque-tag-warning">'+pending.length+'</span></div><div class="card-body"><p class="estoque-help">O saldo do destino aumenta quando quem recebe confirma a chegada das peças.</p>'+cards+'</div></div>';
+    return '<div class="card estoque-transit"><div class="card-hdr"><h2>Remanejamentos em trânsito</h2><span class="estoque-tag estoque-tag-warning">'+pending.length+'</span></div><div class="card-body"><p class="estoque-help">Confira as quantidades abaixo. Ao clicar em CONFERIDO, as peças entram no estoque do destino.</p>'+cards+'</div></div>';
   }
   function movementItems(m){return (m.itens||[]).map(function(it){var p=it.peca||it;return '<li><strong>'+num(it.qtd===undefined?(it.disponivel||0):it.qtd)+' '+h(p.un||'')+'</strong> · '+h(p.desc||'Peça')+(measure(p)?' · '+h(measure(p)):'')+(p.cor?' · '+h(p.cor):'')+(it.instalado!==undefined?' · '+num(it.instalado)+' instalado(s)':'')+'</li>';}).join('');}
   function historyHtml(s,events){
@@ -105,51 +146,36 @@
     if(!p)return '';
     p=Object.assign({},p,{log:(p.log||[]).filter(function(l){return !l.movimento_id;})});
     if(!p.log.length&&!(p.remessas||[]).length)return '';
-    return '<details class="estoque-legacy-history"><summary>Registros anteriores desta pasta</summary><p class="estoque-help">Histórico preservado do controle anterior. Esses envios não substituem a contagem física inicial.</p>'+(p.remessas||[]).slice().reverse().map(function(r){return '<article><strong>Remessa · '+h(dateTime(r.data))+'</strong><p>'+h(r.user||'')+(r.recebido_em?' · Recebida em '+h(dateTime(r.recebido_em)):' · Sem confirmação no registro anterior')+'</p><ul>'+movementItems(r)+'</ul>'+(r.obs?'<p>'+h(r.obs)+'</p>':'')+'</article>';}).join('')+'<ul>'+(p.log||[]).slice().reverse().map(function(l){return '<li>'+h(dateTime(l.data))+' · '+h(l.user||'')+' · '+h(l.obs||l.status||'Registro')+'</li>';}).join('')+'</ul></details>';
+    return '<details class="estoque-legacy-history"><summary>Registros anteriores desta pasta</summary><p class="estoque-help">Histórico preservado dos pedidos e envios anteriores.</p>'+(p.remessas||[]).slice().reverse().map(function(r){return '<article><strong>Remessa · '+h(dateTime(r.data))+'</strong><p>'+h(r.user||'')+(r.recebido_em?' · Recebida em '+h(dateTime(r.recebido_em)):' · Sem confirmação no registro anterior')+'</p><ul>'+movementItems(r)+'</ul>'+(r.obs?'<p>'+h(r.obs)+'</p>':'')+'</article>';}).join('')+'<ul>'+(p.log||[]).slice().reverse().map(function(l){return '<li>'+h(dateTime(l.data))+' · '+h(l.user||'')+' · '+h(l.obs||l.status||'Registro')+'</li>';}).join('')+'</ul></details>';
   }
-  function closureStatus(s,loc,rows){
-    var p=loc.pasta||pasta(s,loc.id),left=sumTypes(rows,'disponivel'),moving=transfers(s,loc.id).length;
-    return {left:left,moving:moving,conferred:!!(p&&p.conferencia_fechamento),ready:loc.conhecido&&left===0&&moving===0&&!!(p&&p.conferencia_fechamento)};
-  }
-  function closureNotice(s,loc,rows){
-    if(loc.tipo!=='condominio')return '';
-    if(loc.finalizada)return '<div class="estoque-notice estoque-notice-success"><strong>Obra finalizada em '+h(dateTime(loc.pasta.finalizado_em))+'.</strong><p>O relatório final preserva a conferência e todas as movimentações deste fechamento.</p>'+button('report','Ver relatório final',true)+'</div>';
-    if(!loc.pasta.conferencia_fechamento)return '';
-    var check=closureStatus(s,loc,rows);
-    return '<div class="estoque-notice '+(check.ready?'estoque-notice-success':'')+'"><strong>'+(check.ready?'Conferência salva. A obra está pronta para finalizar.':'Conferência salva. Ainda há pendências para finalizar.')+'</strong><p>'+(check.left?check.left+' tipo(s) de peça ainda em estoque. Remaneje as sobras. ':'')+(check.moving?check.moving+' remanejamento(s) aguardando recebimento. ':check.ready?'O estoque está zerado e não há remanejamentos em trânsito.':'')+'</p><div class="estoque-actions">'+(owned(loc)&&check.left?button('transfer','Remanejar sobras',true):'')+(canClose(loc)?button(check.ready?'finalize':'reconcile',check.ready?'Finalizar e gerar relatório':'Revisar conferência',check.ready):'')+'</div></div>';
+  function closureNotice(s,loc){
+    if(loc.tipo!=='condominio'||!loc.finalizada)return '';
+    return '<div class="estoque-notice estoque-notice-success"><strong>Obra finalizada em '+h(dateTime(loc.pasta.finalizado_em))+'.</strong><p>O relatório final preserva as peças instaladas e todas as movimentações deste fechamento.</p>'+button('report','Ver relatório final',true)+'</div>';
   }
   function detail(id){
     activeId=id;window._pedidoId=id;var s=state(),loc=locationData(s,id),el=document.getElementById('view-'+USER.role+'-pedido');if(!el)return;
     if(!visible(loc)){el.innerHTML='<div class="estoque-empty">Pasta ou estoque não encontrado.</div>';return;}
-    var folder=loc.tipo==='condominio',p=loc.pasta||{},rows=Estoque.balances(s,id),active=writable(loc),unapproved=rows.some(function(b){return b.solicitado>b.aprovado;}),canMove=active&&owned(loc)&&loc.conhecido&&sumTypes(rows,'disponivel')>0;
+    var folder=loc.tipo==='condominio',p=loc.pasta||{},rows=Estoque.balances(s,id),active=writable(loc),canMove=active&&owned(loc)&&sumTypes(rows,'disponivel')>0;
     var actions=button('refresh','↻ Atualizar');
-    if(active&&((folder&&!isSede())||(!folder&&owned(loc))))actions+=button('add-items','+ Adicionar peças',true,'data-mode="'+(folder?'demanda':'estoque')+'"');
+    if(active&&((folder&&!isSede())||(!folder&&owned(loc))))actions+=button('add-items',folder?'+ Nova solicitação':'+ Adicionar peças',true,'data-mode="'+(folder?'demanda':'estoque')+'"');
     if(canMove)actions+=button('transfer','Remanejar peças');
-    if(folder&&active&&isSede()&&unapproved)actions+=button('approve','Aceitar peças pendentes',true);
-    if(folder&&canClose(loc)&&loc.conhecido)actions+=button('reconcile','Finalizar obra');
+    if(folder&&canClose(loc))actions+=button('finalize','Finalizar obra');
     if(folder)actions+=button('report',loc.finalizada?'Relatório final':'Conferência / PDF');
     if(folder&&loc.finalizada&&isSede())actions+=button('reopen','Reabrir obra');
-    var summary=folder?summaryCell('Cor da estrutura',p.cor_estrutura||'—')+summaryCell('Cor da tela',p.cor_tela||'—')+summaryCell('Número de vagas',num(p.vagas))+summaryCell('Tipos de peça em estoque',loc.conhecido?sumTypes(rows,'disponivel'):'A conferir'):summaryCell('Tipos de peça em estoque',sumTypes(rows,'disponivel'))+summaryCell('Remanejamentos em trânsito',transfers(s,id).length);
-    var initial=!loc.conhecido?'<div class="estoque-notice"><strong>Confira o estoque físico inicial desta obra.</strong><p>Esta pasta pode receber envios, que ficam em trânsito. Antes de confirmar o recebimento ou remanejar peças desta obra, informe o saldo anterior e as peças já instaladas. Não inclua nessa contagem as remessas que ainda aguardam confirmação.</p>'+(active?button('baseline','Conferir estoque inicial',true):'')+'</div>':'';
-    var noRows='<div class="estoque-empty"><strong>'+(folder?'Nenhuma peça lançada nesta pasta.':'O estoque ainda está vazio.')+'</strong><p>'+(folder?'A filial pode adicionar as peças do condomínio usando o catálogo.':'Registre as peças prontas para disponibilizá-las aos condomínios.')+'</p>'+((active&&((folder&&!isSede())||(!folder&&owned(loc))))?button('add-items','+ Adicionar peças',true,'data-mode="'+(folder?'demanda':'estoque')+'"'):'')+'</div>';
+    var summary=folder?summaryCell('Cor da estrutura',p.cor_estrutura||'—')+summaryCell('Cor da tela',p.cor_tela||'—')+summaryCell('Número de vagas',num(p.vagas))+summaryCell('Tipos de peça em estoque',sumTypes(rows,'disponivel')):summaryCell('Tipos de peça em estoque',sumTypes(rows,'disponivel'))+summaryCell('Remanejamentos em trânsito',transfers(s,id).length);
+    var noRows='<div class="estoque-empty"><strong>'+(folder?'Nenhuma peça lançada nesta pasta.':'O estoque ainda está vazio.')+'</strong><p>'+(folder?'Crie uma solicitação pelo catálogo para pedir as peças deste condomínio.':'Registre as peças prontas para disponibilizá-las aos condomínios.')+'</p>'+((active&&((folder&&!isSede())||(!folder&&owned(loc))))?button('add-items',folder?'+ Nova solicitação':'+ Adicionar peças',true,'data-mode="'+(folder?'demanda':'estoque')+'"'):'')+'</div>';
     var details=folder?'<details class="card estoque-general"><summary class="card-hdr">Informações do condomínio</summary><div class="card-body"><div class="form-grid">'+['endereco','cnpj','sindico','contato','email','tipo','chumbacao','pilares'].map(function(k,i){return '<div><small>'+['Endereço','CNPJ','Responsável','Telefone','E-mail','Cobertura','Chumbação','Pilares'][i]+'</small><p>'+h(p[k]||'—')+'</p></div>';}).join('')+'</div></div></details>':'';
-    el.innerHTML='<section class="estoque-view"><div class="page-hdr"><div><button type="button" class="btn btn-ghost btn-sm" data-e-action="list">← Pastas e estoques</button><h1>'+h(loc.nome)+'</h1><p>'+h(folder?(p.filial_nome||'Condomínio'):(loc.id==='estoque-go'?'Sede · peças prontas':'Filial · peças disponíveis'))+'</p></div>'+statusTag(loc)+'</div><div class="estoque-actions estoque-main-actions">'+actions+'</div><div class="estoque-summary '+(!folder?'estoque-summary-compact':'')+'">'+summary+'</div>'+initial+closureNotice(s,loc,rows)+'<div class="card"><div class="card-hdr"><div><h2>'+ (folder?'Peças do condomínio':'Peças em estoque')+'</h2><p class="estoque-help">'+(folder?'Solicitado é a necessidade da obra. Em estoque é o saldo físico disponível. Instalado é informado no fechamento.':'Somente as peças recebidas e disponíveis podem ser remanejadas.')+'</p></div></div><div class="estoque-table-body">'+(rows.length?balanceTable(loc,rows):noRows)+'</div></div>'+transitSection(s,loc)+'<div class="card"><div class="card-hdr"><h2>Histórico de movimentações</h2></div><div class="card-body">'+historyHtml(s,Estoque.history(s,id))+legacyHistory(p)+'</div></div>'+details+'</section>';
+    el.innerHTML='<section class="estoque-view"><div class="page-hdr"><div><button type="button" class="btn btn-ghost btn-sm" data-e-action="list">← Pastas e estoques</button><h1>'+h(loc.nome)+'</h1><p>'+h(folder?(p.filial_nome||'Condomínio'):(loc.id==='estoque-go'?'Sede · peças prontas':'Filial · peças disponíveis'))+'</p></div>'+statusTag(loc)+'</div><div class="estoque-actions estoque-main-actions">'+actions+'</div><div class="estoque-summary '+(!folder?'estoque-summary-compact':'')+'">'+summary+'</div>'+closureNotice(s,loc)+(folder?requestsSection(s,loc):'')+'<div class="card"><div class="card-hdr"><div><h2>'+ (folder?'Peças do condomínio':'Peças em estoque')+'</h2><p class="estoque-help">'+(folder?'O estoque reúne as peças recebidas. Remaneje as sobras antes de finalizar; o saldo que ficar será registrado como instalado.':'Somente as peças recebidas e disponíveis podem ser remanejadas.')+'</p></div></div><div class="estoque-table-body">'+(rows.length?balanceTable(loc,rows):noRows)+'</div></div>'+transitSection(s,loc)+'<div class="card"><div class="card-hdr"><h2>Histórico de movimentações</h2></div><div class="card-body">'+historyHtml(s,Estoque.history(s,id))+legacyHistory(p)+'</div></div>'+details+'</section>';
+    focusRequestCard();
   }
-  function render(){if(location.hash.slice(1)===USER.role+'-pedido')detail(window._pedidoId);else home();}
+  function render(){var hash=location.hash.slice(1);if(hash==='sede-aprovacoes')requestsPage();else if(hash===USER.role+'-pedido')detail(window._pedidoId);else home();}
   function openTransfer(){
-    var s=state(),loc=current(s);if(!loc||!writable(loc)||!owned(loc)||!loc.conhecido)return;
+    var s=state(),loc=current(s);if(!loc||!writable(loc)||!owned(loc))return;
     var rows=Estoque.balances(s,loc.id).filter(function(b){return b.disponivel>0;}),targets=Estoque.locations(s).filter(function(l){return l.id!==loc.id&&l.id!=='estoque-go'&&writable(locationData(s,l.id))&&(isSede()||l.filial_id===USER.filial_id);});
     if(!rows.length){error('Não há peças disponíveis para remanejar.');return;}
     if(!targets.length){error('Não há destino disponível. Crie uma pasta ativa na filial para remanejar as peças.');return;}
     modalDraft={type:'transfer',locationId:loc.id,rows:rows,id:crypto.randomUUID()};
-    modal('Remanejar peças — '+loc.nome,'<p class="estoque-help">Escolha o destino e informe o que está saindo. As peças ficam em trânsito até a confirmação de quem recebe.</p><div class="form-grid"><div class="fg"><label for="e_transfer_destino">Destino *</label><select id="e_transfer_destino"><option value="">Selecione o estoque ou condomínio</option>'+targets.map(function(l){return '<option value="'+h(l.id)+'">'+h(l.nome)+(l.conhecido?'':' — estoque inicial a conferir')+'</option>';}).join('')+'</select></div>'+field('Observações / transporte','e_transfer_obs','','placeholder="Ex.: motorista, veículo ou motivo do remanejamento"')+'</div><div id="e_transfer_notice" class="estoque-notice" role="status" hidden></div><div class="tbl-wrap"><table class="estoque-table estoque-input-table"><thead><tr><th>Peça</th><th>Unid.</th><th class="estoque-num">Disponível</th><th>Enviar agora</th></tr></thead><tbody>'+rows.map(function(b){return '<tr><td class="estoque-piece">'+piece(b.peca)+'</td><td>'+h(b.peca.un)+'</td><td class="estoque-num">'+num(b.disponivel)+'</td><td><input type="number" min="0" max="'+b.disponivel+'" step="any" value="0" aria-label="Enviar '+h(b.peca.desc)+'" data-e-transfer-key="'+h(b.key)+'"></td></tr>';}).join('')+'</tbody></table></div>'+inlineError(),button('cancel','Cancelar')+button('save-transfer','Registrar remanejamento',true));
-  }
-  function updateTransferNotice(){
-    var select=document.getElementById('e_transfer_destino'),notice=document.getElementById('e_transfer_notice');
-    if(!select||!notice)return;
-    var destination=Estoque.getLocation(state(),select.value),pending=destination&&!destination.conhecido;
-    notice.hidden=!pending;
-    notice.textContent=pending?'Você pode enviar para este condomínio agora. As peças ficarão em trânsito; a filial deverá conferir o estoque inicial antes de confirmar o recebimento.':'';
+    modal('Remanejar peças — '+loc.nome,'<p class="estoque-help">Escolha o destino e informe o que está saindo. As peças ficam em trânsito até a confirmação de quem recebe.</p><div class="form-grid"><div class="fg"><label for="e_transfer_destino">Destino *</label><select id="e_transfer_destino"><option value="">Selecione o estoque ou condomínio</option>'+targets.map(function(l){return '<option value="'+h(l.id)+'">'+h(l.nome)+'</option>';}).join('')+'</select></div>'+field('Observações / transporte','e_transfer_obs','','placeholder="Ex.: motorista, veículo ou motivo do remanejamento"')+'</div><div class="tbl-wrap"><table class="estoque-table estoque-input-table"><thead><tr><th>Peça</th><th>Unid.</th><th class="estoque-num">Disponível</th><th>Enviar agora</th></tr></thead><tbody>'+rows.map(function(b){return '<tr><td class="estoque-piece">'+piece(b.peca)+'</td><td>'+h(b.peca.un)+'</td><td class="estoque-num">'+num(b.disponivel)+'</td><td><input type="number" min="0" max="'+b.disponivel+'" step="any" value="0" aria-label="Enviar '+h(b.peca.desc)+'" data-e-transfer-key="'+h(b.key)+'"></td></tr>';}).join('')+'</tbody></table></div>'+inlineError(),button('cancel','Cancelar')+button('save-transfer','Registrar remanejamento',true));
   }
   function numeric(value,unit){return Estoque.qty(value,unit,true);}
   async function saveTransfer(){
@@ -161,59 +187,23 @@
     var meta={id:d.id,obs:document.getElementById('e_transfer_obs').value},ctx=context();
     await commit(function(s){return Estoque.transfer(s,d.locationId,destination,entries,ctx,meta);},function(){close();detail(d.locationId);showToast('Remanejamento registrado. Aguardando confirmação do destino.','success');});
   }
-  function openReceive(id){
+  async function receive(id){
     var s=state(),m=transfers(s,activeId).find(function(t){return t.id===id;});if(!m||!canReceive(s,m))return;
-    modalDraft={type:'receive',movement:m,id:crypto.randomUUID()};
-    modal('Conferir recebimento','<p class="estoque-help">Confirme após conferir a chegada de todas as peças abaixo. O recebimento será registrado no histórico e acrescentado ao estoque de destino.</p><div class="estoque-notice"><strong>'+h(name(s,m.origem_id))+' → '+h(name(s,m.destino_id))+'</strong><ul>'+movementItems(m)+'</ul></div><p class="estoque-help">Se houver divergência na entrega, confira com a origem antes de confirmar o recebimento completo.</p>'+field('Observações do recebimento','e_receive_obs','','placeholder="Conferência, comprovante ou observações"')+inlineError(),button('cancel','Voltar')+button('confirm-receive','Confirmar recebimento completo',true));
-  }
-  async function receive(){
-    var d=modalDraft;if(!d||d.type!=='receive')return;var ctx=context(),meta={id:d.id,obs:document.getElementById('e_receive_obs').value};
-    await commit(function(s){return Estoque.receive(s,d.movement.id,ctx,meta);},function(){close();detail(activeId);showToast('Recebimento confirmado. Peças disponíveis no destino.','success');});
-  }
-  function openBaseline(){
-    var s=state(),loc=current(s);if(!loc||loc.conhecido||!writable(loc))return;
-    var rows=Estoque.balances(s,loc.id);modalDraft={type:'baseline',locationId:loc.id,rows:rows,id:crypto.randomUUID()};
-    modal('Conferir estoque inicial — '+loc.nome,'<p class="estoque-help">Faça uma contagem física. Informe o que está disponível na obra e o que já foi instalado antes deste controle. Preencha 0 quando não houver peças; os envios antigos ficam preservados no histórico. Não inclua as peças dos remanejamentos que ainda aguardam confirmação de recebimento, mesmo que já tenham chegado fisicamente. Elas entrarão no estoque ao confirmar o recebimento.</p><div class="tbl-wrap"><table class="estoque-table estoque-input-table"><thead><tr><th>Peça</th><th>Unid.</th><th>Disponível na obra *</th><th>Já instalado *</th></tr></thead><tbody>'+rows.map(function(b){return '<tr><td class="estoque-piece">'+piece(b.peca)+'</td><td>'+h(b.peca.un)+'</td>'+['disponivel','instalado'].map(function(k){return '<td><input type="number" min="0" step="any" placeholder="Informe" aria-label="'+(k==='disponivel'?'Disponível de ':'Já instalado de ')+h(b.peca.desc)+'" data-e-baseline-key="'+h(b.key)+'" data-e-baseline-field="'+k+'"></td>';}).join('')+'</tr>';}).join('')+'</tbody></table></div>'+field('Observações da contagem','e_baseline_obs','','placeholder="Referência da contagem física"')+'<label class="estoque-check"><input type="checkbox" id="e_baseline_confirm"> Conferi as quantidades físicas e instaladas desta obra.</label>'+inlineError(),button('cancel','Cancelar')+button('save-baseline','Confirmar estoque inicial',true));
-  }
-  async function saveBaseline(){
-    var d=modalDraft;if(!d||d.type!=='baseline')return;
-    if(!document.getElementById('e_baseline_confirm').checked){error('Confirme que as quantidades foram conferidas fisicamente.');return;}
-    var entries=d.rows.map(function(b){return {key:b.key};});
-    try{document.querySelectorAll('[data-e-baseline-key]').forEach(function(input){var key=input.dataset.eBaselineKey,b=d.rows.find(function(r){return r.key===key;});if(input.value==='')throw new Error('Informe as duas quantidades de cada peça. Use 0 quando não houver saldo.');entries.find(function(e){return e.key===key;})[input.dataset.eBaselineField]=numeric(input.value,b.peca.un);});}catch(e){error(e.message);return;}
-    var ctx=context(),meta={id:d.id,obs:document.getElementById('e_baseline_obs').value};
-    await commit(function(s){return Estoque.legacyInitial(s,d.locationId,entries,ctx,meta);},function(){close();detail(d.locationId);showToast('Estoque inicial conferido e registrado no histórico.','success');});
-  }
-  function openReconcile(){
-    var s=state(),loc=locationData(s,activeId);if(!loc||loc.tipo!=='condominio'||!canClose(loc)||!loc.conhecido)return;
-    var rows=Estoque.balances(s,loc.id),check=closureStatus(s,loc,rows);modalDraft={type:'reconcile',locationId:loc.id,rows:rows,id:crypto.randomUUID(),dirty:false};
-    modal('Fechamento da obra — '+loc.nome,'<p class="estoque-help">Informe o total realmente instalado de cada peça. Salvar a conferência desconta essas peças do estoque. Antes de finalizar, remaneje todas as sobras e aguarde a confirmação dos remanejamentos.</p>'+(check.moving?'<div class="estoque-notice"><strong>'+check.moving+' remanejamento(s) em trânsito.</strong><p>É possível salvar a conferência agora. A obra só poderá ser finalizada depois dos recebimentos.</p></div>':'')+'<div class="tbl-wrap"><table class="estoque-table estoque-input-table"><thead><tr><th>Peça</th><th>Unid.</th><th class="estoque-num">Em estoque</th><th>Total instalado *</th><th class="estoque-num">Sobra após conferir</th></tr></thead><tbody>'+rows.map(function(b,i){return '<tr><td class="estoque-piece">'+piece(b.peca)+'</td><td>'+h(b.peca.un)+'</td><td class="estoque-num">'+num(b.disponivel)+'</td><td><input type="number" min="0" max="'+(b.disponivel+b.instalado)+'" step="any" value="'+b.instalado+'" data-e-installed-key="'+h(b.key)+'" aria-label="Total instalado de '+h(b.peca.desc)+'"></td><td class="estoque-num" id="e_leftover_'+i+'">'+num(b.disponivel)+'</td></tr>';}).join('')+'</tbody></table></div><div id="e_closure_preview" class="estoque-closure-preview"></div>'+field('Observações da conferência','e_reconcile_obs','','placeholder="Observações sobre a instalação final"')+inlineError(),button('cancel','Voltar')+(check.left&&owned(loc)?button('transfer','Remanejar sobras'):'')+button('save-reconcile','Salvar conferência',true)+(check.ready?button('finalize','Finalizar e gerar relatório',true,'id="e_finalize_ready"'):''));
-    updateClosurePreview(false);
-  }
-  function updateClosurePreview(dirty){
-    var d=modalDraft;if(!d||d.type!=='reconcile')return;
-    if(dirty)d.dirty=true;var left=0,invalid=false;
-    document.querySelectorAll('[data-e-installed-key]').forEach(function(input,i){var b=d.rows.find(function(r){return r.key===input.dataset.eInstalledKey;}),value=Number(input.value),remaining=Math.round((b.disponivel+b.instalado-value)*1000)/1000,bad=input.value===''||!Number.isFinite(value)||value<0||remaining<0;
-      invalid=invalid||bad;if(remaining>0)left++;var out=document.getElementById('e_leftover_'+i);if(out){out.textContent=bad?'Revise a quantidade':num(remaining);out.classList.toggle('estoque-error-text',bad);}});
-    var message=invalid?'Revise as quantidades instaladas. Elas não podem ultrapassar o estoque recebido.':left?left+' tipo(s) de peça permanecerão em estoque e precisarão ser remanejados.':'Após salvar esta conferência, não haverá sobras de peças no estoque.';
-    var el=document.getElementById('e_closure_preview');if(el)el.textContent=message;
-    var finish=document.getElementById('e_finalize_ready');if(finish)finish.disabled=d.dirty;
-  }
-  async function saveReconcile(){
-    var d=modalDraft;if(!d||d.type!=='reconcile')return;var totals=[];
-    try{document.querySelectorAll('[data-e-installed-key]').forEach(function(input){var b=d.rows.find(function(r){return r.key===input.dataset.eInstalledKey;});if(input.value==='')throw new Error('Informe o total instalado de todas as peças, inclusive 0 quando não houve instalação.');var qtd=numeric(input.value,b.peca.un);if(qtd>b.instalado+b.disponivel)throw new Error('O instalado de '+b.peca.desc+' supera o material disponível.');totals.push({key:b.key,qtd:qtd});});}catch(e){error(e.message);return;}
-    var ctx=context(),meta={id:d.id,obs:document.getElementById('e_reconcile_obs').value};
-    await commit(function(s){return Estoque.reconcile(s,d.locationId,totals,ctx,meta);},function(){close();detail(d.locationId);openReconcile();showToast('Conferência salva. Confira as sobras antes de finalizar.','success');});
+    var ctx=context(),locationId=activeId;
+    await commit(function(latest){return Estoque.receive(latest,id,ctx,{id:'recebimento:'+id});},function(){detail(locationId);showToast('Recebimento conferido. Peças disponíveis no estoque.','success');});
   }
   function openFinalize(){
-    var s=state(),loc=locationData(s,activeId);if(!loc||!canClose(loc))return;var check=closureStatus(s,loc,Estoque.balances(s,loc.id));
-    if(!check.ready){openReconcile();return;}
-    if(modalDraft&&modalDraft.type==='reconcile'&&modalDraft.dirty){error('Salve a conferência atualizada antes de finalizar.');return;}
-    modalDraft={type:'finalize',locationId:loc.id,id:crypto.randomUUID()};
-    modal('Finalizar obra','<div class="estoque-notice estoque-notice-success"><strong>'+h(loc.nome)+'</strong><p>A conferência está salva, o estoque está zerado e não há remanejamentos em trânsito.</p></div><p class="estoque-help">Ao finalizar, a pasta fica disponível para consulta e o sistema registra o relatório final com o total instalado e o histórico completo. Uma eventual reabertura exige justificativa da sede.</p>'+inlineError(),button('cancel','Voltar')+button('confirm-finalize','Finalizar e gerar relatório',true));
+    var s=state(),loc=locationData(s,activeId);if(!loc||!canClose(loc))return;
+    var rows=Estoque.balances(s,loc.id),moving=transfers(s,loc.id).length,unfilled=Estoque.requests(s,loc.id).filter(function(r){return r.itens.some(function(it){return it.pendente>0;});}).length;
+    modalDraft={type:'finalize',locationId:loc.id,id:crypto.randomUUID(),moving:moving,expected:rows.map(function(b){return {key:b.key,disponivel:b.disponivel,instalado:b.instalado};})};
+    modal('Finalizar obra — '+loc.nome,'<p class="estoque-help">Remaneje as sobras antes de finalizar. O saldo que permanecer nesta pasta será registrado como instalado e o estoque será zerado.</p>'+(moving?'<div class="estoque-notice"><strong>'+moving+' remanejamento(s) ainda em trânsito.</strong><p>Aguarde a confirmação dos recebimentos antes de finalizar a obra.</p></div>':'')+'<div class="tbl-wrap"><table class="estoque-table"><thead><tr><th>Peça / medidas / cores</th><th>Unid.</th><th class="estoque-num">Saldo a registrar como instalado</th><th class="estoque-num">Total instalado no relatório</th></tr></thead><tbody>'+rows.map(function(b){return '<tr data-e-close-key="'+h(b.key)+'"><td class="estoque-piece">'+piece(b.peca)+'</td><td>'+h(b.peca.un)+'</td><td class="estoque-num estoque-available">'+num(b.disponivel)+'</td><td class="estoque-num">'+num(b.instalado+b.disponivel)+(b.instalado?'<small>'+num(b.instalado)+' já registrado(s) como instalado(s)</small>':'')+'</td></tr>';}).join('')+'</tbody></table></div>'+(!rows.length?'<p class="estoque-help">Esta pasta não possui peças registradas.</p>':'')+(unfilled?'<p class="estoque-help">Ainda há '+unfilled+' solicitação(ões) com peças não enviadas. Ao finalizar, elas sairão da fila de pendências e ficarão preservadas no histórico da obra.</p>':'')+'<label class="estoque-check"><input type="checkbox" id="e_close_remaining_confirm"> Conferi a instalação e já remanejei todas as sobras. O saldo desta prévia corresponde às peças que ficaram instaladas na obra.</label>'+field('Observações do fechamento (opcional)','e_close_obs','','placeholder="Observações sobre a conclusão da obra"')+inlineError(),button('cancel','Voltar')+(sumTypes(rows,'disponivel')?button('transfer','Remanejar sobras'):'')+button('confirm-finalize','Finalizar e gerar relatório',true,'id="e_close_submit" disabled'));
   }
   async function finalize(){
-    var d=modalDraft;if(!d||d.type!=='finalize')return;var ctx=context();
-    await commit(function(s){return Estoque.finalize(s,d.locationId,ctx,{id:d.id});},function(){close();detail(d.locationId);openReport();showToast('Obra finalizada. Relatório final gerado.','success');});
+    var d=modalDraft;if(!d||d.type!=='finalize')return;
+    if(!document.getElementById('e_close_remaining_confirm').checked){error('Confirme que as sobras foram remanejadas e que o saldo corresponde ao instalado.');return;}
+    if(d.moving){error('Aguarde a confirmação dos remanejamentos em trânsito.');return;}
+    var ctx=context(),meta={id:d.id,obs:document.getElementById('e_close_obs').value,expected:d.expected};
+    await commit(function(s){return Estoque.closeWithRemaining(s,d.locationId,ctx,meta);},function(){close();detail(d.locationId);openReport();showToast('Obra finalizada. Relatório final gerado.','success');});
   }
   function openReopen(){
     var s=state(),loc=current(s);if(!loc||!loc.finalizada||!isSede())return;
@@ -225,7 +215,7 @@
     var ctx=context();await commit(function(s){return Estoque.reopen(s,d.locationId,ctx,{id:d.id,obs:obs});},function(){close();detail(d.locationId);showToast('Obra reaberta. O relatório anterior foi preservado.','success');});
   }
   function reportBody(r,finalReport){
-    return '<h3>'+h(r.condominio)+'</h3><p>'+h(r.filial_nome||'')+' · Estrutura: '+h(r.cor_estrutura||'—')+' · Tela: '+h(r.cor_tela||'—')+' · Vagas: '+num(r.vagas)+'</p><p>'+ (finalReport?'Finalizada em '+h(dateTime(r.finalizado_em))+' · '+h(typeof r.finalizado_por==='object'?(r.finalizado_por.nome||r.finalizado_por.usuario_nome||''):r.finalizado_por||''):'Conferência emitida em '+h(dateTime(r.gerado_em)))+'</p>'+(!r.conhecido?'<p>Estoque inicial ainda não conferido. Saldos físicos pendentes de contagem.</p>':'')+'<div class="tbl-wrap"><table class="estoque-table"><thead><tr><th>Peça / medidas / cores</th><th>Unid.</th><th>Solicitado</th><th>Recebido</th><th>Remanejado</th><th>Instalado</th><th>Saldo</th><th>Diferença *</th></tr></thead><tbody>'+(r.itens||[]).map(function(b){return '<tr><td class="estoque-piece">'+piece(b.peca)+'</td><td>'+h(b.peca.un)+'</td><td>'+num(b.solicitado)+'</td><td>'+num(b.recebido)+'</td><td>'+num(b.enviado)+'</td><td>'+(r.conhecido?num(b.instalado):'A conferir')+'</td><td>'+(r.conhecido?num(b.disponivel):'A conferir')+'</td><td>'+(r.conhecido?num(b.diferenca):'—')+'</td></tr>';}).join('')+'</tbody></table></div><p class="estoque-help">* Diferença entre o solicitado e o instalado. Quantidade positiva indica peças solicitadas que não foram instaladas.</p>'+(finalReport?'<p class="estoque-help">Este relatório corresponde ao fechamento registrado. Estoque físico zerado e nenhuma peça em trânsito.</p>':'');
+    return '<h3>'+h(r.condominio)+'</h3><p>'+h(r.filial_nome||'')+' · Estrutura: '+h(r.cor_estrutura||'—')+' · Tela: '+h(r.cor_tela||'—')+' · Vagas: '+num(r.vagas)+'</p><p>'+ (finalReport?'Finalizada em '+h(dateTime(r.finalizado_em))+' · '+h(typeof r.finalizado_por==='object'?(r.finalizado_por.nome||r.finalizado_por.usuario_nome||''):r.finalizado_por||''):'Conferência emitida em '+h(dateTime(r.gerado_em)))+'</p>'+'<div class="tbl-wrap"><table class="estoque-table"><thead><tr><th>Peça / medidas / cores</th><th>Unid.</th><th>Solicitado</th><th>Recebido</th><th>Remanejado</th><th>Instalado</th><th>Saldo</th><th>Diferença *</th></tr></thead><tbody>'+(r.itens||[]).map(function(b){return '<tr><td class="estoque-piece">'+piece(b.peca)+'</td><td>'+h(b.peca.un)+'</td><td>'+num(b.solicitado)+'</td><td>'+num(b.recebido)+'</td><td>'+num(b.enviado)+'</td><td>'+num(b.instalado)+'</td><td>'+num(b.disponivel)+'</td><td>'+num(b.diferenca)+'</td></tr>';}).join('')+'</tbody></table></div><p class="estoque-help">* Diferença entre o solicitado e o instalado. Quantidade positiva indica peças solicitadas que não foram instaladas.</p>'+(finalReport?'<p class="estoque-help">Este relatório corresponde ao fechamento registrado. Estoque físico zerado e nenhuma peça em trânsito.</p>':'');
   }
   function openReport(){
     var s=state(),loc=locationData(s,activeId);if(!loc||loc.tipo!=='condominio'||!visible(loc))return;
@@ -238,15 +228,13 @@
     var s=state(),r=d.report,area=document.getElementById('printArea');if(!area)return;
     area.innerHTML='<div class="estoque-print"><div class="estoque-print-heading">'+(typeof LOGO_URI==='string'?'<img src="'+h(LOGO_URI)+'" alt="Sombrear" style="height:44px">':'')+'<h2>'+ (d.finalReport?'Relatório final da obra':'Conferência de materiais')+'</h2></div>'+reportBody(r,d.finalReport)+'<h3>Histórico de movimentações</h3>'+historyHtml(s,r.movimentacoes||[]).replace(/<details>/g,'<details open>')+'<div class="pr-sign-wrap" style="margin-top:48px"><div class="pr-sign">SOMBREAR INDÚSTRIA</div><div class="pr-sign">'+h(r.filial_nome||'RESPONSÁVEL PELA OBRA')+'</div></div></div>';window.print();
   }
-  async function approve(){var id=activeId,ctx=context();await commit(function(s){return Estoque.approveDemand(s,id,ctx);},function(){detail(id);showToast('Peças aceitas pela sede.','success');});}
   async function refresh(){
     if(working)return;try{await app().refresh(location.hash.slice(1),true);}catch(e){error(e.message||'Não foi possível atualizar.');}
   }
   document.addEventListener('input',function(e){
     if(e.target.id==='e_folder_search'){homeSearch=e.target.value;var grid=document.getElementById('e_folder_grid');if(grid)grid.innerHTML=folderGrid(state());}
-    if(e.target.hasAttribute('data-e-installed-key'))updateClosurePreview(true);
   });
-  document.addEventListener('change',function(e){if(e.target.id==='e_transfer_destino')updateTransferNotice();if(e.target.id==='e_folder_status'){homeStatus=e.target.value;var grid=document.getElementById('e_folder_grid');if(grid)grid.innerHTML=folderGrid(state());}});
+  document.addEventListener('change',function(e){if(e.target.id==='e_close_remaining_confirm'){var submit=document.getElementById('e_close_submit');if(submit)submit.disabled=!e.target.checked||!!(modalDraft&&modalDraft.moving);}if(e.target.id==='e_folder_status'){homeStatus=e.target.value;var grid=document.getElementById('e_folder_grid');if(grid)grid.innerHTML=folderGrid(state());}});
   document.addEventListener('click',function(e){
     var target=e.target.closest('[data-e-action]');if(!target||working||target.disabled)return;
     var action=target.dataset.eAction;
@@ -257,20 +245,19 @@
     else if(action==='refresh')refresh();
     else if(action==='transfer')openTransfer();
     else if(action==='save-transfer')saveTransfer();
-    else if(action==='receive')openReceive(target.dataset.id);
-    else if(action==='confirm-receive')receive();
-    else if(action==='baseline')openBaseline();
-    else if(action==='save-baseline')saveBaseline();
-    else if(action==='reconcile')openReconcile();
-    else if(action==='save-reconcile')saveReconcile();
+    else if(action==='receive')receive(target.dataset.id);
+    else if(action==='request')openRequest(target.dataset.id);
+    else if(action==='requests-page'){close();location.hash='sede-aprovacoes';}
+    else if(action==='dispatch-request')openRequestDispatch(target.dataset.id);
+    else if(action==='save-request-dispatch')saveRequestDispatch();
+    else if(action==='reconcile')openFinalize();
     else if(action==='finalize')openFinalize();
     else if(action==='confirm-finalize')finalize();
-    else if(action==='approve')approve();
     else if(action==='report')openReport();
     else if(action==='print-report')printReport();
     else if(action==='reopen')openReopen();
     else if(action==='save-reopen')reopen();
     else if(action==='cancel')close();
   });
-  window.EstoqueUI={home:home,detail:detail,render:render,open:open,close:close,openTransfer:openTransfer,openReconcile:openReconcile,openReport:openReport};
+  window.EstoqueUI={home:home,detail:detail,render:render,open:open,close:close,openTransfer:openTransfer,openReconcile:openFinalize,openFinalize:openFinalize,openRequest:openRequest,requestsPage:requestsPage,openReport:openReport};
 })();

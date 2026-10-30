@@ -91,8 +91,9 @@ async function main(){
   async function evaluate(expression){const r=await send('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true},sessionId);if(r.exceptionDetails)throw new Error(r.exceptionDetails.exception?.description||r.exceptionDetails.text);return r.result.value;}
   async function waitFor(expression,label){const end=Date.now()+8000;while(Date.now()<end){try{if(await evaluate(expression))return;}catch{}await pause(50);}throw new Error('Timeout: '+label+'; '+await evaluate("document.getElementById('estoqueError')?.textContent||document.getElementById('pedidoError')?.textContent||document.getElementById('errBox')?.textContent||''"));}
   const click=selector=>evaluate(`document.querySelector(${JSON.stringify(selector)}).click()`);
-  const action=name=>click('[data-e-action="'+name+'"]');
-  const pieceAction=name=>click('[data-p-action="'+name+'"]');
+  const visibleAction=(attribute,name)=>evaluate(`(()=>{const selector='[${attribute}="${name}"]',modal=document.getElementById('modalOverlay');const scope=modal.classList.contains('open')?modal:document.querySelector('.view.active');const button=scope.querySelector(selector);if(!button)throw new Error('Ação visível não encontrada: '+${JSON.stringify(name)});button.click();})()`);
+  const action=name=>visibleAction('data-e-action',name);
+  const pieceAction=name=>visibleAction('data-p-action',name);
   const fill=(selector,value)=>evaluate(`(()=>{const e=document.querySelector(${JSON.stringify(selector)});e.value=${JSON.stringify(String(value))};e.dispatchEvent(new Event(e.tagName==='SELECT'?'change':'input',{bubbles:true}));})()`);
   async function login(role){
     await evaluate("try{localStorage.removeItem('sombrear_session')}catch{} ");
@@ -112,7 +113,14 @@ async function main(){
   const state=()=>evaluate('EstoqueApp.getState()');
   const balance=(id)=>evaluate(`Estoque.balances(EstoqueApp.getState(),${JSON.stringify(id)})`);
   const history=(id)=>evaluate(`Estoque.history(EstoqueApp.getState(),${JSON.stringify(id)})`);
+  const requests=(id)=>evaluate(`Estoque.requests(EstoqueApp.getState(),${JSON.stringify(id)})`);
   const modalClosed=()=>waitFor("!document.getElementById('modalOverlay').classList.contains('open')",'modal fechado');
+  async function dashboard(role,expected){
+    await evaluate(`location.hash=${JSON.stringify(role+'-dashboard')}`);
+    await waitFor(`document.querySelector('#view-${role}-dashboard.active .kpi-val')`,'dashboard '+role);
+    const values=await evaluate("Object.fromEntries(Array.from(document.querySelectorAll('.view.active .kpi')).map(k=>[k.querySelector('.kpi-label').textContent,Number(k.querySelector('.kpi-val').textContent)]))");
+    for(const [label,value] of Object.entries(expected))assert.equal(values[label],value,'dashboard '+role+': '+label);
+  }
   async function checkStockCards(role){
     await waitFor("document.querySelector('.view.active .estoque-stock-grid')",'cards dos estoques');
     const cards=await evaluate("Array.from(document.querySelectorAll('.view.active .estoque-stock-grid .estoque-location-card')).map(c=>({name:c.querySelector('h2').textContent,id:c.querySelector('[data-e-action=\"open\"]').dataset.id}))");
@@ -160,48 +168,66 @@ async function main(){
     await modalClosed();assert.equal(patches,previous+1,'clique duplo gera uma única gravação');
     assert.equal((await balance(id))[0].solicitado,qtd);
   }
-  async function transfer(from,to,key,qtd,{conflict=false,unconfirmed=false}={}){
+  async function transfer(from,to,key,qtd){
     await open(from);await action('transfer');
     await waitFor("document.getElementById('e_transfer_destino')",'remanejamento aberto');
-    if(unconfirmed){
-      const option=await evaluate(`(()=>{const e=Array.from(document.querySelectorAll('#e_transfer_destino option')).find(e=>e.value===${JSON.stringify(to)});return e?{label:e.textContent,disabled:e.disabled}:null;})()`);
-      assert.ok(option,'condomínio antigo aparece entre os destinos');assert.equal(option.disabled,false);
-      assert.match(option.label,/confer|inicial/i,'opção informa a necessidade de conferência inicial');
-    }
+    const option=await evaluate(`Array.from(document.querySelectorAll('#e_transfer_destino option')).some(e=>e.value===${JSON.stringify(to)}&&!e.disabled)`);
+    assert.equal(option,true,'destino ativo aparece e pode ser selecionado');
     await fill('#e_transfer_destino',to);await fill('#e_transfer_obs','Remanejamento de teste');
-    if(unconfirmed){
-      assert.equal(await evaluate("document.getElementById('e_transfer_notice').hidden"),false,'aviso do destino selecionado fica visível');
-      assert.match(await evaluate("document.getElementById('e_transfer_notice').textContent"),/conferir o estoque inicial antes de confirmar o recebimento/i,'aviso orienta conferir antes do recebimento');
-      assert.equal(await evaluate("document.querySelector('[data-e-action=\"save-transfer\"]').disabled"),false,'aviso não bloqueia o envio');
-    }
     await fillKey('data-e-transfer-key',key,qtd);
-    if(conflict){
-      const before=clone(records());conflictNext=true;await action('save-transfer');
-      await waitFor("document.getElementById('estoqueError')?.textContent.includes('Outro usuário')",'conflito de estoque tratado');
-      assert.deepEqual(records().filter(p=>p.tipo_registro!=='controle_estoque'),before.filter(p=>p.tipo_registro!=='controle_estoque'),'conflito não altera as pastas');
-      const concurrent=Core.fromRecords(records(),store.filiais,store.catalogo);
-      assert.ok(concurrent.movimentos.some(m=>m.id==='parallel-stock-entry'));
-      assert.equal(Core.balances(concurrent,from).find(b=>b.key===key).disponivel,100,'transferência rejeitada não reduz a origem');
-    }
     const previous=patches;
-    await evaluate("document.querySelector('[data-e-action=\"save-transfer\"]').click();document.querySelector('[data-e-action=\"save-transfer\"]').click()");
+    await evaluate("(()=>{const b=document.querySelector('[data-e-action=\"save-transfer\"]');b.click();b.click();})()");
     await modalClosed();assert.equal(patches,previous+1,'remanejamento é uma única gravação atômica');
     const moves=(await state()).movimentos.filter(m=>m.tipo==='transferencia'&&m.origem_id===from&&m.destino_id===to);
     assert.ok(moves.length);return moves.at(-1).id;
   }
   async function receive(id,moveId){
-    await open(id);await click('[data-e-action="receive"][data-id="'+moveId+'"]');
-    await waitFor("document.querySelector('[data-e-action=\"confirm-receive\"]')",'confirmação do recebimento');
+    await open(id);
+    const selector='.view.active [data-e-action="receive"][data-id="'+moveId+'"]';
+    assert.match(await evaluate(`document.querySelector(${JSON.stringify(selector)}).textContent`),/conferido/i);
     const before=patches;
-    await evaluate("document.querySelector('[data-e-action=\"confirm-receive\"]').click();document.querySelector('[data-e-action=\"confirm-receive\"]').click()");
-    await modalClosed();assert.equal(patches,before+1);
+    await evaluate(`(()=>{const b=document.querySelector(${JSON.stringify(selector)});b.click();b.click();})()`);
+    await waitFor(`EstoqueApp.getState().movimentos.filter(m=>m.tipo==='recebimento'&&m.referencia_id===${JSON.stringify(moveId)}).length===1`,'recebimento com um clique');
+    await modalClosed();assert.equal(patches,before+1,'Conferido não abre formulário nem duplica o recebimento');
     assert.equal((await state()).movimentos.filter(m=>m.tipo==='recebimento'&&m.referencia_id===moveId).length,1);
+  }
+  async function openRequests(){
+    await evaluate("if(location.hash==='#sede-aprovacoes'){EstoqueUI.requestsPage();}else location.hash='sede-aprovacoes';");
+    await waitFor("document.querySelector('#view-sede-aprovacoes.active [data-e-request]')",'solicitações da sede');
+  }
+  async function dispatchRequest(id,key,qtd,{conflict=false,expectError=false}={}){
+    await openRequests();
+    const request=(await requests()).find(r=>r.id===id);
+    const pendingSelector='.view.active [data-e-request="'+id+'"] [data-e-request-row="'+key+'"] [data-e-request-value="pendente"]';
+    assert.equal(await evaluate(`document.querySelector(${JSON.stringify(pendingSelector)}).textContent.trim()`),String(request.itens.find(it=>it.key===key).pendente),'lista exibe a quantidade que falta enviar');
+    await click('.view.active [data-e-action="dispatch-request"][data-id="'+id+'"]');
+    await waitFor("document.querySelector('[data-e-request-key]')",'envio da solicitação');
+    await fillKey('data-e-request-key',key,qtd);
+    const before=clone(records()),previous=patches;
+    if(expectError){
+      await action('save-request-dispatch');
+      await waitFor("!!document.getElementById('estoqueError')?.textContent",'envio acima do estoque bloqueado');
+      assert.match(await evaluate("document.getElementById('estoqueError').textContent"),/saldo|estoque|disponível/i);
+      assert.deepEqual(records(),before);assert.equal(patches,previous);return;
+    }
+    if(conflict){
+      conflictNext=true;await action('save-request-dispatch');
+      await waitFor("document.getElementById('estoqueError')?.textContent.includes('Outro usuário')",'conflito durante atendimento tratado');
+      const concurrent=Core.fromRecords(records(),store.filiais,store.catalogo);
+      assert.ok(concurrent.movimentos.some(m=>m.id==='parallel-stock-entry'));
+      assert.equal(Core.balances(concurrent,'estoque-go').find(b=>b.key===key).disponivel,70,'envio rejeitado não altera o estoque da solicitação');
+      assert.deepEqual(records().filter(p=>p.tipo_registro!=='controle_estoque'),before.filter(p=>p.tipo_registro!=='controle_estoque'));
+    }
+    await evaluate("(()=>{const b=document.querySelector('[data-e-action=\"save-request-dispatch\"]');b.click();b.click();})()");
+    await modalClosed();assert.equal(patches,previous+1,'atendimento com clique duplo gera apenas um envio');
+    return (await state()).movimentos.filter(m=>m.tipo==='transferencia'&&m.origem_id==='estoque-go'&&m.destino_id===request.pasta_id).at(-1).id;
   }
   await login('filial');await checkStockCards('filial');
   const pid=await folder('Condomínio Riacho 33',130);
-  await demand(pid,80,true);
+  await demand(pid,100,true);
   const secondId=await folder('Condomínio Parque 10',20);
   await demand(secondId,10);
+  const directId=await folder('Condomínio Recebimento Direto',8);
   assert.equal((await balance(pid))[0].disponivel,0,'demanda não cria estoque');
   assert.equal(records().find(p=>p.id===pid).cor_tela,'Prata');
   assert.equal(records().find(p=>p.id===pid).vagas,130);
@@ -228,11 +254,15 @@ async function main(){
   }
   console.log('OK: seleção no catálogo herda estrutura Preta e tela Verde da pasta, sem cores padrão indevidas.');
   await login('sede');await checkStockCards('sede');await shot('estoque-home');
-  for(const id of [pid,secondId]){await open(id);await action('approve');await waitFor(`Estoque.balances(EstoqueApp.getState(),${JSON.stringify(id)})[0].aprovado>0`,'demanda aprovada');}
   const go='estoque-go',df='estoque-filial-df';
-  await open(go);await click('[data-e-action="add-items"][data-mode="estoque"]');
+  const mainRequest=(await requests(pid)).find(r=>r.itens.some(it=>it.solicitado===100));
+  assert.ok(mainRequest,'demanda da filial cria solicitação individual para a sede');
+  assert.equal(mainRequest.itens[0].pendente,100);
+  assert.equal((await requests(coloredId))[0].itens.find(it=>it.peca.catalogo_id===catalog[0].id).peca.cor,'Preta');
+  assert.equal((await requests(coloredId))[0].itens.find(it=>it.peca.catalogo_id===catalog[4].id).peca.cor,'Verde');
+  await open(go);await click('.view.active [data-e-action="add-items"][data-mode="estoque"]');
   await waitFor("document.querySelector('[data-line-field=\"desc\"]')",'entrada de peças prontas');
-  for(const [i,entry] of [{qtd:100,cor:'Branca',ma:'2.4'},{qtd:25,cor:'Preta',ma:'2,40'},{qtd:15,cor:'Branca',ma:'3,00'}].entries()){
+  for(const [i,entry] of [{qtd:70,cor:'Branca',ma:'2.4'},{qtd:25,cor:'Preta',ma:'2,40'},{qtd:15,cor:'Branca',ma:'3,00'}].entries()){
     if(i)await pieceAction('add-row');
     await fill('[data-line="'+i+'"][data-line-field="desc"]',catalog[0].desc);
     await fill('[data-line="'+i+'"][data-line-field="qtd"]',entry.qtd);
@@ -243,63 +273,127 @@ async function main(){
   const variants=await balance(go);
   assert.equal(variants.length,3,'cores e medidas diferentes ficam separadas');
   assert.equal(variants.find(b=>b.disponivel===25).key,pillar.key,'pilar solicitado preto corresponde ao estoque preto');
-  const key=variants.find(b=>b.disponivel===100).key;
+  const key=variants.find(b=>b.disponivel===70).key;
   assert.equal((await balance(pid))[0].key,key,'2,40 e 2.4 identificam a mesma peça');
-  const firstMove=await transfer(go,pid,key,80,{conflict:true});
+  const firstMove=await dispatchRequest(mainRequest.id,key,50,{conflict:true});
   assert.equal((await balance(go)).find(b=>b.key===key).disponivel,20);
   assert.equal((await balance(pid))[0].disponivel,0);
-  assert.equal((await balance(pid))[0].em_transito_entrada,80);
+  assert.equal((await balance(pid))[0].em_transito_entrada,50);
+  assert.equal((await requests(pid)).find(r=>r.id===mainRequest.id).itens[0].pendente,50);
   assert.ok((await state()).movimentos.some(m=>m.id==='parallel-stock-entry'),'retry preserva movimento concorrente');
   assert.match((await balance(go)).find(b=>b.disponivel===26).peca.cor,/preta/i);
   assert.equal(Number(String((await balance(go)).find(b=>b.disponivel===15).peca.ma).replace(',','.')),3);
-  console.log('OK: GO recebe peças prontas por variante; transferência atômica reserva origem e aguarda confirmação do destino.');
+  await dashboard('sede',{'Condomínios':5,'Solicitações Pendentes':4,'Remanejamentos em trânsito':1,'Obras finalizadas':0});
+  await shot('estoque-dashboard-sede');
+  await click('.view.active [data-e-action="request"][data-id="'+mainRequest.id+'"]');
+  await waitFor(`document.querySelector('#view-sede-pedido.active [data-e-request="${mainRequest.id}"]')`,'dashboard abre a solicitação na pasta');
+  assert.equal(await evaluate("document.querySelector('.view.active h1').textContent"),'Condomínio Riacho 33');
+  assert.equal(await evaluate(`document.querySelector('.view.active [data-e-request="${mainRequest.id}"] [data-e-request-value="pendente"]').textContent.trim()`),'50');
+  await openRequests();await send('Page.reload',{},sessionId);
+  await waitFor("typeof EstoqueApp!=='undefined' && typeof USER!=='undefined' && USER && !document.getElementById('bootOv')",'pendências após recarregar');
+  await openRequests();
+  assert.equal((await requests(pid)).find(r=>r.id===mainRequest.id).itens[0].pendente,50);
+  assert.ok(await evaluate(`document.querySelector('.view.active [data-e-request="${mainRequest.id}"]')!==null`),'solicitação parcial continua na lista da sede');
+  assert.equal(await evaluate(`document.querySelector('.view.active [data-e-request="${mainRequest.id}"] [data-e-request-value="pendente"]').textContent.trim()`),'50');
+  await shot('estoque-solicitacao-parcial');
+  await dispatchRequest(mainRequest.id,key,50,{expectError:true});await action('cancel');
+  await open(go);await click('.view.active [data-e-action="add-items"][data-mode="estoque"]');
+  await fill('[data-line="0"][data-line-field="desc"]',catalog[0].desc);
+  await fill('[data-line="0"][data-line-field="ma"]','2,40');
+  await fill('[data-line="0"][data-line-field="qtd"]',50);
+  await fill('[data-line="0"][data-line-field="cor"]','Branca');
+  await pieceAction('submit');await modalClosed();
+  const secondMove=await dispatchRequest(mainRequest.id,key,50);
+  assert.equal((await requests(pid)).find(r=>r.id===mainRequest.id).itens[0].pendente,0);
+  assert.equal((await requests(pid)).find(r=>r.id===mainRequest.id).status,'enviado');
+  assert.equal((await balance(go)).find(b=>b.key===key).disponivel,20);
+  assert.equal((await balance(pid))[0].em_transito_entrada,100);
+  await openRequests();
+  assert.equal(await evaluate(`document.querySelector('.view.active [data-e-action="dispatch-request"][data-id="${mainRequest.id}"]')===null`),true,'solicitação atendida não permanece pendente');
+  assert.equal((await requests()).filter(r=>r.pasta_id===coloredId&&r.status==='pendente').length,1,'envio branco não abate demanda de outras cores');
+  assert.deepEqual(await requests(directId),[],'pasta vazia não exige solicitação para receber');
+  const directMove=await transfer(go,directId,key,4);
+  assert.deepEqual(await requests(directId),[],'remanejamento direto não cria pedido artificial');
+  const legacyItemsBefore=clone(records().find(p=>p.id==='legado').itens);
+  const legacyMove=await transfer(go,'legado',key,4);
+  assert.equal((await balance('legado'))[0].disponivel,0,'envio não presume estoque a partir do pedido antigo');
+  assert.equal((await balance('legado'))[0].em_transito_entrada,4);
+  assert.equal((await balance(go)).find(b=>b.key===key).disponivel,12);
+  console.log('OK: solicitação 100 → envio 50 → pendência 50 após reload → envio 50 → zero; saldo GO limita envios e variantes permanecem separadas.');
   await login('filial');await checkStockCards('filial');
   console.log('OK: DF e GO cadastradas geram somente um estoque GO; filial consulta GO sem adicionar ou remanejar.');
-  await receive(pid,firstMove);
-  assert.equal((await balance(pid))[0].disponivel,80);
-  assert.equal((await balance(pid))[0].em_transito_entrada,0);
-  const between=await transfer(pid,secondId,key,10);
-  assert.equal((await balance(pid))[0].disponivel,70);
-  assert.equal((await balance(secondId))[0].disponivel,0);
-  await receive(secondId,between);
+  await dashboard('filial',{'Condomínios':5,'Solicitações Pendentes':3,'Recebimentos a conferir':4,'Vagas concluídas':0});
+  await receive(pid,firstMove);assert.equal((await balance(pid))[0].disponivel,50);
+  await receive(pid,secondMove);assert.equal((await balance(pid))[0].disponivel,100);
+  await receive(directId,directMove);assert.equal((await balance(directId))[0].disponivel,4);
+  await receive('legado',legacyMove);
+  assert.equal((await balance('legado'))[0].disponivel,4,'Conferido acrescenta só o recebido, sem inferir as vinte peças antigas');
+  assert.equal((await balance('legado'))[0].em_transito_entrada,0);
+  assert.equal(await evaluate("document.querySelector('.view.active .estoque-available').textContent.trim()"),'4','legado mostra o saldo físico recebido na tela');
+  assert.equal(await evaluate("document.querySelector('.view.active [data-e-action=\"baseline\"]')===null"),true,'recebimento antigo não exige conferência inicial');
+  assert.deepEqual(records().find(p=>p.id==='legado').itens,legacyItemsBefore);
+  const between=await transfer(pid,secondId,key,10);await receive(secondId,between);
   assert.equal((await balance(secondId))[0].disponivel,10);
-  const returned=await transfer(pid,df,key,5);await receive(df,returned);
+  const returned=await transfer(pid,df,key,25);await receive(df,returned);
   assert.equal((await balance(pid))[0].disponivel,65);
-  assert.equal((await balance(df))[0].disponivel,5);
+  assert.equal((await balance(df))[0].disponivel,25);
   for(const id of [pid,secondId])assert.ok((await history(id)).some(m=>m.id===between),'histórico nas duas pontas');
-  console.log('OK: confirmação de recebimento, remanejamento entre condomínios e devolução ao DF com histórico.');
-  await open(pid);await action('reconcile');
-  await waitFor("document.querySelector('[data-e-installed-key]')",'conferência final');
-  assert.equal(await evaluate("document.querySelector('[data-e-installed-key]').value"),'0','instalado não é presumido');
-  await fillKey('data-e-installed-key',key,60);await action('save-reconcile');
-  await waitFor(`Estoque.balances(EstoqueApp.getState(),${JSON.stringify(pid)})[0].instalado===60`,'instalado conferido');
-  assert.equal((await balance(pid))[0].instalado,60);
-  assert.equal((await balance(pid))[0].disponivel,5);
-  assert.notEqual((await state()).pastas.find(p=>p.id===pid).status_obra,'finalizada');
-  assert.ok(await evaluate("!document.querySelector('[data-e-action=\"finalize\"]') || document.querySelector('[data-e-action=\"finalize\"]').disabled"),'fechamento indisponível com sobras');
-  await shot('estoque-sobras-fechamento');await action('cancel');
+  console.log('OK: Conferido recebe com um clique, inclusive legado sem formulário; filial remaneja entre obras e DF com histórico.');
+  await open(pid);await action('finalize');
+  await waitFor("document.getElementById('e_close_remaining_confirm')",'prévia do fechamento');
+  assert.equal(await evaluate("document.querySelector('[data-e-installed-key]')===null"),true,'instalado não precisa ser digitado');
+  assert.equal(await evaluate("document.getElementById('e_close_remaining_confirm').checked"),false,'conversão do saldo exige confirmação prévia');
+  assert.match(await evaluate(`document.querySelector('[data-e-close-key="${key}"]').textContent`),/65/);
+  await action('cancel');
+  assert.equal((await balance(pid))[0].disponivel,65);assert.equal((await balance(pid))[0].instalado,0,'cancelar prévia não altera estoque');
   const leftovers=await transfer(pid,df,key,5);
-  assert.equal((await balance(pid))[0].disponivel,0);
-  assert.equal((await balance(pid))[0].em_transito_saida,5);
-  assert.ok(await evaluate("!document.querySelector('[data-e-action=\"finalize\"]') || document.querySelector('[data-e-action=\"finalize\"]').disabled"),'fechamento indisponível com saída em trânsito');
-  await receive(df,leftovers);await open(pid);
-  await action('finalize');await waitFor("document.querySelector('[data-e-action=\"confirm-finalize\"]')",'confirmação de finalização');
-  await action('confirm-finalize');await waitFor(`EstoqueApp.getState().pastas.find(p=>p.id===${JSON.stringify(pid)}).status_obra==='finalizada'`,'obra finalizada');
+  assert.equal((await balance(pid))[0].disponivel,60);assert.equal((await balance(pid))[0].em_transito_saida,5);
+  await action('finalize');
+  await waitFor("document.getElementById('modalOverlay').classList.contains('open')",'fechamento com trânsito');
+  assert.match(await evaluate("document.getElementById('modalBox').textContent"),/trânsito|recebimento/i);
+  assert.equal(await evaluate("!document.querySelector('[data-e-action=\"confirm-finalize\"]') || document.querySelector('[data-e-action=\"confirm-finalize\"]').disabled"),true,'trânsito impede finalizar');
+  await shot('estoque-sobras-fechamento');await action('cancel');
+  await receive(df,leftovers);await open(pid);await action('finalize');
+  await waitFor("document.getElementById('e_close_remaining_confirm')",'prévia do saldo restante');
+  assert.match(await evaluate(`document.querySelector('[data-e-close-key="${key}"]').textContent`),/60/);
+  // Outro operador recebe uma peça depois que a prévia foi aberta. O saldo exibido não pode ser fechado silenciosamente.
+  let concurrent=Core.fromRecords(records(),store.filiais,store.catalogo);
+  const ctxSede={...store.usuarios[0],data:'2026-10-29',agora:'2026-10-29T16:00:00Z'};
+  const ctxFilial={...store.usuarios[1],data:'2026-10-29',agora:'2026-10-29T16:01:00Z'};
+  concurrent=Core.transfer(concurrent,go,pid,[{key,qtd:1}],ctxSede,{id:'parallel-close-transfer'});
+  concurrent=Core.receive(concurrent,'parallel-close-transfer',ctxFilial,{id:'parallel-close-receipt'});
+  store.pastas_estoques=Core.toRecords(concurrent);version++;
+  const beforeStale=patches;
+  await click('#e_close_remaining_confirm');await action('confirm-finalize');
+  await waitFor("!!document.getElementById('estoqueError')?.textContent",'prévia desatualizada bloqueada');
+  assert.match(await evaluate("document.getElementById('estoqueError').textContent"),/saldo|estoque|quantidade|conferência/i);
+  assert.equal(patches,beforeStale,'prévia desatualizada não grava fechamento');
+  assert.notEqual(Core.fromRecords(records(),store.filiais,store.catalogo).pastas.find(p=>p.id===pid).status_obra,'finalizada');
+  assert.equal(Core.balances(Core.fromRecords(records(),store.filiais,store.catalogo),pid)[0].disponivel,61);
+  await action('cancel');await evaluate('EstoqueApp.refresh(undefined,true)');
+  const corrective=await transfer(pid,df,key,1);await receive(df,corrective);
+  await open(pid);await action('finalize');await waitFor("document.getElementById('e_close_remaining_confirm')",'nova prévia atualizada');
+  await click('#e_close_remaining_confirm');await action('confirm-finalize');
+  await waitFor(`EstoqueApp.getState().pastas.find(p=>p.id===${JSON.stringify(pid)}).status_obra==='finalizada'`,'obra finalizada');
   const closed=(await state()).pastas.find(p=>p.id===pid);
   assert.equal(closed.status_obra,'finalizada');assert.ok(closed.relatorio_final);
   const report=await evaluate(`Estoque.report(EstoqueApp.getState(),${JSON.stringify(pid)})`);
   assert.equal(report.itens.find(b=>b.key===key).instalado,60);
   assert.equal(report.itens.find(b=>b.key===key).disponivel,0);
-  assert.equal(report.itens.find(b=>b.key===key).solicitado,80);
+  assert.equal(report.itens.find(b=>b.key===key).solicitado,100);
   assert.equal(await evaluate("document.querySelector('.view.active [data-e-action=\"add-items\"]')===null && document.querySelector('.view.active [data-e-action=\"transfer\"]')===null"),true,'obra finalizada bloqueia alterações');
-  await action('report');await waitFor("document.getElementById('modalOverlay').classList.contains('open')",'relatório final');
+  if(!await evaluate("document.getElementById('modalOverlay').classList.contains('open')"))await action('report');
+  await waitFor("document.getElementById('modalOverlay').classList.contains('open')",'relatório final');
   assert.match(await evaluate("document.getElementById('modalBox').textContent"),/Riacho 33/);
   await shot('estoque-relatorio-final');
   await evaluate('window.print=()=>{window.printed=true;}');await action('print-report');
   assert.equal(await evaluate('window.printed'),true);
   assert.match(await evaluate("document.getElementById('printArea').textContent"),/Relatório final da obra/);
   await action('cancel');
-  console.log('OK: instalação só no fechamento; sobras e trânsito bloqueiam conclusão; relatório final preserva solicitado e instalado.');
+  console.log('OK: fechamento converte o saldo restante em 60 instalados; trânsito e prévia desatualizada bloqueiam, relatório final preserva solicitado e histórico.');
+  await dashboard('filial',{'Condomínios':5,'Solicitações Pendentes':2,'Recebimentos a conferir':0,'Vagas concluídas':130});
+  await shot('estoque-dashboard-filial');
+  console.log('OK: dashboards contam solicitações, recebimentos e obras concluídas corretamente; sede abre a solicitação pela lista do dashboard.');
   await send('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true},sessionId);
   await open(df);await pause(400);await shot('estoque-mobile');
   assert.ok(await evaluate('document.documentElement.scrollWidth<=window.innerWidth'),'sem rolagem horizontal da página');
@@ -307,39 +401,16 @@ async function main(){
   await send('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false},sessionId);
   const persisted=clone(records());await send('Page.reload',{},sessionId);
   await waitFor("typeof EstoqueApp!=='undefined' && typeof USER!=='undefined' && USER && !document.getElementById('bootOv')",'recarregamento');
-  assert.deepEqual(records(),persisted);assert.equal((await balance(df))[0].disponivel,10);
+  assert.deepEqual(records(),persisted);assert.equal((await balance(df))[0].disponivel,31);
+  assert.equal((await balance('legado'))[0].disponivel,4);
   assert.equal((await state()).pastas.find(p=>p.id===pid).status_obra,'finalizada');
   assert.deepEqual(store.pedidos,archivedOrders,'novo sistema não altera os pedidos arquivados');
   store.pedidos=[];version++;await send('Page.reload',{},sessionId);
   await waitFor("typeof EstoqueApp!=='undefined' && typeof USER!=='undefined' && USER && !document.getElementById('bootOv')",'recarrega após escrita de aba antiga');
-  assert.equal((await balance(df))[0].disponivel,10,'escrita de aba antiga não apaga estoque');
+  assert.equal((await balance(df))[0].disponivel,31,'escrita de aba antiga não apaga estoque');
   assert.deepEqual(records(),persisted);store.pedidos=clone(archivedOrders);
-  await login('sede');await open('legado');
-  const oldBefore=clone(records().find(p=>p.id==='legado').itens);
-  assert.equal((await balance('legado'))[0].disponivel,0,'legado não inventa estoque');
-  const legacyMove=await transfer(go,'legado',key,4,{unconfirmed:true});
-  assert.equal((await balance(go)).find(b=>b.key===key).disponivel,16,'GO desconta o envio ao condomínio antigo');
-  assert.equal((await balance('legado'))[0].disponivel,0,'envio não presume o saldo inicial do condomínio');
-  assert.equal((await balance('legado'))[0].em_transito_entrada,4);
-  assert.equal((await balance('legado'))[0].conhecido,false);
-  await login('filial');await open('legado');
-  assert.equal(await evaluate(`document.querySelector('.view.active [data-e-action="receive"][data-id="${legacyMove}"]')===null`),true,'recebimento aguarda a conferência inicial');
-  assert.ok(await evaluate("document.querySelector('.view.active [data-e-action=\"baseline\"]')!==null"),'filial pode conferir o estoque inicial');
-  await action('baseline');await waitFor("document.querySelector('[data-e-baseline-key]')",'conferência do legado');
-  await evaluate("(()=>{document.querySelector('[data-e-baseline-field=\"disponivel\"]').value='7';document.querySelector('[data-e-baseline-field=\"instalado\"]').value='3';})()");
-  await click('#e_baseline_confirm');await action('save-baseline');await modalClosed();
-  assert.equal((await balance('legado'))[0].disponivel,7);
-  assert.equal((await balance('legado'))[0].instalado,3);
-  assert.deepEqual(records().find(p=>p.id==='legado').itens,oldBefore);
-  assert.equal((await balance('legado'))[0].em_transito_entrada,4,'conferência inicial mantém o envio pendente');
-  await receive('legado',legacyMove);
-  assert.equal((await balance('legado'))[0].disponivel,11,'recebimento acrescenta as quatro peças uma única vez');
-  assert.equal((await balance('legado'))[0].instalado,3);
-  assert.equal((await balance('legado'))[0].em_transito_entrada,0);
-  assert.deepEqual(records().find(p=>p.id==='legado').itens,oldBefore);
-  assert.ok((await history('legado')).some(m=>m.id===legacyMove));
-  console.log('OK: condomínio antigo aparece no remanejamento; envio fica em trânsito até conferência inicial e recebimento único.');
-  console.log('OK: mobile, recarregamento e conferência explícita de legado preservam peças e saldos.');
+  assert.deepEqual(records().find(p=>p.id==='legado').itens,legacyItemsBefore);
+  console.log('OK: mobile, recarregamento e legado preservam peças e saldos.');
   const snapshot=clone(records());failRead=true;
   await send('Page.reload',{},sessionId);
   await waitFor("document.getElementById('bootOv')?.textContent.includes('Erro ao conectar')",'falha de leitura exibida');

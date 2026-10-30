@@ -1,6 +1,7 @@
 .estoque-view{max-width:1500px;margin:0 auto}
 .estoque-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
 .estoque-main-actions{margin-bottom:20px}
+.estoque-view [data-e-action]:disabled,.estoque-modal [data-e-action]:disabled{opacity:.45;cursor:not-allowed}
 .estoque-view .page-hdr .btn-sm{margin-bottom:12px}
 .estoque-help{font-size:12px;line-height:1.7;color:#64748b;margin:8px 0}
 .estoque-stock-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;margin:0 0 30px}
@@ -68,6 +69,16 @@
 .estoque-transfer h3{font-size:13px;font-weight:600;line-height:1.6;margin-top:7px}
 .estoque-transfer header p{font-size:11px;color:#94a3b8;margin:3px 0}
 .estoque-transfer ul{padding-left:20px;font-size:12px;line-height:1.9;color:#475569;margin:12px 0 0}
+.estoque-request{border-bottom:1px solid #e2e8f0;padding:16px 0;scroll-margin-top:80px}
+.estoque-request:last-child{border-bottom:0}
+.estoque-request>header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:0 20px 14px}
+.estoque-request h3{font-size:13px;color:#334155;line-height:1.6;margin:0}
+.estoque-request header p{font-size:11px;color:#64748b;line-height:1.6;margin:4px 0 0}
+.estoque-request-pending{font-weight:700;background:#fffbeb;color:#926200}
+.estoque-request-note{padding:0 20px;margin-bottom:0}
+.estoque-request-highlight{box-shadow:inset 3px 0 #9acd32}
+.estoque-requests>.estoque-table-body>.estoque-empty{border:0}
+.estoque-pending-requests .btn{white-space:nowrap}
 .estoque-history{list-style:none;padding:0;margin:0}
 .estoque-history>li{padding:0 0 20px 18px;margin-left:4px;border-left:2px solid #e0ebd5;position:relative;font-size:12px;line-height:1.7}
 .estoque-history>li:before{position:absolute;content:'';width:8px;height:8px;border-radius:50%;background:#9acd32;left:-5px;top:6px}
@@ -99,6 +110,7 @@
 .estoque-error-text{color:#b91c1c}
 .estoque-check{display:flex;align-items:flex-start;gap:9px;margin:18px 0 0;font-size:12px;color:#475569;line-height:1.6}
 .estoque-check input{margin-top:3px;flex:none;width:16px;height:16px;accent-color:#6fae2e}
+.estoque-check+.fg{margin-top:16px}
 .estoque-closure-preview{font-size:12px;color:#475569;background:#f8fafc;border-radius:7px;padding:12px 14px;line-height:1.7;margin-bottom:16px}
 .estoque-report-history{margin-top:20px;border-top:1px solid #e2e8f0;padding-top:16px}
 .estoque-report-history>.estoque-history{margin-top:18px}

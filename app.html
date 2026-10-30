@@ -590,7 +590,7 @@ function fmtMoeda(v){return'R$ '+(v||0).toLocaleString('pt-BR',{minimumFractionD
 function uid(){return 'p'+Date.now();}
 function initials(nome){return nome?nome.split(' ').map(function(n){return n[0];}).join('').substring(0,2).toUpperCase():'??';}
 
-var STATUS_LABELS={rascunho:'Rascunho',aguardando:'Aguardando Aprovação',aprovado:'Aprovado',em_fabricacao:'Em Fabricação',pronto_envio:'Pronto para Envio',em_transito:'Em Trânsito',entregue:'Entregue ✓',concluido:'Concluído ✅',inativo:'Inativo'};
+var STATUS_LABELS={rascunho:'Rascunho',aguardando:'Peças pendentes',aprovado:'Aprovado',em_fabricacao:'Em Fabricação',pronto_envio:'Pronto para Envio',em_transito:'Em Trânsito',entregue:'Entregue ✓',concluido:'Concluído ✅',inativo:'Inativo'};
 var STATUS_NEXT={aguardando:'aprovado',aprovado:'em_fabricacao',em_fabricacao:'pronto_envio',pronto_envio:'em_transito',em_transito:'entregue',entregue:'concluido'};
 
 var ITEM_STATUS_FLOW=['aguardando','aprovado','em_fabricacao','pronto_envio','em_transito','entregue','concluido'];
@@ -646,12 +646,14 @@ var ROUTES_FILIAL=[
 var ROUTES_SEDE=[
   {hash:'sede-dashboard',label:'📊 Dashboard',title:'Dashboard'},
   {hash:'sede-pedidos',label:'📁 Pastas e Estoques',title:'Pastas e Estoques'},
-  {hash:'sede-aprovacoes',label:'✅ Aprovações',title:'Aprovações',badge:true},
+  {hash:'sede-aprovacoes',label:'📋 Solicitações Pendentes',title:'Solicitações de Peças',badge:true},
   {hash:'sede-filiais',label:'🏢 Filiais',title:'Filiais'},
   {hash:'sede-catalogo',label:'💰 Catálogo de Preços',title:'Catálogo de Preços'},
   {hash:'sede-usuarios',label:'👥 Usuários',title:'Usuários'},
   {hash:'sede-relatorios',label:'📈 Relatórios',title:'Relatórios'}
 ];
+
+function solicitacoesPendentes(){return Estoque.requests(EstoqueApp.getState()).filter(function(r){return r.ativo&&r.itens.some(function(it){return it.pendente>0;});});}
 
 function buildSidebar(){
   var routes=USER.role==='sede'?ROUTES_SEDE:ROUTES_FILIAL;
@@ -659,7 +661,7 @@ function buildSidebar(){
   routes.forEach(function(r){
     var badgeHtml='';
     if(r.badge){
-      var cnt=DB.pedidos().filter(function(p){return p.status==='aguardando';}).length;
+      var cnt=solicitacoesPendentes().length;
       if(cnt>0)badgeHtml='<span class="nav-badge">'+cnt+'</span>';
     }
     html+='<a class="nav-item" href="#'+r.hash+'" data-hash="'+r.hash+'">'+r.label+badgeHtml+'</a>';
@@ -680,7 +682,7 @@ function buildSidebar(){
   document.getElementById('tbAv').textContent=initials(USER.nome);
   document.getElementById('tbName').textContent=USER.nome;
   if(USER.role==='sede'){
-    var pend=DB.pedidos().filter(function(p){return p.status==='aguardando';}).length;
+    var pend=solicitacoesPendentes().length;
     document.getElementById('notifDot').style.display=pend>0?'block':'none';
   }
 }
@@ -726,10 +728,10 @@ function toggleSidebar(){
 // ════════════════════════════════════════════
 function renderFilialDash(){
   var peds=DB.pedidos().filter(function(p){return p.filial_id===USER.filial_id;});
-  var emFab=peds.filter(function(p){return p.status==='em_fabricacao';}).length;
-  var prontos=peds.filter(function(p){return p.status==='pronto_envio';}).length;
-  var entregues=peds.filter(function(p){return p.status==='entregue';}).length;
-  var totalVagas=peds.filter(function(p){return p.status==='entregue';}).reduce(function(s,p){return s+p.vagas;},0);
+  var inventory=EstoqueApp.getState();
+  var emFab=solicitacoesPendentes().filter(function(r){return r.filial_id===USER.filial_id;}).length;
+  var prontos=Estoque.pendingTransfers(inventory).filter(function(m){var dest=Estoque.getLocation(inventory,m.destino_id);return dest&&dest.filial_id===USER.filial_id;}).length;
+  var totalVagas=peds.filter(function(p){return p.status_obra==='finalizada';}).reduce(function(n,p){return n+(Number(p.vagas)||0);},0);
 
   var recentRows=peds.slice(0,5).map(function(p){
     return '<tr><td><strong>'+p.cliente+'</strong></td><td>'+p.vagas+'</td><td>'+badge(p.status)+'</td><td>'+fmtDate(p.criado)+'</td><td><button class="btn btn-sm btn-outline" onclick="verPedidoFilial(\''+p.id+'\')">Ver →</button></td></tr>';
@@ -746,15 +748,15 @@ function renderFilialDash(){
   gestorCard+
 
   '<div class="kpi-grid">'+
-    '<div class="kpi" data-icon="📋"><div class="kpi-label">Total de Pedidos</div><div class="kpi-val">'+peds.length+'</div><div class="kpi-sub">histórico completo</div></div>'+
-    '<div class="kpi" style="border-top-color:#7c3aed" data-icon="🏭"><div class="kpi-label">Em Fabricação</div><div class="kpi-val">'+emFab+'</div><div class="kpi-sub">na indústria</div></div>'+
-    '<div class="kpi" style="border-top-color:#0891b2" data-icon="📦"><div class="kpi-label">Prontos para Envio</div><div class="kpi-val">'+prontos+'</div><div class="kpi-sub">aguardando despacho</div></div>'+
-    '<div class="kpi" style="border-top-color:#16a34a" data-icon="✅"><div class="kpi-label">Vagas Entregues</div><div class="kpi-val">'+totalVagas+'</div><div class="kpi-sub">este ano</div></div>'+
+    '<div class="kpi" data-icon="📋"><div class="kpi-label">Condomínios</div><div class="kpi-val">'+peds.length+'</div><div class="kpi-sub">histórico completo</div></div>'+
+    '<div class="kpi" style="border-top-color:#7c3aed" data-icon="🏭"><div class="kpi-label">Solicitações Pendentes</div><div class="kpi-val">'+emFab+'</div><div class="kpi-sub">aguardando envio da sede</div></div>'+
+    '<div class="kpi" style="border-top-color:#0891b2" data-icon="📦"><div class="kpi-label">Recebimentos a conferir</div><div class="kpi-val">'+prontos+'</div><div class="kpi-sub">clique em Conferido no destino</div></div>'+
+    '<div class="kpi" style="border-top-color:#16a34a" data-icon="✅"><div class="kpi-label">Vagas concluídas</div><div class="kpi-val">'+totalVagas+'</div><div class="kpi-sub">nas obras finalizadas</div></div>'+
   '</div>'+
 
   '<div style="display:grid;grid-template-columns:1fr 1.6fr;gap:20px;align-items:start">'+
     '<div class="card"><div class="card-hdr"><h2>Vagas por mês</h2></div><div class="card-body"><div class="chart-wrap"><canvas id="chartFilialMes"></canvas></div></div></div>'+
-    '<div class="card"><div class="card-hdr"><h2>Pedidos recentes</h2><button class="btn btn-sm btn-ghost" onclick="location.hash=\'filial-pedidos\'">Ver todos</button></div>'+
+    '<div class="card"><div class="card-hdr"><h2>Condomínios recentes</h2><button class="btn btn-sm btn-ghost" onclick="location.hash=\'filial-pedidos\'">Ver todos</button></div>'+
     '<div class="card-body" style="padding:0"><div class="tbl-wrap"><table><thead><tr><th>Condomínio</th><th>Vagas</th><th>Status</th><th>Data</th><th></th></tr></thead><tbody>'+recentRows+'</tbody></table></div></div></div>'+
   '</div>';
 
@@ -885,42 +887,42 @@ function confirmarRecebimento(id){
 // ════════════════════════════════════════════
 function renderSedeDash(){
   var peds=DB.pedidos();
-  var ag=peds.filter(function(p){return p.status==='aguardando';});
-  var fab=peds.filter(function(p){return p.status==='em_fabricacao';}).length;
-  var ent=peds.filter(function(p){return p.status==='entregue';}).length;
-  var totalVagas=peds.filter(function(p){return p.status==='entregue';}).reduce(function(s,p){return s+p.vagas;},0);
-  var totalVal=peds.filter(function(p){return p.status==='entregue';}).reduce(function(s,p){return s+(p.valor||0);},0);
+  var ag=solicitacoesPendentes();
+  var inventory=EstoqueApp.getState(),transit=Estoque.pendingTransfers(inventory);
+  var completed=peds.filter(function(p){return p.status_obra==='finalizada';});
+  var totalVagas=completed.reduce(function(n,p){return n+(Number(p.vagas)||0);},0);
 
-  var agRows=ag.slice(0,5).map(function(p){
-    return'<tr><td>'+p.filial_nome+'</td><td><strong>'+p.cliente+'</strong></td><td>'+p.vagas+'</td><td>'+fmtMoeda(p.valor)+'</td><td>'+fmtDate(p.criado)+'</td>'+
-    '<td><button class="btn btn-sm btn-approve" onclick="aprovarRapido(\''+p.id+'\')">✅ Aprovar</button> <button class="btn btn-sm btn-outline" onclick="verPedidoSede(\''+p.id+'\')">Ver</button></td></tr>';
-  }).join('')||'<tr><td colspan="6" style="text-align:center;padding:24px;color:#94a3b8">Nenhum pedido aguardando aprovação.</td></tr>';
+  var safe=function(value){return String(value==null?'':value).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});};
+  var agRows=ag.slice(0,5).map(function(r){
+    var missing=r.itens.filter(function(it){return it.pendente>0;});
+    return '<tr><td>'+safe(r.filial_nome)+'</td><td><strong>'+safe(r.condominio)+'</strong></td><td>'+missing.length+' tipo(s)</td><td>'+(r.status==='parcial'?'Enviado parcialmente':'A enviar')+'</td><td>'+safe(fmtDate((r.data||'').slice(0,10)))+'</td><td><button class="btn btn-sm btn-primary" data-e-action="request" data-id="'+safe(r.id)+'">Ver solicitação</button></td></tr>';
+  }).join('')||'<tr><td colspan="6" style="text-align:center;padding:24px;color:#94a3b8">Nenhuma solicitação com peças pendentes de envio.</td></tr>';
 
   document.getElementById('view-sede-dashboard').innerHTML=
   '<div class="page-hdr"><div><h1>Dashboard — Sede</h1><p>Visão geral de todas as filiais.</p></div></div>'+
   '<div class="kpi-grid">'+
-    '<div class="kpi" data-icon="📋"><div class="kpi-label">Total de Pedidos</div><div class="kpi-val">'+peds.length+'</div><div class="kpi-sub">histórico completo</div></div>'+
-    '<div class="kpi" style="border-top-color:#d97706" data-icon="⏳"><div class="kpi-label">Aguardando Aprovação</div><div class="kpi-val">'+ag.length+'</div><div class="kpi-sub"><a onclick="location.hash=\'sede-aprovacoes\'" style="color:var(--verde-d);cursor:pointer">Ver fila →</a></div></div>'+
-    '<div class="kpi" style="border-top-color:#7c3aed" data-icon="🏭"><div class="kpi-label">Em Fabricação</div><div class="kpi-val">'+fab+'</div><div class="kpi-sub">na produção</div></div>'+
-    '<div class="kpi" style="border-top-color:#16a34a" data-icon="✅"><div class="kpi-label">Vagas Entregues</div><div class="kpi-val">'+totalVagas+'</div><div class="kpi-sub">'+fmtMoeda(totalVal)+' em pedidos</div></div>'+
+    '<div class="kpi" data-icon="📋"><div class="kpi-label">Condomínios</div><div class="kpi-val">'+peds.length+'</div><div class="kpi-sub">histórico completo</div></div>'+
+    '<div class="kpi" style="border-top-color:#d97706" data-icon="⏳"><div class="kpi-label">Solicitações Pendentes</div><div class="kpi-val">'+ag.length+'</div><div class="kpi-sub"><a onclick="location.hash=\'sede-aprovacoes\'" style="color:var(--verde-d);cursor:pointer">Ver fila →</a></div></div>'+
+    '<div class="kpi" style="border-top-color:#7c3aed" data-icon="🏭"><div class="kpi-label">Remanejamentos em trânsito</div><div class="kpi-val">'+transit.length+'</div><div class="kpi-sub">aguardando Conferido no destino</div></div>'+
+    '<div class="kpi" style="border-top-color:#16a34a" data-icon="✅"><div class="kpi-label">Obras finalizadas</div><div class="kpi-val">'+completed.length+'</div><div class="kpi-sub">'+totalVagas+' vagas nas obras concluídas</div></div>'+
   '</div>'+
   '<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">'+
-    '<div class="card"><div class="card-hdr"><h2>Pedidos por Status</h2></div><div class="card-body"><div class="chart-wrap"><canvas id="chartStatus"></canvas></div></div></div>'+
-    '<div class="card"><div class="card-hdr"><h2>Vagas por Filial — 2026</h2></div><div class="card-body"><div class="chart-wrap"><canvas id="chartFiliais"></canvas></div></div></div>'+
+    '<div class="card"><div class="card-hdr"><h2>Situação dos condomínios</h2></div><div class="card-body"><div class="chart-wrap"><canvas id="chartStatus"></canvas></div></div></div>'+
+    '<div class="card"><div class="card-hdr"><h2>Vagas por filial</h2></div><div class="card-body"><div class="chart-wrap"><canvas id="chartFiliais"></canvas></div></div></div>'+
   '</div>'+
-  '<div class="card"><div class="card-hdr"><h2>⏳ Aguardando Aprovação</h2>'+(ag.length?'<span class="badge s-aguardando">'+ag.length+' pedido(s)</span>':'')+'</div>'+
-  '<div class="card-body" style="padding:0"><div class="tbl-wrap"><table><thead><tr><th>Filial</th><th>Condomínio</th><th>Vagas</th><th>Valor Est.</th><th>Data</th><th>Ações</th></tr></thead><tbody>'+agRows+'</tbody></table></div></div></div>';
+  '<div class="card"><div class="card-hdr"><h2>⏳ Solicitações Pendentes</h2>'+(ag.length?'<span class="badge s-aguardando">'+ag.length+' solicitação(ões)</span>':'')+'</div>'+
+  '<div class="card-body" style="padding:0"><div class="tbl-wrap"><table><thead><tr><th>Filial</th><th>Condomínio</th><th>Peças pendentes</th><th>Envio</th><th>Data</th><th>Ações</th></tr></thead><tbody>'+agRows+'</tbody></table></div></div></div>';
 
   setTimeout(function(){
     var st=document.getElementById('chartStatus');
     if(st){
-      var stMap={};peds.forEach(function(p){stMap[p.status]=(stMap[p.status]||0)+1;});
+      var stMap={};peds.forEach(function(p){var label=p.status_obra==='finalizada'?'Finalizada':ag.some(function(r){return r.pasta_id===p.id;})?'Peças pendentes':transit.some(function(m){return m.origem_id===p.id||m.destino_id===p.id;})?'Peças em trânsito':'Em andamento';stMap[label]=(stMap[label]||0)+1;});
       var stLabels=Object.keys(stMap).map(function(k){return STATUS_LABELS[k]||k;});
       var stData=Object.values(stMap);
       new Chart(st,{type:'doughnut',data:{labels:stLabels,datasets:[{data:stData,backgroundColor:['#94a3b8','#fbbf24','#60a5fa','#a78bfa','#22d3ee','#fb923c','#4ade80'],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{font:{size:11},boxWidth:12}}}}});
     }
     var fi=document.getElementById('chartFiliais');
-    if(fi){new Chart(fi,{type:'bar',data:{labels:['Jan','Fev','Mar','Abr','Mai','Jun'],datasets:[{label:'Sombrear DF',data:[120,150,200,80,0,0],backgroundColor:'rgba(154,205,50,.75)',borderRadius:5}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'}},scales:{y:{beginAtZero:true,grid:{color:'rgba(0,0,0,.04)'}},x:{grid:{display:false}}}}});}
+    if(fi){new Chart(fi,{type:'bar',data:{labels:DB.filiais().map(function(f){return f.nome;}),datasets:[{label:'Vagas cadastradas',data:DB.filiais().map(function(f){return peds.filter(function(p){return p.filial_id===f.id;}).reduce(function(n,p){return n+(Number(p.vagas)||0);},0);}),backgroundColor:'rgba(154,205,50,.75)',borderRadius:5}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'}},scales:{y:{beginAtZero:true,grid:{color:'rgba(0,0,0,.04)'}},x:{grid:{display:false}}}}});}
   },100);
 }
 
@@ -936,17 +938,7 @@ function renderSedePedidos(){EstoqueUI.home();}
 // ════════════════════════════════════════════
 // VIEW: SEDE — APROVAÇÕES
 // ════════════════════════════════════════════
-function renderAprovacoes(){
-  var peds=DB.pedidos().filter(function(p){return p.status==='aguardando';});
-  var rows=peds.map(function(p){
-    return'<tr><td><strong>'+p.filial_nome+'</strong></td><td>'+p.cliente+'</td><td>'+p.vagas+'</td><td>'+p.tipo+'</td><td>'+fmtDate(p.criado)+'</td>'+
-    '<td style="display:flex;gap:6px"><button class="btn btn-sm btn-approve" onclick="aprovarPedido(\''+p.id+'\')">✅ Aprovar</button><button class="btn btn-sm btn-ghost" onclick="verPedidoSede(\''+p.id+'\')">Ver</button></td></tr>';
-  }).join('')||'<tr><td colspan="6" style="text-align:center;padding:40px;color:#94a3b8;font-size:14px">🎉 Nenhum pedido aguardando aprovação!</td></tr>';
-  document.getElementById('view-sede-aprovacoes').innerHTML=
-  '<div class="page-hdr"><div><h1>Fila de Aprovações</h1><p>Pedidos aguardando sua revisão e aprovação.</p></div></div>'+
-  (peds.length?'<div class="apv-box apv-pending"><strong>⚠️ '+peds.length+' pedido(s)</strong> aguardando aprovação.</div>':'')+
-  '<div class="card"><div class="card-body" style="padding:0"><div class="tbl-wrap"><table><thead><tr><th>Filial</th><th>Condomínio</th><th>Vagas</th><th>Tipo</th><th>Data</th><th>Ações</th></tr></thead><tbody>'+rows+'</tbody></table></div></div></div>';
-}
+function renderAprovacoes(){EstoqueUI.requestsPage();}
 
 function aprovarPedido(id){return PedidosUI.approve(id);}
 

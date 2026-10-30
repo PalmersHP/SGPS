@@ -48,10 +48,10 @@
       document.getElementById('view-filial-novo-pedido').innerHTML='<div class="page-hdr"><div><h1>Nova pasta de condomínio</h1><p>Cadastre os dados gerais. As peças serão lançadas dentro da pasta.</p></div></div><div class="card"><div class="card-hdr"><h2>Dados do condomínio</h2></div><div class="card-body">'+form()+'</div></div><div class="pedido-footer"><span></span>'+button('submit','Criar pasta do condomínio',true)+'</div>';
     }else{
       var stock=draft.mode==='estoque';
-      modal((stock?'Adicionar peças ao estoque — ':'Adicionar peças solicitadas — ')+draft.data.cliente,
-        '<p class="pedido-help">'+(stock?'Informe as peças disponíveis neste depósito, com as medidas e a cor corretas. Esta entrada ficará registrada no histórico.':'Selecione as peças e a quantidade necessária para esta obra. O lançamento será conferido pela sede; o estoque só aumenta quando houver recebimento.')+'</p>'+itemEditor()+
+      modal((stock?'Adicionar peças ao estoque — ':'Solicitar peças para — ')+draft.data.cliente,
+        '<p class="pedido-help">'+(stock?'Informe as peças disponíveis neste depósito, com as medidas e a cor corretas. Esta entrada ficará registrada no histórico.':'Selecione as peças e quantidades para este condomínio. A solicitação ficará pendente na sede até o envio completo; cada entrega entra no estoque quando a filial clicar em Conferido.')+'</p>'+itemEditor()+
         (stock?'<div class="fg"><label for="p_entrada_obs">Origem / motivo da entrada'+(USER.role==='filial'?' *':'')+'</label><input id="p_entrada_obs" value="'+h(draft.obs||'')+'" placeholder="Ex.: peças prontas da produção ou conferência do depósito"></div>':''),
-        button('cancel','Cancelar')+button('submit',stock?'Registrar entrada no estoque':'Enviar peças para conferência',true));
+        button('cancel','Cancelar')+button('submit',stock?'Registrar entrada no estoque':'Enviar solicitação à sede',true));
     }
     draftTotal();
   }
@@ -89,7 +89,7 @@
     var target=d.mode==='new'?d.data.id:d.target;
     draft=null;close();EstoqueApp.open(target);
     if(location.hash==='#'+USER.role+'-pedido')EstoqueUI.detail(target);
-    showToast(d.mode==='new'?'Pasta criada. Agora você pode lançar as peças.':d.mode==='estoque'?'Entrada de estoque registrada.':'Peças enviadas para conferência da sede.','success');
+    showToast(d.mode==='new'?'Pasta criada. Agora você pode lançar as peças.':d.mode==='estoque'?'Entrada de estoque registrada.':'Solicitação enviada à sede. Acompanhe os envios nesta pasta.','success');
   }
   async function approve(orderId){
     var state=await EstoqueApp.save(function(s){return Estoque.approveDemand(s,orderId,ctx());});
