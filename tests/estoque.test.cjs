@@ -184,6 +184,48 @@ test('legado mantém saldo desconhecido, remessas pendentes e nenhuma entrada pr
   assert.equal(reloaded.movimentos.length,s.movimentos.length);assert.equal(E.pendingTransfers(reloaded,'antigo').length,0);
   assert.equal(row(reloaded,'antigo').disponivel,30);assert.deepEqual(reloaded.pastas[0].remessas,old.remessas);
 });
+test('GO pode despachar para condomínio antigo sem conferir nem presumir seu saldo inicial',()=>{
+  const old={id:'antigo',cliente:'Obra antiga',filial_id:'df',status:'em_fabricacao',criado:'2026-10-20',cor_estrutura:'Branca',cor_tela:'Prata',itens:[{...piece(80),id:'i-old',item_status:'aprovado'}],remessas:[{id:'recebida',data:'2026-10-20',recebido_em:'2026-10-21',itens:[{item_id:'i-old',qtd:60}]}],log:[]};
+  const original=clone(old);
+  let s=E.addStock(E.fromRecords([old],filiais,cat),'estoque-go',[piece(100)],sede,meta('producao-antigo'));
+  const before=clone(s);
+  s=transfer(s,'estoque-go','antigo',20,'novo-envio-antigo');
+  assert.equal(row(before,'estoque-go').disponivel,100);
+  assert.deepEqual(old,original);
+  assert.equal(row(s,'estoque-go').disponivel,80);
+  assert.deepEqual([row(s,'antigo').disponivel,row(s,'antigo').instalado,row(s,'antigo').em_transito_entrada,row(s,'antigo').conhecido],[0,0,20,false]);
+  assert.equal(E.getLocation(s,'antigo').conhecido,false);
+  assert.equal(E.pendingTransfers(s,'antigo').length,1);
+  assert.throws(()=>receive(s,'novo-envio-antigo'),/estoque inicial/);
+  assert.throws(()=>transfer(s,'antigo',stock,1,'saida-sem-conferencia'),/estoque inicial/);
+  assert.throws(()=>E.finalize(s,'antigo',filial,meta('fechar-sem-conferencia')),/estoque inicial/);
+  assert.equal(physical(s),100);
+  s=E.legacyInitial(s,'antigo',[{key:row(s,'antigo').key,disponivel:10,instalado:50}],filial,meta('conferencia-antigo'));
+  assert.deepEqual([row(s,'antigo').disponivel,row(s,'antigo').instalado,row(s,'antigo').em_transito_entrada],[10,50,20]);
+  assert.equal(physical(s),160);
+  s=receive(s,'novo-envio-antigo');
+  assert.deepEqual([row(s,'antigo').disponivel,row(s,'antigo').instalado,row(s,'antigo').em_transito_entrada],[30,50,0]);
+  assert.equal(physical(s),160);
+  assert.equal(row(s,'estoque-go').disponivel,80);
+  assert.deepEqual(s.pastas[0].remessas,old.remessas);
+  assert.throws(()=>receive(s,'novo-envio-antigo'),/Já registrado/);
+  const reloaded=E.fromRecords(E.toRecords(s),filiais,cat);
+  assert.equal(physical(reloaded),160);
+  assert.equal(row(reloaded,'antigo').disponivel,30);
+  assert.equal(E.pendingTransfers(reloaded,'antigo').length,0);
+});
+test('envios continuam bloqueados para destinos inativos, cancelados e finalizados',()=>{
+  const s=ready();
+  for(const flags of [{inativo:true},{status:'cancelado'}]){
+    const inactive=clone(s);Object.assign(inactive.pastas[0],flags);delete inactive.pastas[0].estoque_inicial_conferido;
+    assert.throws(()=>transfer(inactive,'estoque-go','obra1',1,'destino-inativo'),/inativo/);
+    assert.equal(row(inactive,'estoque-go').disponivel,100);
+  }
+  let closed=E.reconcile(s,'obra1',[],filial,meta('conferir-destino'));
+  closed=E.finalize(closed,'obra1',filial,meta('fechar-destino'));
+  assert.throws(()=>transfer(closed,'estoque-go','obra1',1,'destino-finalizado'),/finalizada/);
+  assert.equal(row(closed,'estoque-go').disponivel,100);
+});
 test('serialização usa um meta discriminado e preserva dados adicionais das pastas',()=>{
   let s=ready();s.pastas[0].observacao_customizada='preservada';
   const raw=E.toRecords(s),metaRecord=raw.find(r=>r.tipo_registro==='controle_estoque');

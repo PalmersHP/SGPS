@@ -160,10 +160,20 @@ async function main(){
     await modalClosed();assert.equal(patches,previous+1,'clique duplo gera uma única gravação');
     assert.equal((await balance(id))[0].solicitado,qtd);
   }
-  async function transfer(from,to,key,qtd,{conflict=false}={}){
+  async function transfer(from,to,key,qtd,{conflict=false,unconfirmed=false}={}){
     await open(from);await action('transfer');
     await waitFor("document.getElementById('e_transfer_destino')",'remanejamento aberto');
+    if(unconfirmed){
+      const option=await evaluate(`(()=>{const e=Array.from(document.querySelectorAll('#e_transfer_destino option')).find(e=>e.value===${JSON.stringify(to)});return e?{label:e.textContent,disabled:e.disabled}:null;})()`);
+      assert.ok(option,'condomínio antigo aparece entre os destinos');assert.equal(option.disabled,false);
+      assert.match(option.label,/confer|inicial/i,'opção informa a necessidade de conferência inicial');
+    }
     await fill('#e_transfer_destino',to);await fill('#e_transfer_obs','Remanejamento de teste');
+    if(unconfirmed){
+      assert.equal(await evaluate("document.getElementById('e_transfer_notice').hidden"),false,'aviso do destino selecionado fica visível');
+      assert.match(await evaluate("document.getElementById('e_transfer_notice').textContent"),/conferir o estoque inicial antes de confirmar o recebimento/i,'aviso orienta conferir antes do recebimento');
+      assert.equal(await evaluate("document.querySelector('[data-e-action=\"save-transfer\"]').disabled"),false,'aviso não bloqueia o envio');
+    }
     await fillKey('data-e-transfer-key',key,qtd);
     if(conflict){
       const before=clone(records());conflictNext=true;await action('save-transfer');
@@ -307,12 +317,28 @@ async function main(){
   await login('sede');await open('legado');
   const oldBefore=clone(records().find(p=>p.id==='legado').itens);
   assert.equal((await balance('legado'))[0].disponivel,0,'legado não inventa estoque');
+  const legacyMove=await transfer(go,'legado',key,4,{unconfirmed:true});
+  assert.equal((await balance(go)).find(b=>b.key===key).disponivel,16,'GO desconta o envio ao condomínio antigo');
+  assert.equal((await balance('legado'))[0].disponivel,0,'envio não presume o saldo inicial do condomínio');
+  assert.equal((await balance('legado'))[0].em_transito_entrada,4);
+  assert.equal((await balance('legado'))[0].conhecido,false);
+  await login('filial');await open('legado');
+  assert.equal(await evaluate(`document.querySelector('.view.active [data-e-action="receive"][data-id="${legacyMove}"]')===null`),true,'recebimento aguarda a conferência inicial');
+  assert.ok(await evaluate("document.querySelector('.view.active [data-e-action=\"baseline\"]')!==null"),'filial pode conferir o estoque inicial');
   await action('baseline');await waitFor("document.querySelector('[data-e-baseline-key]')",'conferência do legado');
   await evaluate("(()=>{document.querySelector('[data-e-baseline-field=\"disponivel\"]').value='7';document.querySelector('[data-e-baseline-field=\"instalado\"]').value='3';})()");
   await click('#e_baseline_confirm');await action('save-baseline');await modalClosed();
   assert.equal((await balance('legado'))[0].disponivel,7);
   assert.equal((await balance('legado'))[0].instalado,3);
   assert.deepEqual(records().find(p=>p.id==='legado').itens,oldBefore);
+  assert.equal((await balance('legado'))[0].em_transito_entrada,4,'conferência inicial mantém o envio pendente');
+  await receive('legado',legacyMove);
+  assert.equal((await balance('legado'))[0].disponivel,11,'recebimento acrescenta as quatro peças uma única vez');
+  assert.equal((await balance('legado'))[0].instalado,3);
+  assert.equal((await balance('legado'))[0].em_transito_entrada,0);
+  assert.deepEqual(records().find(p=>p.id==='legado').itens,oldBefore);
+  assert.ok((await history('legado')).some(m=>m.id===legacyMove));
+  console.log('OK: condomínio antigo aparece no remanejamento; envio fica em trânsito até conferência inicial e recebimento único.');
   console.log('OK: mobile, recarregamento e conferência explícita de legado preservam peças e saldos.');
   const snapshot=clone(records());failRead=true;
   await send('Page.reload',{},sessionId);

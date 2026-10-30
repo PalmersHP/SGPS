@@ -193,7 +193,7 @@
   };
   api.transfer=function(input,from,to,entries,ctx,meta){
     actor(ctx);if(from===to)fail('Escolha um destino diferente da origem.');
-    var state=copy(input),origin=ensureKnown(state,from),dest=ensureKnown(state,to);
+    var state=copy(input),origin=ensureKnown(state,from),dest=ensureOpen(state,to);
     if(ctx.role==='sede'){if(from!=='estoque-go')fail('A sede remaneja peças a partir do estoque Sombrear GO.');}
     else if(!owns(ctx,origin)||!owns(ctx,dest)||from==='estoque-go'||to==='estoque-go')fail('A filial só pode remanejar entre seus condomínios e seu próprio estoque.');
     if(!Array.isArray(entries)||!entries.length)fail('Selecione pelo menos uma peça para remanejar.');
