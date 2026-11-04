@@ -84,6 +84,27 @@ test('paginação lista todos os clientes, inclusive páginas menores que per_pa
   assert.equal(result.clients.length, 2);assert.equal(f.requests.length, 2);assertPrivate(f);
 });
 
+test('listagem OAuth vazia aceita campo clients omitido, sem aceitar outras respostas inválidas', async () => {
+  const empty = fixture({request({req}) {
+    if (req.route === '/auth/v1/admin/oauth/clients') return response({});
+  }});
+  const result = await run(['--list-clients'], empty.deps);
+  assert.deepEqual(result.clients, []);
+  assert.equal(empty.state.writes, 0);assert.equal(empty.requests.length, 1);assertPrivate(empty);
+  for (const data of [{unexpected: true}, {clients: null}, {clients: {}}]) {
+    const invalid = fixture({request({req}) {
+      if (req.route === '/auth/v1/admin/oauth/clients') return response(data);
+    }});
+    await assert.rejects(run(['--list-clients'], invalid.deps), /listagem inválida/);
+    assert.equal(invalid.state.writes, 0);
+  }
+  const users = fixture({request({req}) {
+    if (req.route === '/auth/v1/admin/users') return response({});
+  }});
+  await assert.rejects(run(grantArgs, users.deps), /listagem inválida/);
+  assert.equal(users.state.writes, 0);
+});
+
 test('OAuth Server desabilitado produz instrução clara sem ecoar resposta ou chave', async () => {
   const f = fixture({request() {return response({code: 'oauth_server_disabled', msg: 'server disabled ' + env.SUPABASE_SERVICE_ROLE_KEY}, 400);}});
   await assert.rejects(run(['--list-clients'], f.deps), error => {

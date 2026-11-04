@@ -117,7 +117,9 @@ function api(config, fetchImpl) {
     const result = [], seen = new Set(), perPage = 100;
     for (let page = 1; page <= 10000; page++) {
       const {data, headers} = await request(route + '?page=' + page + '&per_page=' + perPage);
-      const items = data[field];
+      // GoTrue omits the optional `clients` field when no OAuth apps exist.
+      // Keep other malformed response shapes (and user listings) fail-closed.
+      const items = field === 'clients' && object(data) && Object.keys(data).length === 0 ? [] : data[field];
       if (!Array.isArray(items)) throw new Error('Resposta de listagem inválida; nenhuma conta foi alterada.');
       for (const item of items) {
         const id = item?.id || item?.client_id;

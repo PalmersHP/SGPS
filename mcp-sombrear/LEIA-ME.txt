@@ -8,10 +8,15 @@ Consentimento: https://sgps-rouge.vercel.app/oauth-sombrear.html
 ATIVAÇÃO
 
 1. Supabase > Authentication > OAuth Server:
-   - Ativar OAuth Server e Dynamic Client Registration.
+   https://supabase.com/dashboard/project/gwcgcvgowoqyhthdbear/auth/oauth-server
+   - Ativar "Enable the Supabase OAuth Server" e "Allow Dynamic OAuth Apps"
+     (registro dinâmico de clientes).
    - Authorization Path: /oauth-sombrear.html
+   - Clicar em "Save changes".
    Em Authentication > URL Configuration, conferir Site URL:
    https://sgps-rouge.vercel.app
+   Acesso direto à configuração:
+   https://supabase.com/dashboard/project/gwcgcvgowoqyhthdbear/auth/url-configuration
    Antes de mudar um Site URL já usado por outro app, conferir os fluxos existentes.
 
 2. ChatGPT na web > Plugins > botão + > Add custom MCP server:
