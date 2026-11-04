@@ -1,0 +1,98 @@
+Sombrear — conexão de pedidos e estoques ao ChatGPT
+
+Servidor: https://sgps-rouge.vercel.app/api/mcp
+Protocolo: MCP Streamable HTTP, OAuth 2.1 do Supabase.
+Descoberta: https://sgps-rouge.vercel.app/.well-known/oauth-protected-resource/api/mcp
+Consentimento: https://sgps-rouge.vercel.app/oauth-sombrear.html
+
+ATIVAÇÃO
+
+1. Supabase > Authentication > OAuth Server:
+   - Ativar OAuth Server e Dynamic Client Registration.
+   - Authorization Path: /oauth-sombrear.html
+   Em Authentication > URL Configuration, conferir Site URL:
+   https://sgps-rouge.vercel.app
+   Antes de mudar um Site URL já usado por outro app, conferir os fluxos existentes.
+
+2. ChatGPT na web > Plugins > botão + > Add custom MCP server:
+   - Nome: Sombrear Pedidos e Estoques.
+   - Connection: Server URL.
+   - URL: https://sgps-rouge.vercel.app/api/mcp
+   - Authentication: OAuth. A opção de registro dinâmico dispensa preencher
+     manualmente um client secret. Criar como plugin e instalar na conta/workspace.
+   Contas/workspaces podem restringir a criação e o uso de MCP personalizado.
+
+3. O ChatGPT registra um OAuth client no Supabase. Um administrador precisa
+   vincular o ID desse cliente à conta Auth e ao operador SGPS corretos.
+   O script abaixo lista somente informações públicas dos clientes:
+
+   node --env-file=mcp-sombrear/.env scripts/configurar-mcp.cjs --list-clients
+
+   Preparar a concessão (dry-run; trocar os exemplos pelos identificadores reais):
+
+   node --env-file=mcp-sombrear/.env scripts/configurar-mcp.cjs \
+     --email EMAIL_DO_OPERADOR --usuario-id ID_NO_SGPS \
+     --client-id UUID_DO_CLIENTE --all-filiais
+
+   --all-filiais permite ao operador atuar na sede e nas filiais, com sua autoria
+   real no histórico. --perfil-atual conserva o perfil atual do operador no SGPS.
+   Revisar o plano e repetir com --apply para aplicar. Não altera senha nem envia
+   e-mail. Exige conta Supabase Auth já existente e usuário SGPS ativo.
+
+4. Conectar/autorizar o plugin usando a senha da conta Supabase Auth. A sessão
+   antiga do app e a senha demonstrativa não autenticam esta integração.
+   Caso a primeira conexão tenha ocorrido antes da concessão, reconectar.
+   Primeiro teste: "Mostre meu perfil e liste os estoques e condomínios".
+   Nenhuma alteração de estoque é necessária para validar a conexão.
+
+OPERAÇÃO
+
+Há 19 ferramentas de contexto, consulta, criação de pastas, solicitação de peças,
+entrada, envio parcial, remanejo, recebimento, fechamento e reabertura de obra.
+Consultar catálogo, locais e saldos antes de lançar. Reutilizar o operation_id
+UUID quando uma chamada falhar ou sua resposta se perder. Uma nova intenção de
+lançamento recebe um novo ID. O servidor guarda a operação no próprio histórico
+e valida a versão da base antes de gravar.
+
+Envio desconta a origem; somente recebimento confirmado credita o destino.
+Fechamento exige prévia atualizada, confirmação do remanejo das sobras e ausência
+de peças em trânsito. O saldo restante é registrado como instalado.
+
+AUTENTICAÇÃO E PUBLICAÇÃO
+
+O servidor público não usa service_role. Verifica a assinatura do token no Auth,
+issuer do projeto, aud authenticated (padrão Supabase), validade, client_id e uma
+concessão administrativa específica para resource_url. Permissões em user_metadata
+ou argumentos do chat não são aceitas. Revogação lê app_metadata atualizado em
+cada chamada. Usuário SGPS removido ou inativo também perde acesso.
+
+O grant fica em Auth > app_metadata.sombrear_mcp, não em sgps_store público.
+Não publicar a chave administrativa nem o arquivo .env. A chave que estava no
+antigo servidor financeiro foi retirada do código; versões históricas do Git
+podem conservá-la, portanto ela deve ser substituída no Supabase pelo administrador.
+
+npm run build gera apenas assets web em public/. Vercel executa api/*.js como
+funções Node. Backups, scripts administrativos e código do servidor não são
+copiados para a pasta pública. O MCP financeiro antigo continua separado:
+cd mcp-sombrear && npm start (exige suas variáveis privadas locais).
+
+RESET OPERACIONAL
+
+Consultar sem alterar:
+node scripts/reset-pedidos.cjs --keep-catalog
+
+Aplicar após decidir o escopo:
+node scripts/reset-pedidos.cjs --apply --keep-catalog \
+  --backup-dir /CAMINHO/PRIVADO/FORA/DO/REPOSITORIO
+
+--clear-catalog substitui --keep-catalog somente quando a exclusão do catálogo
+também tiver sido solicitada. Usuários e filiais são preservados. Tabelas fin_*
+não fazem parte do reset de pedidos. O script cria e confere backup privado antes
+de gravar, usa CAS e verifica o estado final. Conflitos interrompem sem rollback
+automático. Fechar formulários antigos e recarregar o app depois do reset.
+
+REFERÊNCIAS OFICIAIS
+https://developers.openai.com/api/docs/guides/custom-mcp-server
+https://developers.openai.com/plugins/build/auth
+https://supabase.com/docs/guides/auth/oauth-server/getting-started
+https://supabase.com/docs/guides/auth/oauth-server/token-security

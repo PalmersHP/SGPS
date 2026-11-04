@@ -1,0 +1,14 @@
+{
+  "name": "sombrear-pedidos",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "build": "node scripts/build-web.cjs",
+    "test": "node --test tests/estoque.test.cjs tests/pedidos.test.cjs tests/mcp-*.test.cjs tests/reset-pedidos.test.cjs",
+    "mcp:dev": "node mcp-sombrear/http.cjs"
+  },
+  "engines": { "node": "24.x" },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.29.0"
+  }
+}

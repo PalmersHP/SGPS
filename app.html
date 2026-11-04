@@ -755,14 +755,19 @@ function renderFilialDash(){
   '</div>'+
 
   '<div style="display:grid;grid-template-columns:1fr 1.6fr;gap:20px;align-items:start">'+
-    '<div class="card"><div class="card-hdr"><h2>Vagas por mês</h2></div><div class="card-body"><div class="chart-wrap"><canvas id="chartFilialMes"></canvas></div></div></div>'+
+    '<div class="card"><div class="card-hdr"><h2>Vagas cadastradas por mês</h2></div><div class="card-body"><div class="chart-wrap"><canvas id="chartFilialMes"></canvas></div></div></div>'+
     '<div class="card"><div class="card-hdr"><h2>Condomínios recentes</h2><button class="btn btn-sm btn-ghost" onclick="location.hash=\'filial-pedidos\'">Ver todos</button></div>'+
     '<div class="card-body" style="padding:0"><div class="tbl-wrap"><table><thead><tr><th>Condomínio</th><th>Vagas</th><th>Status</th><th>Data</th><th></th></tr></thead><tbody>'+recentRows+'</tbody></table></div></div></div>'+
   '</div>';
 
   // Chart
-  var meses=['Nov','Dez','Jan','Fev','Mar','Abr'];
-  var dados=[0,0,120,150,200,80];
+  var mesAtual=new Date().toLocaleDateString('sv-SE',{timeZone:'America/Sao_Paulo'}).slice(0,7).split('-');
+  var periodos=Array.from({length:6},function(_,i){return new Date(Date.UTC(Number(mesAtual[0]),Number(mesAtual[1])-6+i,1));});
+  var meses=periodos.map(function(d){return d.toLocaleDateString('pt-BR',{month:'short',timeZone:'UTC'}).replace(/\.$/,'')+'/'+String(d.getUTCFullYear()).slice(-2);});
+  var dados=periodos.map(function(d){
+    var mes=d.toISOString().slice(0,7);
+    return peds.filter(function(p){return String(p.criado||'').slice(0,7)===mes;}).reduce(function(total,p){var vagas=Number(p.vagas);return total+(Number.isFinite(vagas)&&vagas>0?vagas:0);},0);
+  });
   setTimeout(function(){
     var ctx=document.getElementById('chartFilialMes');
     if(ctx){new Chart(ctx,{type:'bar',data:{labels:meses,datasets:[{label:'Vagas',data:dados,backgroundColor:'rgba(154,205,50,.7)',borderColor:'#9ACD32',borderWidth:2,borderRadius:5}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,grid:{color:'rgba(0,0,0,.04)'}},x:{grid:{display:false}}}}});}
@@ -804,7 +809,7 @@ var WZ_CATALOGO=[
 
 function atualizarWzCatalogo() {
   var catDb = DB.catalogo();
-  if (!catDb || !catDb.length) return;
+  if (!catDb || !catDb.length) { WZ_CATALOGO=[]; return; }
   var defaultDims = {
     'CHUMBADOR PARA PILAR MA': { ma: '—', mb: '—', mc: '—' },
     'PILAR SOMBRITE MA': { ma: '2,40', mb: '0,00', mc: '0,00' },

@@ -3,6 +3,16 @@
 *.png
 *.jpg
 *.jpeg
-Logo Sombrear.png
-logo.png
+!Logo Sombrear.png
+!logo.png
 tests/
+node_modules/
+**/node_modules/
+.env
+.env.*
+**/.env
+**/.env.*
+backups/
+mcp-sombrear/server.js
+scripts/reset-pedidos.cjs
+scripts/configurar-mcp.cjs

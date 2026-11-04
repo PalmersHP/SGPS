@@ -3,8 +3,9 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 
-const SUPA_URL = 'https://gwcgcvgowoqyhthdbear.supabase.co';
-const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd3Y2djdmdvd29xeWh0aGRiZWFyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NjIyNDU3NSwiZXhwIjoyMDkxODAwNTc1fQ.eNDohZVqE9p2YOiSVMUnTEuiZmorxqOwwl4I-uWUgOA';
+const SUPA_URL = process.env.SUPABASE_URL;
+const SUPA_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+if (!SUPA_URL || !SUPA_KEY) throw new Error('Configure SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY no ambiente privado.');
 
 const H = {
   'Content-Type': 'application/json',
