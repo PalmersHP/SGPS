@@ -46,6 +46,11 @@ ATIVAÇÃO
 
 4. Conectar/autorizar o plugin usando a senha da conta Supabase Auth. A sessão
    antiga do app e a senha demonstrativa não autenticam esta integração.
+   Se não souber a senha, usar "Esqueci minha senha" na conexão ou abrir
+   https://sgps-rouge.vercel.app/recuperar-acesso.html para solicitar o link.
+   O envio ocorre somente após clicar no botão. O e-mail retorna pelo Site URL,
+   cuja página inicial encaminha a sessão de recuperação à tela de nova senha.
+   Nenhuma senha é alterada até a pessoa escolher e salvar a nova senha.
    Caso a primeira conexão tenha ocorrido antes da concessão, reconectar.
    Primeiro teste: "Mostre meu perfil e liste os estoques e condomínios".
    Nenhuma alteração de estoque é necessária para validar a conexão.

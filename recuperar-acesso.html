@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="referrer" content="no-referrer">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Recuperar acesso — Sombrear</title>
+  <script src="recuperar-acesso.js"></script>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap">
+  <style>
+    *{box-sizing:border-box}body{margin:0;min-height:100vh;background:#f4f7f2;color:#1e293b;font-family:Poppins,Arial,sans-serif;font-size:14px}button,input{font:inherit}button,a,input{touch-action:manipulation}[hidden]{display:none!important}.layout{min-height:100vh;display:grid;grid-template-columns:minmax(280px,40%) 1fr}.brand{background:linear-gradient(155deg,#071a03,#0f2d06 55%,#163a08);padding:56px;display:flex;align-items:center;justify-content:center;color:#fff}.brand-inner{max-width:350px}.brand-logo{display:block;width:160px;max-height:88px;object-fit:contain;object-position:left;filter:brightness(0) invert(1);margin-bottom:28px}.brand-label{color:#9acd32;font-size:11px;letter-spacing:2px;text-transform:uppercase;font-weight:600}.brand h2{font-size:29px;line-height:1.35;margin:14px 0 18px}.brand h2 span{color:#9acd32}.brand p{font-size:13px;line-height:1.9;color:#cedac8}.content{display:flex;align-items:center;justify-content:center;padding:40px 32px}.card{background:#fff;border:1px solid #e1e8dc;border-radius:18px;padding:36px;max-width:550px;width:100%;box-shadow:0 14px 50px rgba(25,50,10,.045)}h1{font-size:23px;line-height:1.4;margin:0 0 9px}.intro,.help{color:#64748b;font-size:12px;line-height:1.8}.intro{margin:0 0 24px}.help{margin:14px 0 0}.field{margin-bottom:18px}.field label{display:block;font-size:11px;font-weight:600;color:#475569;margin-bottom:7px;text-transform:uppercase;letter-spacing:.4px}.field input{width:100%;padding:12px 13px;border:2px solid #e2e8f0;border-radius:8px;background:#fff;color:#1e293b;min-height:46px}.field input:focus{outline:none;border-color:#9acd32;box-shadow:0 0 0 3px rgba(154,205,50,.12)}.field .help{margin-top:7px;font-size:11px}.btn{border:1px solid #79ad2d;border-radius:8px;padding:11px 15px;min-height:44px;cursor:pointer;font-size:13px;font-weight:600;background:linear-gradient(135deg,#8dbe31,#6fae2e);color:#fff;width:100%}.btn:hover{background:#73a52c}.btn:disabled{opacity:.5;cursor:not-allowed}.message{padding:13px 15px;border-radius:8px;font-size:12px;line-height:1.8;margin:0 0 20px;overflow-wrap:anywhere}.error{background:#fff3f1;border:1px solid #fecaca;color:#a62d27}.notice{background:#f2f8e9;border:1px solid #d5e8ba;color:#476925}.loading{display:flex;align-items:center;gap:10px;color:#64748b;font-size:12px;padding:12px 0}.spinner{width:18px;height:18px;border:2px solid #e2e8f0;border-top-color:#7eb22f;border-radius:50%;animation:spin .8s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}.account{background:#f8faf6;border:1px solid #e5ebdf;border-radius:8px;padding:12px 14px;margin-bottom:20px}.account small{display:block;font-size:10px;color:#64748b}.account strong{display:block;font-size:12px;font-weight:500;overflow-wrap:anywhere;margin-top:3px}.finish-icon{width:42px;height:42px;display:grid;place-items:center;border-radius:50%;background:#edf6e3;color:#639329;font-size:22px;margin-bottom:16px}.footer{font-size:10px;line-height:1.7;color:#94a3b8;margin:24px 0 0;text-align:center}:focus-visible{outline:3px solid #9acd32;outline-offset:3px}@media(max-width:850px){.layout{grid-template-columns:1fr}.brand{padding:25px 24px;justify-content:flex-start}.brand-inner{max-width:none;width:100%}.brand-logo{width:116px;max-height:54px;margin-bottom:14px}.brand h2{font-size:22px;margin:7px 0 0}.brand p{display:none}.brand-label{font-size:10px}.content{padding:24px 16px;align-items:flex-start}.card{padding:26px;max-width:550px}.brand h2 br{display:none}}@media(max-width:420px){.card{padding:23px 20px}h1{font-size:21px}.content{padding:18px 12px}}@media(prefers-reduced-motion:reduce){.spinner{animation:none}}
+  </style>
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
+</head>
+<body>
+  <div class="layout">
+    <aside class="brand" aria-label="Sombrear"><div class="brand-inner">
+      <img class="brand-logo" src="logo.png" alt="Sombrear">
+      <span class="brand-label">Conexões Sombrear</span>
+      <h2>Recupere seu acesso.<br> <span>Continue conectado.</span></h2>
+      <p>Defina uma nova senha para a conta usada na conexão com o ChatGPT.</p>
+    </div></aside>
+    <main class="content"><div class="card" id="recoveryCard" aria-busy="true">
+      <h1 id="recoveryTitle">Recuperar acesso</h1>
+      <p class="intro" id="recoveryIntro">Preparando a recuperação da sua conta.</p>
+      <div id="recoveryError" class="message error" role="alert" hidden></div>
+      <div id="recoveryNotice" class="message notice" role="status" hidden></div>
+      <div id="recoveryLoading" class="loading" role="status"><span class="spinner" aria-hidden="true"></span><span>Verificando o acesso…</span></div>
+      <section id="recoveryRequestPanel" hidden>
+        <form id="recoveryRequestForm">
+          <div class="field"><label for="recoveryEmail">E-mail da sua conta</label><input id="recoveryEmail" name="email" type="email" autocomplete="username" inputmode="email" autocapitalize="none" spellcheck="false" required maxlength="254" placeholder="seu@sombrear.com.br"></div>
+          <button class="btn" type="submit" id="sendRecoveryButton">Enviar link de recuperação</button>
+        </form>
+        <p class="help">Use o e-mail cadastrado pelo administrador para conectar aplicativos à Sombrear.</p>
+      </section>
+      <section id="passwordPanel" hidden>
+        <div class="account"><small>Conta verificada</small><strong id="recoveryAccount"></strong></div>
+        <form id="passwordForm">
+          <div class="field"><label for="newPassword">Nova senha</label><input id="newPassword" name="new-password" type="password" autocomplete="new-password" minlength="12" required aria-describedby="passwordHelp"><p class="help" id="passwordHelp">Use pelo menos 12 caracteres.</p></div>
+          <div class="field"><label for="confirmPassword">Confirme a nova senha</label><input id="confirmPassword" name="confirm-password" type="password" autocomplete="new-password" minlength="12" required></div>
+          <button class="btn" type="submit" id="savePasswordButton">Salvar nova senha</button>
+        </form>
+      </section>
+      <section id="recoveryComplete" hidden><div class="finish-icon" aria-hidden="true">✓</div><p class="help" id="recoveryCompleteMessage"></p></section>
+      <noscript><p class="message error">Ative o JavaScript para recuperar o acesso.</p></noscript>
+      <p class="footer">Sombrear Estruturas Inteligentes · Goiânia / Brasília</p>
+    </div></main>
+  </div>
+</body>
+</html>

@@ -2,8 +2,18 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="refresh" content="0;url=ecosistema.html">
-<script>window.location.replace('ecosistema.html');</script>
+<meta name="referrer" content="no-referrer">
+<script>
+(function () {
+  // Recovery emails use the configured Site URL. Preserve the recovery fragment
+  // for the password screen instead of dropping it in the normal home redirect.
+  var fragment = window.location.hash;
+  var values = new URLSearchParams(fragment.slice(1));
+  var recovery = values.get('type') === 'recovery' || values.has('error') || values.has('error_code');
+  window.location.replace(recovery ? '/recuperar-acesso.html' + fragment : 'ecosistema.html');
+})();
+</script>
+<noscript><meta http-equiv="refresh" content="0;url=ecosistema.html"></noscript>
 </head>
-<body></body>
+<body><noscript><p>Ative o JavaScript para recuperar seu acesso.</p></noscript></body>
 </html>

@@ -8,6 +8,7 @@
   var authorization = null;
   var previousRedirect = null;
   var busy = false;
+  var recoverySending = false;
   var stage = 'loading';
   var retryAction = null;
   var panels = ['loadingPanel', 'loginPanel', 'consentPanel', 'existingPanel', 'completePanel'];
@@ -35,7 +36,8 @@
     el('oauthCard').setAttribute('aria-busy', String(value));
     document.querySelectorAll('button, #loginForm input').forEach(function (control) { control.disabled = value; });
     if (message) text('loadingText', message);
-    text('loginButton', value && stage === 'login' ? 'Entrando…' : 'Entrar para continuar');
+    text('loginButton', value && stage === 'login' && !recoverySending ? 'Entrando…' : 'Entrar para continuar');
+    text('forgotPasswordButton', value && recoverySending ? 'Enviando link…' : 'Esqueci minha senha');
   }
   function clearError() {
     text('oauthError', '');
@@ -85,7 +87,7 @@
   }
   function createAuthClient() {
     return window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey, {
-      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false, storageKey: 'sombrear-oauth-consent-memory' }
+      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false, flowType: 'implicit', storageKey: 'sombrear-oauth-consent-memory' }
     });
   }
   async function initialize() {
@@ -162,6 +164,7 @@
     event.preventDefault();
     if (busy || !client || stage !== 'login' || !el('loginForm').reportValidity()) return;
     clearError();
+    el('recoveryNotice').hidden = true;
     setBusy(true);
     try {
       var result = await client.auth.signInWithPassword({ email: el('oauthEmail').value.trim(), password: el('oauthPassword').value });
@@ -176,6 +179,25 @@
       if (signedUser) { show(null, 'Não foi possível revisar o acesso', 'Tente carregar a solicitação novamente.'); showError(error, retryDetails); }
       else { stage = 'login'; show('loginPanel'); showError(error); }
     } finally { setBusy(false); }
+  }
+  async function requestPasswordReset() {
+    if (busy || !client || stage !== 'login') return;
+    el('oauthEmail').value = el('oauthEmail').value.trim();
+    if (!el('oauthEmail').reportValidity()) return;
+    clearError();
+    el('recoveryNotice').hidden = true;
+    recoverySending = true;
+    setBusy(true);
+    try {
+      var result = await client.auth.resetPasswordForEmail(el('oauthEmail').value);
+      var error = result.error;
+      if (error && !/user_not_found|email_not_found|user_banned/.test(String(error.code || ''))) throw error;
+      text('recoveryNotice', 'Se houver uma conta para este e-mail, você receberá um link para definir uma nova senha. Confira também a caixa de spam. Depois, volte ao ChatGPT e reinicie a conexão.');
+      el('recoveryNotice').hidden = false;
+    } catch (error) {
+      var rateLimited = error && (error.status === 429 || /rate.limit|too.many/i.test(String(error.code || '') + ' ' + String(error.message || '')));
+      showError(new Error(rateLimited ? 'Aguarde alguns instantes antes de solicitar outro link.' : 'Não foi possível solicitar o link agora. Tente novamente em alguns instantes.'));
+    } finally { recoverySending = false; setBusy(false); }
   }
   async function retryDetails() {
     if (busy || !client || !signedUser) return;
@@ -219,6 +241,7 @@
     finally { setBusy(false); }
   }
   el('loginForm').addEventListener('submit', login);
+  el('forgotPasswordButton').addEventListener('click', requestPasswordReset);
   el('approveButton').addEventListener('click', function () { decide(true); });
   el('denyButton').addEventListener('click', function () { decide(false); });
   el('switchAccountButton').addEventListener('click', switchAccount);
