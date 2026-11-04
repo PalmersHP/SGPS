@@ -55,6 +55,24 @@ ATIVAÇÃO
    Primeiro teste: "Mostre meu perfil e liste os estoques e condomínios".
    Nenhuma alteração de estoque é necessária para validar a conexão.
 
+SE O CHATGPT INFORMAR QUE NÃO TEM ACESSO
+
+Abrir os detalhes do Sombrear em Plugins/Apps no ChatGPT e conferir se o plugin
+está instalado, a conta está conectada e as ferramentas estão habilitadas.
+Conectar a conta e concluir "Autorizar acesso" quando solicitado. Após uma
+atualização do servidor, usar Refresh/Atualizar nos detalhes da conexão e abrir
+uma nova conversa. Selecionar @Sombrear e testar: "Execute contexto_operador e
+listar_locais para conferir minha conexão, sem alterar os dados".
+
+Selecionar @Sombrear sozinho não comprova que a autorização foi concluída.
+Uma resposta com o perfil real e os locais confirma a leitura; o lançamento só
+está concluído quando a ferramenta retorna o registro criado. Não repetir pedidos
+sem consultar os registros e preservar o operation_id de uma tentativa incerta.
+
+Chamadas de ferramentas sem token válido retornam um resultado MCP de erro com
+_meta["mcp/www_authenticate"], para o ChatGPT solicitar login/reconexão. Falta de
+permissão e indisponibilidade do Auth têm mensagens próprias, sem repetir login.
+
 OPERAÇÃO
 
 Há 19 ferramentas de contexto, consulta, criação de pastas, solicitação de peças,
