@@ -31,7 +31,7 @@
   async function save(transform){
     if(busy)return null;
     busy=true;revision++;
-    var controls=Array.from(document.querySelectorAll('[data-p-action],[data-e-action]')).map(function(el){return {el:el,disabled:el.disabled};});
+    var controls=Array.from(document.querySelectorAll('[data-p-action],[data-e-action],[data-e-priority-edit]')).map(function(el){return {el:el,disabled:el.disabled};});
     controls.forEach(function(c){c.el.disabled=true;});
     try{
       var record=await read();

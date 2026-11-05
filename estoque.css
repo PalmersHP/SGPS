@@ -117,6 +117,16 @@
 .estoque-modal .modal-body>p:not(.estoque-help):not(.estoque-error){font-size:12px;color:#475569;line-height:1.8}
 .estoque-error{font-size:12px;line-height:1.7;color:#b91c1c;margin:12px 0;min-height:0}
 .estoque-error:empty{display:none}
+.estoque-priority-control{width:170px;max-width:100%}
+.estoque-priority-control select{width:170px;max-width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;background:#fff;color:#334155;font:12px Poppins,sans-serif}
+.estoque-priority-control select:focus{outline:2px solid #9acd32;outline-offset:1px}
+.estoque-priority-control select:disabled{opacity:.6}
+.estoque-priority-control [data-e-priority-status]{white-space:normal;margin:6px 0;font-size:11px;line-height:1.5}
+.estoque-priority-control [data-e-priority-status]:empty{display:none}
+.estoque-priority-control [hidden]{display:none!important}
+.estoque-priority-history small{display:block;color:#64748b}
+.estoque-priority-history>div{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin:5px 0}
+.pedido-table [data-line-field="prioridade"]{min-width:165px}
 .estoque-error-text{color:#b91c1c}
 .estoque-check{display:flex;align-items:flex-start;gap:9px;margin:18px 0 0;font-size:12px;color:#475569;line-height:1.6}
 .estoque-check input{margin-top:3px;flex:none;width:16px;height:16px;accent-color:#6fae2e}

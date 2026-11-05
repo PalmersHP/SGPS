@@ -60,22 +60,25 @@ test('tools têm schemas estritos, OAuth OIDC e annotations; argumentos inválid
   assert.equal((await call(ops,'registrar_entrada',{operation_id:'nao-e-uuid',local_id:'estoque-go',itens:[item(1,{cor:'Branca'})]})).error.code,'INVALID_ARGUMENT');
   assert.equal((await call(ops,'registrar_entrada',operation({local_id:'estoque-go',itens:[item(1,{cor:'Branca',senha:'injetada'})]}))).error.code,'INVALID_ARGUMENT');
   assert.equal((await call(ops,'registrar_entrada',operation({local_id:'estoque-go',itens:[item(-1,{cor:'Branca'})]}))).error.code,'INVALID_ARGUMENT');
+  assert.equal((await call(ops,'registrar_entrada',operation({local_id:'estoque-go',itens:[item(1,{cor:'Branca',prioridade:'P1'})]}))).error.code,'INVALID_ARGUMENT');
   assert.equal((await call(ops,'listar_catalogo',{limit:0})).error.code,'INVALID_ARGUMENT');
-  assert.equal((await call(ops,'criar_pasta',operation({condominio:'Prioridade inválida',cor_estrutura:'Branca',cor_tela:'Prata',vagas:10,prioridade:'P4'}),df)).error.code,'INVALID_ARGUMENT');
+  assert.equal((await call(ops,'criar_pasta',operation({condominio:'Prioridade pertence às peças',cor_estrutura:'Branca',cor_tela:'Prata',vagas:10,prioridade:'P1'}),df)).error.code,'INVALID_ARGUMENT');
   assert.equal((await call(ops,'nao_existe',{})).error.code,'UNKNOWN_TOOL');
   assert.equal(db.writes,0);
 });
 
 test('fluxo 100/50 usa catálogo, cores da pasta, autoria real e replay durável',async()=>{
   const db=memory(),ops=api(db);
-  const folderArgs=operation({contexto_filial_id:'df',condominio:'Riacho 33',cor_estrutura:'Preta',cor_tela:'Prata',vagas:130,prioridade:'P1'});
+  const folderArgs=operation({contexto_filial_id:'df',condominio:'Riacho 33',cor_estrutura:'Preta',cor_tela:'Prata',vagas:130});
   const folder=await good(ops,'criar_pasta',folderArgs,admin),pasta=folder.data.pasta_id;
   assert.equal(pasta,'p-mcp-'+folderArgs.operation_id);
-  assert.equal((await good(ops,'consultar_local',{local_id:pasta},admin)).data.local.pasta.prioridade,'P1');
+  assert.equal(Object.hasOwn((await good(ops,'consultar_local',{local_id:pasta},admin)).data.local.pasta,'prioridade'),false);
+  assert.equal((await call(ops,'solicitar_pecas',operation({contexto_filial_id:'df',pasta_id:pasta,itens:[item(100,{prioridade:'P4'})]}),admin)).error.code,'INVALID_ARGUMENT');
   const stockArgs=operation({local_id:'estoque-go',itens:[item(100,{cor:'Preta'})]});
   const stockResult=await good(ops,'registrar_entrada',stockArgs);
-  const demand=await good(ops,'solicitar_pecas',operation({contexto_filial_id:'df',pasta_id:pasta,itens:[item(100)]}),admin);
+  const demand=await good(ops,'solicitar_pecas',operation({contexto_filial_id:'df',pasta_id:pasta,itens:[item(100,{prioridade:'P1'})]}),admin);
   let state=db.state(),request=E.requests(state,pasta)[0],k=request.itens[0].key;
+  assert.equal(request.itens[0].prioridade,'P1');assert.equal(request.itens[0].peca.prioridade,undefined);assert.equal(request.prioridade,undefined);
   assert.equal(request.id,demand.data.solicitacao_id);assert.equal(request.itens[0].peca.cor,'Preta');assert.equal(request.itens[0].peca.ma,'2,40');
   const sent=await good(ops,'enviar_solicitacao',operation({solicitacao_id:request.id,itens:[{key:k,qtd:50}]}));
   assert.equal(E.requests(db.state(),pasta)[0].itens[0].pendente,50);

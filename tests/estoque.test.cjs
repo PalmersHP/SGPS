@@ -391,39 +391,44 @@ test('fechar arquiva a pendência sem apagá-la e reabrir restaura a mesma solic
   assert.equal(row(s,'obra1').instalado,50);assert.equal(row(s,'obra1').disponivel,0);
 });
 
-test('prioridade validada acompanha pasta, solicitações e relatório congelado',()=>{
-  assert.equal(create(empty()).pastas[0].prioridade,'');
-  for(const prioridade of ['','P1','P2','P3'])assert.equal(E.createFolder(empty(),details('obra1',{prioridade}),filial).pastas[0].prioridade,prioridade);
-  for(const prioridade of ['P0','p1',' P1 ',null,1])assert.throws(()=>E.createFolder(empty(),details('obra1',{prioridade}),filial),/Prioridade inválida/);
-  let s=E.createFolder(empty(),details('obra1',{prioridade:'P2',tipo:'Sombrite',obs:'Obra em etapas'}),filial);
-  s=E.addDemand(s,'obra1',[piece(10)],filial,meta('etapa1','Etapa 1 — blocos A e B'));
-  assert.deepEqual([E.requests(s)[0].prioridade,E.requests(s)[0].obs],['P2','Etapa 1 — blocos A e B']);
-  s=E.editFolder(s,'obra1',{prioridade:'P1'},sede,meta('priorizar'));
-  assert.equal(E.requests(s)[0].prioridade,'P1');
-  assert.deepEqual([E.report(s,'obra1').prioridade,E.report(s,'obra1').obs,E.report(s,'obra1').tipo],['P1','Obra em etapas','Sombrite']);
+test('prioridade pertence a cada linha da solicitação sem herdar ou publicar prioridade antiga da pasta',()=>{
+  assert.equal(Object.hasOwn(create(empty()).pastas[0],'prioridade'),false);
+  assert.throws(()=>E.createFolder(empty(),details('obra1',{prioridade:'P1'}),filial),/cada peça/);
+  let s=E.createFolder(empty(),details('obra1',{tipo:'Sombrite',obs:'Obra em etapas'}),filial);
+  s.pastas[0].prioridade='P1'; // Historical folder metadata is preserved, never inherited.
+  s=E.addDemand(s,'obra1',[piece(10,{prioridade:'P2'}),piece(2,{ma:'4,60'}),piece(3,{cor:'Preta',prioridade:'P3'})],filial,meta('etapa1','Etapa 1 — blocos A e B'));
+  const request=E.requests(s)[0];
+  assert.equal(request.obs,'Etapa 1 — blocos A e B');assert.equal(Object.hasOwn(request,'prioridade'),false);
+  assert.deepEqual(request.itens.map(it=>it.prioridade),['P2','','P3']);
+  assert.deepEqual(s.pastas[0].itens.map(it=>it.prioridade),['P2','','P3']);assert.deepEqual(s.movimentos.at(-1).itens.map(it=>it.prioridade),['P2','','P3']);
+  assert.equal(s.pastas[0].prioridade,'P1');assert.equal(Object.hasOwn(E.getLocation(s,'obra1').pasta,'prioridade'),false);assert.equal(Object.hasOwn(E.locations(s).find(l=>l.id==='obra1').pasta,'prioridade'),false);
+  assert.equal(Object.hasOwn(E.report(s,'obra1'),'prioridade'),false);
+  assert.deepEqual([E.report(s,'obra1').obs,E.report(s,'obra1').tipo],['Obra em etapas','Sombrite']);
+  s=E.editFolder(s,'obra1',{endereco:'Rua 1'},sede,meta('editar-endereco'));assert.equal(s.pastas[0].prioridade,'P1');
+  assert.equal(Object.hasOwn(s.movimentos.at(-1).antes,'prioridade'),false);
   const expected=E.balances(s,'obra1').map(({key,disponivel,instalado})=>({key,disponivel,instalado}));
   s=E.closeWithRemaining(s,'obra1',filial,{...meta('fechar-com-prioridade'),expected});
   const frozen=clone(E.report(s,'obra1'));
-  assert.equal(frozen.solicitacoes[0].obs,'Etapa 1 — blocos A e B');
+  assert.deepEqual(frozen.solicitacoes[0].itens.map(it=>it.prioridade),['P2','','P3']);
   s=E.reopen(s,'obra1',sede,meta('reabrir-prioridade','Retomar etapa'));
-  s=E.editFolder(s,'obra1',{prioridade:'P3'},filial,meta('prioridade-menor'));
+  s=E.setDemandPriorities(s,'etapa1',[{key:request.itens[0].key,prioridade:'P3'}],filial,meta('prioridade-menor'));
   assert.deepEqual(s.pastas[0].relatorios_finais[0],frozen);
-  assert.equal(E.report(s,'obra1').prioridade,'P3');
+  assert.equal(E.report(s,'obra1').solicitacoes[0].itens[0].prioridade,'P3');
 });
 test('edição de dados gerais usa whitelist, audita antes/depois e preserva identidade da pasta',()=>{
   const initial=create(create(empty()),'obra2'),before=clone(initial);
-  const s=E.editFolder(initial,'obra1',{nome:'Novo nome',vagas:'150',prioridade:'P1',chumbacao:'Direta',pilares:'MA',cnpj:'00.000.000/0001-00',endereco:'Rua 10',obs:'Etapa 2'},sede,meta('editar-pasta','Dados conferidos'));
+  const s=E.editFolder(initial,'obra1',{nome:'Novo nome',vagas:'150',chumbacao:'Direta',pilares:'MA',cnpj:'00.000.000/0001-00',endereco:'Rua 10',obs:'Etapa 2'},sede,meta('editar-pasta','Dados conferidos'));
   const p=s.pastas.find(p=>p.id==='obra1'),m=s.movimentos.at(-1);
   assert.deepEqual(initial,before);assert.equal(p.id,'obra1');assert.equal(p.filial_id,'df');assert.equal(p.vagas,150);
   assert.deepEqual([p.cliente,p.chumbacao,p.pilares,p.cnpj],['Novo nome','Direta','MA','00.000.000/0001-00']);
-  assert.equal(m.tipo,'pasta_editada');assert.equal(m.antes.cliente,'Condomínio obra1');assert.equal(m.depois.cliente,'Novo nome');assert.equal(m.depois.prioridade,'P1');
+  assert.equal(m.tipo,'pasta_editada');assert.equal(m.antes.cliente,'Condomínio obra1');assert.equal(m.depois.cliente,'Novo nome');assert.equal(Object.hasOwn(m.depois,'prioridade'),false);
   assert.deepEqual(s.movimentos.slice(0,-1),initial.movimentos);
   assert.throws(()=>E.editFolder(s,'obra1',{filial_id:'mg'},sede,meta('trocar-filial')),/Campo não permitido/);
   assert.throws(()=>E.editFolder(s,'obra1',{itens:[]},sede,meta('trocar-itens')),/Campo não permitido/);
   assert.throws(()=>E.editFolder(s,'obra1',{cliente:'Condomínio obra2'},filial,meta('duplicar-nome')),/pasta existente/);
   assert.throws(()=>E.editFolder(s,'obra1',{vagas:0},filial,meta('vagas-zero')),/quantidade/);
-  assert.throws(()=>E.editFolder(s,'obra1',{prioridade:'urgente'},filial,meta('bad-prio')),/Prioridade inválida/);
-  assert.throws(()=>E.editFolder(s,'obra1',{prioridade:'P3'},sede,meta('editar-pasta')),/Já registrado/);
+  assert.throws(()=>E.editFolder(s,'obra1',{prioridade:'P1'},filial,meta('bad-prio')),/cada peça/);
+  assert.throws(()=>E.editFolder(s,'obra1',{vagas:160},sede,meta('editar-pasta')),/Já registrado/);
   assert.throws(()=>E.editFolder(s,'obra1',{cliente:'Outro'},outra,meta('outra-filial')),/filial responsável/);
 });
 test('alterar cores gerais não recolore demanda, saldo ou remessas legadas',()=>{
@@ -486,6 +491,105 @@ test('edição bloqueia outra filial, quantidades inválidas, legado e obra fina
   assert.throws(()=>E.editDemand(old,'solicitacao-legada:legado',[piece(4)],sede,meta('editar-legado')),/anteriores ao controle/);
   const expected=E.balances(s,'obra1').map(({key,disponivel,instalado})=>({key,disponivel,instalado}));
   s=E.closeWithRemaining(s,'obra1',filial,{...meta('fechar-edicao'),expected});
-  assert.throws(()=>E.editFolder(s,'obra1',{prioridade:'P1'},sede,meta('fechada-prioridade')),/finalizada/);
+  assert.throws(()=>E.editFolder(s,'obra1',{cliente:'Obra encerrada'},sede,meta('fechada-nome')),/finalizada/);
   assert.throws(()=>E.editDemand(s,'editar-permissoes',[piece(1)],filial,meta('fechada-peca')),/finalizada/);assert.equal(E.requests(s)[0].editavel,false);
+});
+
+test('prioridade não participa do SKU nem do estoque e duplicatas só aceitam a mesma prioridade',()=>{
+  const initial=ready(),snapshot=clone(initial),white=piece(1),black=piece(1,{cor:'Preta'}),long=piece(1,{ma:'4,60'});
+  assert.equal(E.keyOf({...white,prioridade:'P1'}),E.keyOf({...white,prioridade:'P3'}));
+  assert.equal(Object.hasOwn(E.normalizeItem({...white,prioridade:'P1'}),'prioridade'),false);
+  assert.notEqual(E.keyOf(white),E.keyOf(black));assert.notEqual(E.keyOf(white),E.keyOf(long));
+  assert.throws(()=>E.addDemand(initial,'obra1',[piece(2,{ma:'4,60',prioridade:'P1'}),piece(3,{ma:'4.6',prioridade:'P2'})],filial,meta('conflito')),/mesma solicitação/);
+  assert.throws(()=>E.addDemand(initial,'obra1',[piece(2),piece(3,{prioridade:'P1'})],filial,meta('conflito-sem-prioridade')),/mesma solicitação/);
+  assert.deepEqual(initial,snapshot);
+  let s=E.addDemand(initial,'obra1',[piece(2,{prioridade:'P1'}),piece(3,{prioridade:'P1'}),{...black,qtd:7,prioridade:'P2'},{...long,qtd:4,prioridade:'P3'}],filial,meta('primeira'));
+  s=E.addDemand(s,'obra1',[piece(6,{prioridade:'P3'})],filial,meta('segunda'));
+  const requests=E.requests(s);
+  assert.deepEqual(requests[0].itens.map(r=>[r.prioridade,r.solicitado]),[['P1',5],['P2',7],['P3',4]]);
+  assert.equal(requests[0].itens[0].key,requests[1].itens[0].key);assert.equal(requests[1].itens[0].prioridade,'P3');
+  assert.equal(E.balances(s,'obra1').length,3);assert.equal(physical(s),100);
+  s=E.setDemandPriorities(s,'primeira',[{key:requests[0].itens[0].key,prioridade:'P2'}],sede,meta('alterar-duplicadas'));
+  assert.deepEqual(s.pastas[0].itens.map(it=>it.prioridade),['P2','P2','P2','P3','P3']);
+  s=E.dispatchRequest(s,'primeira',[{key:requests[0].itens[0].key,qtd:5}],sede,meta('envio'));
+  assert.equal(Object.hasOwn(s.movimentos.at(-1).itens[0],'prioridade'),false);assert.equal(Object.hasOwn(s.movimentos.at(-1).itens[0].peca,'prioridade'),false);
+  assert.deepEqual(E.requests(s).map(r=>r.itens[0].enviado),[5,0]);assert.equal(physical(s),100);
+});
+
+test('alterar prioridade após envio parcial preserva atendimento, recebimento, estoque e auditoria',()=>{
+  let s=E.addDemand(ready(),'obra1',[piece(100,{prioridade:'P2'})],filial,meta('pedido-priorizado','Etapa 3'));
+  s=E.dispatchRequest(s,'pedido-priorizado',[{key:key(s),qtd:50}],sede,meta('metade'));
+  const original=clone(s),k=key(s),requestBefore=E.requests(s)[0],stocks=E.locations(s).map(l=>E.balances(s,l.id));
+  s=E.setDemandPriorities(s,'pedido-priorizado',[{key:k,prioridade:'P1'}],sede,meta('priorizar-parcial','Produzir saldo primeiro'));
+  assert.deepEqual(original.movimentos,s.movimentos.slice(0,-1));assert.deepEqual(E.locations(s).map(l=>E.balances(s,l.id)),stocks);
+  const changed=E.requests(s)[0],event=s.movimentos.at(-1);
+  assert.deepEqual({...changed,itens:requestBefore.itens},requestBefore);
+  assert.deepEqual(changed.itens.map(r=>[r.solicitado,r.enviado,r.recebido,r.pendente,r.prioridade]),[[100,50,0,50,'P1']]);
+  assert.deepEqual(event.itens,[{key:k,peca:requestBefore.itens[0].peca,prioridade:'P1',prioridade_anterior:'P2'}]);
+  assert.equal(event.tipo,'prioridades_alteradas');assert.equal(event.referencia_id,'pedido-priorizado');assert.equal(event.pasta_id,'obra1');assert.equal(event.usuario_id,sede.id);assert.equal(event.obs,'Produzir saldo primeiro');
+  assert.equal(s.pastas[0].itens[0].prioridade,'P1');assert.equal(s.pastas[0].log.at(-1).movimento_id,event.id);
+  s=receive(s,'metade');
+  const receivedBalances=E.balances(s,'obra1');
+  s=E.setDemandPriorities(s,'pedido-priorizado',[{key:k,prioridade:''}],filial,meta('retirar-prioridade'));
+  assert.deepEqual(E.balances(s,'obra1'),receivedBalances);assert.equal(physical(s),100);
+  assert.deepEqual(E.requests(s)[0].itens.map(r=>[r.solicitado,r.enviado,r.recebido,r.pendente,r.prioridade]),[[100,50,50,50,'']]);
+  const reloaded=E.fromRecords(E.toRecords(s),filiais,cat);
+  assert.deepEqual(E.requests(reloaded),E.requests(s));assert.deepEqual(E.balances(reloaded,'obra1'),E.balances(s,'obra1'));assert.deepEqual(reloaded.movimentos,s.movimentos);
+  assert.throws(()=>E.setDemandPriorities(s,'pedido-priorizado',[{key:k,prioridade:'P3'}],filial,meta('retirar-prioridade')),/Já registrado/);
+});
+
+test('edição de demanda mantém prioridade atual no mesmo SKU e reexecuta mudanças independentes por linha',()=>{
+  let s=E.addDemand(ready(),'obra1',[piece(10,{prioridade:'P1'})],filial,meta('etapa-editavel','Etapa original'));
+  const first=clone(s.movimentos.at(-1)),k=key(s);
+  s=E.setDemandPriorities(s,'etapa-editavel',[{key:k,prioridade:'P2'}],filial,meta('prioridade-2'));
+  const priorityEvent=clone(s.movimentos.at(-1));
+  s=E.editDemand(s,'etapa-editavel',[piece(20),piece(3,{cor:'Preta'})],sede,{id:'editar-quantidade'});
+  let r=E.requests(s)[0];assert.deepEqual(r.itens.map(it=>it.prioridade),['P2','']);assert.equal(r.obs,'Etapa original');assert.equal(r.id,'etapa-editavel');assert.equal(r.data,first.data);
+  assert.equal(s.movimentos.at(-1).itens_anteriores[0].prioridade,'P2');assert.deepEqual(s.movimentos.find(m=>m.id===first.id),first);assert.deepEqual(s.movimentos.find(m=>m.id===priorityEvent.id),priorityEvent);
+  s=E.setDemandPriorities(s,'etapa-editavel',[{key:r.itens[1].key,prioridade:'P3'}],sede,meta('priorizar-preta'));
+  s=E.editDemand(s,'etapa-editavel',[piece(25,{prioridade:''}),piece(4,{cor:'Preta'})],filial,{id:'editar-novamente'});
+  r=E.requests(s)[0];assert.deepEqual(r.itens.map(it=>[it.prioridade,it.pendente]),[['',25],['P3',4]]);
+  assert.equal(E.requests(s).length,1);assert.deepEqual(s.pastas[0].itens.map(it=>it.prioridade),['','P3']);
+  const reloaded=E.fromRecords(E.toRecords(s),filiais,cat);assert.deepEqual(E.requests(reloaded),E.requests(s));assert.deepEqual(E.balances(reloaded,'obra1'),E.balances(s,'obra1'));
+});
+
+test('prioridades rejeitam enum inválido, alterações sem pendência e acesso indevido sem gravar parcialmente',()=>{
+  let s=E.addDemand(ready(),'obra1',[piece(10,{prioridade:'P2'}),piece(3,{cor:'Preta'})],filial,meta('validacoes'));
+  const rows=E.requests(s)[0].itens,k=rows[0].key,black=rows[1].key;
+  for(const value of [null,'p1','P4',' P1 ',1,true]){
+    assert.throws(()=>E.addDemand(s,'obra1',[piece(1,{prioridade:value})],filial,meta('invalid-add')),/Prioridade inválida/);
+    assert.throws(()=>E.editDemand(s,'validacoes',[piece(1,{prioridade:value})],filial,meta('invalid-edit')),/Prioridade inválida/);
+    assert.throws(()=>E.setDemandPriorities(s,'validacoes',[{key:k,prioridade:value}],sede,meta('invalid-priority')),/Prioridade inválida/);
+  }
+  assert.throws(()=>E.editDemand(s,'validacoes',[piece(2,{prioridade:'P1'}),piece(3,{prioridade:'P3'})],filial,meta('invalid-duplicate')),/mesma solicitação/);
+  assert.throws(()=>E.setDemandPriorities(s,'validacoes',[],sede,meta('vazio')),/pelo menos/);
+  assert.throws(()=>E.setDemandPriorities(s,'validacoes',[{key:k}],sede,meta('omitida')),/Informe a prioridade/);
+  assert.throws(()=>E.setDemandPriorities(s,'validacoes',[{key:'inexistente',prioridade:'P1'}],sede,meta('ausente')),/não encontrada nesta solicitação/);
+  assert.throws(()=>E.setDemandPriorities(s,'validacoes',[{key:k,prioridade:'P1'},{key:k,prioridade:'P1'}],sede,meta('repetida')),/duas vezes/);
+  assert.throws(()=>E.setDemandPriorities(s,'validacoes',[{key:k,prioridade:'P1'}],outra,meta('outra-filial')),/filial responsável/);
+  const inactive=clone(s);inactive.pastas[0].inativo=true;assert.throws(()=>E.setDemandPriorities(inactive,'validacoes',[{key:k,prioridade:'P1'}],sede,meta('inativa')),/inativo/);
+  s=E.dispatchRequest(s,'validacoes',[{key:k,qtd:10}],sede,meta('enviar-tudo-branco'));
+  const before=clone(s);
+  assert.throws(()=>E.setDemandPriorities(s,'validacoes',[{key:black,prioridade:'P3'},{key:k,prioridade:'P1'}],sede,meta('lote-invalido')),/pendente de envio/);
+  assert.deepEqual(s,before);
+  s=E.setDemandPriorities(s,'validacoes',[{key:black,prioridade:'P3'}],sede,meta('somente-pendente'));
+  s=receive(s,'enviar-tudo-branco');
+  const expected=E.balances(s,'obra1').map(({key,disponivel,instalado})=>({key,disponivel,instalado}));
+  s=E.closeWithRemaining(s,'obra1',filial,{...meta('fechar-prioridades'),expected});
+  assert.throws(()=>E.setDemandPriorities(s,'validacoes',[{key:black,prioridade:'P1'}],sede,meta('obra-fechada')),/finalizada/);
+});
+
+test('prioridade da solicitação legada não modifica solicitação nova do mesmo SKU nem reconta remessa',()=>{
+  const legacy={...details('antiga'),filial_id:'df',prioridade:'P1',itens:[{...piece(10),id:'linha-antiga'}],remessas:[{id:'remessa-anterior',itens:[{item_id:'linha-antiga',qtd:4}]}]};
+  let s=E.fromRecords([legacy],filiais,cat);
+  s=E.addDemand(s,'antiga',[piece(2,{prioridade:'P3'})],filial,meta('pedido-novo'));
+  const before=clone(s),k=E.requests(s)[0].itens[0].key;
+  assert.deepEqual(E.requests(s).map(r=>r.itens[0].prioridade),['','P3']);
+  s=E.setDemandPriorities(s,'solicitacao-legada:antiga',[{key:k,prioridade:'P2'}],sede,meta('priorizar-legado'));
+  assert.deepEqual(s.pastas[0].remessas,before.pastas[0].remessas);assert.deepEqual(s.movimentos.slice(0,-1),before.movimentos);
+  assert.deepEqual(E.requests(s).map(r=>[r.itens[0].prioridade,r.itens[0].enviado,r.itens[0].pendente]),[['P2',4,6],['P3',0,2]]);
+  assert.deepEqual(s.pastas[0].itens.map(it=>it.prioridade),['P2','P3']);assert.deepEqual(E.balances(s,'antiga'),E.balances(before,'antiga'));
+  s=receive(s,'legado:antiga:remessa-anterior');
+  assert.deepEqual(E.requests(s).map(r=>[r.itens[0].enviado,r.itens[0].recebido]),[[4,4],[0,0]]);
+  const persisted=E.fromRecords(E.toRecords(s),filiais,cat);assert.deepEqual(E.requests(persisted),E.requests(s));assert.equal(row(persisted,'antiga').disponivel,4);
 });

@@ -900,7 +900,7 @@ function renderSedeDash(){
   var safe=function(value){return String(value==null?'':value).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});};
   var agRows=ag.slice(0,5).map(function(r){
     var missing=r.itens.filter(function(it){return it.pendente>0;});
-    return '<tr><td>'+safe(r.filial_nome)+'</td><td><strong>'+safe(r.condominio)+'</strong> '+EstoqueUI.priorityBadge(r.prioridade)+(r.obs?'<p class="estoque-report-observation" style="font-size:11px;margin-top:6px">'+safe(r.obs)+'</p>':'')+'</td><td>'+missing.length+' tipo(s)</td><td>'+(r.status==='parcial'?'Enviado parcialmente':'A enviar')+'</td><td>'+safe(fmtDate((r.data||'').slice(0,10)))+'</td><td><button class="btn btn-sm btn-primary" data-e-action="request" data-id="'+safe(r.id)+'">Ver solicitação</button></td></tr>';
+    return '<tr><td>'+safe(r.filial_nome)+'</td><td><strong>'+safe(r.condominio)+'</strong>'+(r.obs?'<p class="estoque-report-observation" style="font-size:11px;margin-top:6px">'+safe(r.obs)+'</p>':'')+'</td><td>'+missing.length+' tipo(s)</td><td>'+(r.status==='parcial'?'Enviado parcialmente':'A enviar')+'</td><td>'+safe(fmtDate((r.data||'').slice(0,10)))+'</td><td><button class="btn btn-sm btn-primary" data-e-action="request" data-id="'+safe(r.id)+'">Ver solicitação</button></td></tr>';
   }).join('')||'<tr><td colspan="6" style="text-align:center;padding:24px;color:#94a3b8">Nenhuma solicitação com peças pendentes de envio.</td></tr>';
 
   document.getElementById('view-sede-dashboard').innerHTML=

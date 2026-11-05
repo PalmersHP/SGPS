@@ -8,8 +8,8 @@
   function text(v){return String(v==null?'':v).trim().replace(/\s+/g,' ');}
   function canonical(v){return text(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();}
   function priority(v){if(v===undefined)return '';if(['','P1','P2','P3'].indexOf(v)<0)fail('Prioridade inválida. Escolha Sem prioridade, P1, P2 ou P3.');return v;}
-  var folderFields=['cliente','cor_estrutura','cor_tela','vagas','endereco','sindico','contato','email','tipo','obs','prioridade','chumbacao','pilares','cnpj'];
-  function folderDetails(p){var result={};folderFields.forEach(function(k){result[k]=k==='prioridade'?(p[k]||''):k==='vagas'?p[k]:text(p[k]);});return result;}
+  var folderFields=['cliente','cor_estrutura','cor_tela','vagas','endereco','sindico','contato','email','tipo','obs','chumbacao','pilares','cnpj'];
+  function folderDetails(p){var result={};folderFields.forEach(function(k){result[k]=k==='vagas'?p[k]:text(p[k]);});return result;}
   function legacyColors(p){return p.cores_legadas?Object.assign({},p,p.cores_legadas):p;}
   function unit(v){var u=canonical(v||'PÇ');if(['PC','PÇ','PECA','PECAS'].indexOf(u)>=0)return 'PÇ';if(['UN','UNID','UNIDADE','UNIDADES'].indexOf(u)>=0)return 'UNID';if(u==='M2')return 'M²';return u;}
   function quantity(value,un,zero){
@@ -72,7 +72,7 @@
     ids.forEach(function(id){
       var p=folder(state,id);if(!p)return;
       p.atualizado=m.data;p.log=p.log||[];
-      p.log.push({status:p.status||'rascunho',data:m.data,user:m.usuario_nome,obs:m.obs||({pasta_criada:'Pasta do condomínio criada.',pasta_editada:'Dados do condomínio editados.',demanda:'Peças solicitadas pela filial.',demanda_editada:'Solicitação de peças editada.',aceite:'Peças aceitas pela sede.',entrada:'Entrada no estoque.',transferencia:'Remanejamento despachado.',recebimento:'Recebimento de peças confirmado.',conferencia_inicial:'Estoque inicial conferido.',conferencia_fechamento:'Peças instaladas conferidas no fechamento.',finalizacao:'Obra finalizada.',reabertura:'Obra reaberta.'}[m.tipo]||m.tipo),movimento_id:m.id});
+      p.log.push({status:p.status||'rascunho',data:m.data,user:m.usuario_nome,obs:m.obs||({pasta_criada:'Pasta do condomínio criada.',pasta_editada:'Dados do condomínio editados.',demanda:'Peças solicitadas pela filial.',demanda_editada:'Solicitação de peças editada.',prioridades_alteradas:'Prioridades das peças alteradas.',aceite:'Peças aceitas pela sede.',entrada:'Entrada no estoque.',transferencia:'Remanejamento despachado.',recebimento:'Recebimento de peças confirmado.',conferencia_inicial:'Estoque inicial conferido.',conferencia_fechamento:'Peças instaladas conferidas no fechamento.',finalizacao:'Obra finalizada.',reabertura:'Obra reaberta.'}[m.tipo]||m.tipo),movimento_id:m.id});
     });
   }
   function receiptIds(state){return new Set(state.movimentos.filter(function(m){return m.tipo==='recebimento';}).map(function(m){return m.referencia_id;}));}
@@ -86,14 +86,16 @@
       var rows=new Map();
       items.forEach(function(it){
         var pc=it.peca||piece(state,it,p),key=it.key||keyOf(pc),n=Number(it.qtd)||0;if(n<=0)return;
-        if(!rows.has(key))rows.set(key,{key:key,peca:copy(pc),solicitado:0,enviado:0,recebido:0,pendente:0});
+        var pr=priority(it.prioridade);
+        if(rows.has(key)&&rows.get(key).prioridade!==pr)fail('A mesma peça com as mesmas medidas e cor não pode ter prioridades diferentes na mesma solicitação.');
+        if(!rows.has(key))rows.set(key,{key:key,peca:copy(pc),prioridade:pr,solicitado:0,enviado:0,recebido:0,pendente:0});
         rows.get(key).solicitado=round(rows.get(key).solicitado+n);
       });
       return Array.from(rows.values());
     }
     function add(id,p,items,data,user,obs,legacy){
       var rows=demandRows(p,items);if(!rows.length)return;
-      var l=location(state,p.id),request={id:id,pasta_id:p.id,condominio:p.cliente||p.nome,filial_id:p.filial_id,filial_nome:p.filial_nome||'',data:data||p.criado,usuario_nome:user||'',prioridade:p.prioridade||'',obs:text(obs),legado:!!legacy,status:'pendente',itens:rows,ativo:!!(l&&l.ativo&&!l.finalizada)};
+      var l=location(state,p.id),request={id:id,pasta_id:p.id,condominio:p.cliente||p.nome,filial_id:p.filial_id,filial_nome:p.filial_nome||'',data:data||p.criado,usuario_nome:user||'',obs:text(obs),legado:!!legacy,status:'pendente',itens:rows,ativo:!!(l&&l.ativo&&!l.finalizada)};
       request.itens.forEach(function(it){it.pendente=it.solicitado;});requests.push(request);byId.set(id,request);
     }
     state.movimentos.forEach(function(m){if(m.tipo==='demanda'||m.tipo==='demanda_editada')(m.itens||[]).forEach(function(it){if(it.demanda_id)itemRequests.set(m.pasta_id+'|'+it.demanda_id,m.tipo==='demanda'?m.id:m.referencia_id);});});
@@ -136,6 +138,11 @@
           edited.itens=demandRows(p,m.itens||[]);edited.itens.forEach(function(it){it.pendente=it.solicitado;});
           edited.obs=text(m.obs);edited.editado_em=m.data;edited.editado_por=m.usuario_nome;
         }
+        return;
+      }
+      if(m.tipo==='prioridades_alteradas'){
+        var prioritized=byId.get(m.referencia_id);
+        if(prioritized&&prioritized.pasta_id===m.pasta_id)(m.itens||[]).forEach(function(change){var row=prioritized.itens.find(function(it){return it.key===change.key;});if(row)row.prioridade=priority(change.prioridade);});
         return;
       }
       if(m.tipo!=='transferencia'||legacyTransfers.has(m.id))return;
@@ -193,12 +200,15 @@
     if(pending(state,p.id).length){p.status='em_transito';return;}
     p.status=requests.length?'entregue':'rascunho';
   }
-  function demandItems(state,p,items,ctx,complement){
+  function demandItems(state,p,items,ctx,complement,previousPriorities){
     if(!Array.isArray(items)||!items.length)fail('Selecione pelo menos uma peça.');
+    var priorities=new Map();
     return items.map(function(it){
       var normalized=piece(state,it,p);if(!normalized.desc)fail('Selecione a peça em todas as linhas.');
+      var key=keyOf(normalized),pr=priority(it.prioridade===undefined&&previousPriorities?previousPriorities.get(key):it.prioridade);
+      if(priorities.has(key)&&priorities.get(key)!==pr)fail('A mesma peça com as mesmas medidas e cor não pode ter prioridades diferentes na mesma solicitação.');priorities.set(key,pr);
       var n=quantity(it.qtd,normalized.un,false),price=Number(it.preco_unit)||0;
-      return Object.assign({},normalized,{id:uid('i'),qtd:n,preco_unit:price,subtotal:round(n*price),item_status:'aguardando',complemento:!!complement,solicitado_em:ctx.data,solicitado_por:ctx.nome});
+      return Object.assign({},normalized,{id:uid('i'),qtd:n,prioridade:pr,preco_unit:price,subtotal:round(n*price),item_status:'aguardando',complemento:!!complement,solicitado_em:ctx.data,solicitado_por:ctx.nome});
     });
   }
   function priceFolder(p){p.subtotal_pecas=round((p.itens||[]).reduce(function(n,it){return n+(Number(it.preco_unit)||0)*(Number(it.qtd)||0);},0));p.frete=p.frete||0;p.valor=p.subtotal_pecas+p.frete;}
@@ -236,13 +246,14 @@
   api.toRecords=function(state){return copy(state.pastas).concat([{id:META_ID,tipo_registro:'controle_estoque',versao_estoque:1,estoques:copy(state.estoques),movimentos:copy(state.movimentos)}]);};
   api.createFolder=function(input,details,ctx){
     actor(ctx);if(ctx.role!=='filial'||!ctx.filial_id)fail('A pasta deve ser criada pela filial responsável.');
+    if(Object.prototype.hasOwnProperty.call(details,'prioridade'))fail('A prioridade deve ser informada em cada peça da solicitação, não no condomínio.');
     var state=copy(input),id=details.id||uid('p');
     if(id===META_ID||location(state,id))fail('Já registrado. Esta pasta já existe.');
     var name=text(details.cliente||details.nome);if(!name)fail('Informe o nome do condomínio.');
     if(state.pastas.some(function(p){return p.filial_id===ctx.filial_id&&canonical(p.cliente||p.nome)===canonical(name);}))fail('Já existe uma pasta para este condomínio. Abra a pasta existente para lançar as peças.');
     var vagas=quantity(details.vagas,'PÇ',false);
     if(!text(details.cor_estrutura)||!text(details.cor_tela))fail('Informe as cores da estrutura e da tela.');
-    var p=Object.assign({},copy(details),{id:id,tipo_registro:'pasta_condominio',cliente:name,filial_id:ctx.filial_id,filial_nome:ctx.filial_nome||'',vagas:vagas,prioridade:priority(details.prioridade),status:'rascunho',status_obra:'aberta',versao_pedido:2,estoque_inicial_conferido:true,criado:ctx.data,atualizado:ctx.data,itens:[],remessas:[],log:[],valor:0,subtotal_pecas:0,frete:0});
+    var p=Object.assign({},copy(details),{id:id,tipo_registro:'pasta_condominio',cliente:name,filial_id:ctx.filial_id,filial_nome:ctx.filial_nome||'',vagas:vagas,status:'rascunho',status_obra:'aberta',versao_pedido:2,estoque_inicial_conferido:true,criado:ctx.data,atualizado:ctx.data,itens:[],remessas:[],log:[],valor:0,subtotal_pecas:0,frete:0});
     state.pastas.unshift(p);append(state,event(state,'pasta_criada',ctx,{id:'criacao:'+id},{pasta_id:id,itens:[]}));return state;
   };
   api.editFolder=function(input,pastaId,details,ctx,meta){
@@ -251,9 +262,10 @@
     var before=folderDetails(p),after=copy(before),aliases={nome:'cliente',condominio:'cliente'},seen=new Set();
     Object.keys(details).forEach(function(k){
       var field=aliases[k]||k;
+      if(field==='prioridade')fail('A prioridade deve ser informada em cada peça da solicitação, não no condomínio.');
       if(folderFields.indexOf(field)<0)fail('Campo não permitido na edição da pasta: '+k+'.');
       if(seen.has(field))fail('Informe o nome do condomínio apenas uma vez.');seen.add(field);
-      after[field]=field==='prioridade'?priority(details[k]):field==='vagas'?quantity(details[k],'PÇ',false):text(details[k]);
+      after[field]=field==='vagas'?quantity(details[k],'PÇ',false):text(details[k]);
     });
     if(!after.cliente)fail('Informe o nome do condomínio.');
     if(!after.cor_estrutura||!after.cor_tela)fail('Informe as cores da estrutura e da tela.');
@@ -270,7 +282,7 @@
   api.addDemand=function(input,pastaId,items,ctx,meta){
     var state=copy(input),p=ownFolder(state,pastaId,ctx),m=event(state,'demanda',ctx,meta,{pasta_id:pastaId});
     var additions=demandItems(state,p,items,ctx,p.itens.length>0);p.itens=p.itens.concat(additions);priceFolder(p);
-    m.itens=additions.map(function(it){var pc=piece(state,it,p);return {key:keyOf(pc),peca:pc,qtd:it.qtd,demanda_id:it.id};});append(state,m);recalc(state,p);return state;
+    m.itens=additions.map(function(it){var pc=piece(state,it,p);return {key:keyOf(pc),peca:pc,qtd:it.qtd,prioridade:it.prioridade,demanda_id:it.id};});append(state,m);recalc(state,p);return state;
   };
   api.editDemand=function(input,requestId,items,ctx,meta){
     actor(ctx);var state=copy(input),request=requestLedger(state).requests.find(function(r){return r.id===requestId;});
@@ -281,10 +293,35 @@
     var previous=state.movimentos.filter(function(m){return m.id===requestId&&m.tipo==='demanda'||m.tipo==='demanda_editada'&&m.referencia_id===requestId;}).at(-1);
     var ids=new Set((previous.itens||[]).map(function(it){return it.demanda_id;}));
     var remaining=p.itens.filter(function(it){return !ids.has(it.id);});
-    var additions=demandItems(state,p,items,ctx,remaining.length>0);
+    var additions=demandItems(state,p,items,ctx,remaining.length>0,new Map(request.itens.map(function(it){return [it.key,it.prioridade];})));
     var eventMeta=Object.assign({},meta||{});if(!Object.prototype.hasOwnProperty.call(eventMeta,'obs'))eventMeta.obs=request.obs;
-    var m=event(state,'demanda_editada',ctx,eventMeta,{pasta_id:p.id,referencia_id:requestId,itens_anteriores:copy(previous.itens),obs_anterior:request.obs,itens:additions.map(function(it){var pc=piece(state,it,p);return {key:keyOf(pc),peca:pc,qtd:it.qtd,demanda_id:it.id};})});
+    var priorItems=copy(previous.itens);priorItems.forEach(function(it){var row=request.itens.find(function(r){return r.key===it.key;});it.prioridade=row?row.prioridade:priority(it.prioridade);});
+    var m=event(state,'demanda_editada',ctx,eventMeta,{pasta_id:p.id,referencia_id:requestId,itens_anteriores:priorItems,obs_anterior:request.obs,itens:additions.map(function(it){var pc=piece(state,it,p);return {key:keyOf(pc),peca:pc,qtd:it.qtd,prioridade:it.prioridade,demanda_id:it.id};})});
     p.itens=remaining.concat(additions);priceFolder(p);append(state,m);recalc(state,p);return state;
+  };
+  api.setDemandPriorities=function(input,requestId,changes,ctx,meta){
+    actor(ctx);var state=copy(input),request=requestLedger(state).requests.find(function(r){return r.id===requestId;});
+    if(!request)fail('Solicitação não encontrada.');
+    var p=editableFolder(state,request.pasta_id,ctx);
+    if(!Array.isArray(changes)||!changes.length)fail('Selecione pelo menos uma peça para alterar a prioridade.');
+    var seen=new Set(),items=changes.map(function(change){
+      if(!change||typeof change.key!=='string')fail('Selecione uma peça da solicitação.');
+      if(seen.has(change.key))fail('A mesma peça foi selecionada duas vezes.');seen.add(change.key);
+      var row=request.itens.find(function(it){return it.key===change.key;});if(!row)fail('Peça não encontrada nesta solicitação.');
+      if(row.pendente<=0)fail('Só é possível alterar a prioridade de peças com quantidade pendente de envio.');
+      if(!Object.prototype.hasOwnProperty.call(change,'prioridade')||change.prioridade===undefined)fail('Informe a prioridade da peça.');
+      return {key:row.key,peca:copy(row.peca),prioridade:priority(change.prioridade),prioridade_anterior:row.prioridade};
+    });
+    var m=event(state,'prioridades_alteradas',ctx,meta,{pasta_id:p.id,referencia_id:requestId,itens:items});
+    var revisions=state.movimentos.filter(function(move){return move.tipo==='demanda'&&move.id===requestId||move.tipo==='demanda_editada'&&move.referencia_id===requestId;}),ids;
+    if(revisions.length)ids=new Set((revisions.at(-1).itens||[]).map(function(it){return it.demanda_id;}));
+    else{
+      var modernIds=new Set();state.movimentos.forEach(function(move){if(move.pasta_id===p.id&&(move.tipo==='demanda'||move.tipo==='demanda_editada'))(move.itens||[]).forEach(function(it){modernIds.add(it.demanda_id);});});
+      ids=new Set(p.itens.filter(function(it){return !modernIds.has(it.id)&&it.item_status!=='cancelado';}).map(function(it){return it.id;}));
+    }
+    var matched=new Set();p.itens.forEach(function(it){if(!ids.has(it.id))return;var key=keyOf(piece(state,it,p)),change=items.find(function(change){return change.key===key;});if(change){it.prioridade=change.prioridade;matched.add(key);}});
+    if(matched.size!==items.length)fail('Os itens desta solicitação estão inconsistentes. Atualize a tela antes de continuar.');
+    append(state,m);return state;
   };
   api.approveDemand=function(input,pastaId,ctx,keys,meta){
     actor(ctx);if(ctx.role!=='sede')fail('Somente a sede pode aceitar as peças solicitadas.');
@@ -371,7 +408,7 @@
   function buildReport(state,pastaId,when){
     var p=folder(state,pastaId);if(!p)fail('Pasta não encontrada.');
     var rows=balances(state,pastaId),items=rows.map(function(b){return {key:b.key,peca:copy(b.peca),solicitado:b.solicitado,aprovado:b.aprovado,recebido:b.entradas,enviado:b.saidas,instalado:b.instalado,disponivel:b.disponivel,em_transito_entrada:b.em_transito_entrada,em_transito_saida:b.em_transito_saida,diferenca:round(b.solicitado-b.instalado),historico_enviado:b.historico_enviado,historico_recebido:b.historico_recebido};});
-    return {pasta_id:p.id,condominio:p.cliente,filial_id:p.filial_id,filial_nome:p.filial_nome,cor_estrutura:p.cor_estrutura,cor_tela:p.cor_tela,vagas:p.vagas,prioridade:p.prioridade||'',obs:text(p.obs),tipo:text(p.tipo),gerado_em:when||p.finalizado_em||p.atualizado,finalizado_em:p.finalizado_em||null,finalizado_por:p.finalizado_por||null,conhecido:known(p),saldo_base:'movimentacoes_confirmadas',itens:items,solicitacoes:copy(requestLedger(state).requests.filter(function(r){return r.pasta_id===pastaId;})),movimentacoes:copy(state.movimentos.filter(function(m){return [m.pasta_id,m.origem_id,m.destino_id].indexOf(pastaId)>=0;})),totais:{linhas:items.length,solicitado:round(items.reduce(function(n,it){return n+it.solicitado;},0)),instalado:round(items.reduce(function(n,it){return n+it.instalado;},0)),disponivel:round(items.reduce(function(n,it){return n+it.disponivel;},0)),em_transito:round(items.reduce(function(n,it){return n+it.em_transito_entrada+it.em_transito_saida;},0))}};
+    return {pasta_id:p.id,condominio:p.cliente,filial_id:p.filial_id,filial_nome:p.filial_nome,cor_estrutura:p.cor_estrutura,cor_tela:p.cor_tela,vagas:p.vagas,obs:text(p.obs),tipo:text(p.tipo),gerado_em:when||p.finalizado_em||p.atualizado,finalizado_em:p.finalizado_em||null,finalizado_por:p.finalizado_por||null,conhecido:known(p),saldo_base:'movimentacoes_confirmadas',itens:items,solicitacoes:copy(requestLedger(state).requests.filter(function(r){return r.pasta_id===pastaId;})),movimentacoes:copy(state.movimentos.filter(function(m){return [m.pasta_id,m.origem_id,m.destino_id].indexOf(pastaId)>=0;})),totais:{linhas:items.length,solicitado:round(items.reduce(function(n,it){return n+it.solicitado;},0)),instalado:round(items.reduce(function(n,it){return n+it.instalado;},0)),disponivel:round(items.reduce(function(n,it){return n+it.disponivel;},0)),em_transito:round(items.reduce(function(n,it){return n+it.em_transito_entrada+it.em_transito_saida;},0))}};
   }
   api.finalize=function(input,pastaId,ctx,meta){
     var state=copy(input),p=ownFolder(state,pastaId,ctx);
@@ -401,9 +438,10 @@
     p.relatorios_finais=p.relatorios_finais||[];if(p.relatorio_final)p.relatorios_finais.push(copy(p.relatorio_final));
     delete p.relatorio_final;delete p.finalizado_em;delete p.finalizado_por;delete p.conferencia_fechamento;p.status_obra='aberta';recalc(state,p);append(state,m);return state;
   };
-  api.report=function(state,id){var p=folder(state,id);if(!p)fail('Pasta não encontrada.');return p.status_obra==='finalizada'&&p.relatorio_final?copy(p.relatorio_final):buildReport(state,id);};
-  api.locations=function(state){return copy(descriptors(state));};
-  api.getLocation=function(state,id){var l=location(state,id);return l?copy(l):null;};
+  api.report=function(state,id){var p=folder(state,id);if(!p)fail('Pasta não encontrada.');var result=p.status_obra==='finalizada'&&p.relatorio_final?copy(p.relatorio_final):buildReport(state,id);delete result.prioridade;(result.solicitacoes||[]).forEach(function(r){delete r.prioridade;(r.itens||[]).forEach(function(it){it.prioridade=priority(it.prioridade);});});return result;};
+  function publicLocations(state){return copy(descriptors(state)).map(function(l){if(l.pasta)delete l.pasta.prioridade;return l;});}
+  api.locations=publicLocations;
+  api.getLocation=function(state,id){var l=location(state,id);if(!l)return null;l=copy(l);if(l.pasta)delete l.pasta.prioridade;return l;};
   api.balances=balances;
   api.history=function(state,id){return copy(state.movimentos.filter(function(m){return !id||[m.pasta_id,m.origem_id,m.destino_id].indexOf(id)>=0;}));};
   api.pendingTransfers=function(state,id){return copy(pending(state,id));};

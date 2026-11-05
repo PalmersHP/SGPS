@@ -1,7 +1,7 @@
 (function(){
   'use strict';
   var draft=null;
-  var folderFields=['cliente','vagas','cor_estrutura','cor_tela','tipo','obs','prioridade','endereco','cnpj','sindico','contato','email','chumbacao','pilares'];
+  var folderFields=['cliente','vagas','cor_estrutura','cor_tela','tipo','obs','endereco','cnpj','sindico','contato','email','chumbacao','pilares'];
   var h=function(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});};
   var num=function(v){return Number(v||0).toLocaleString('pt-BR',{maximumFractionDigits:3});};
   var date=function(){return new Date().toLocaleDateString('sv-SE',{timeZone:'America/Sao_Paulo'});};
@@ -10,12 +10,13 @@
   function allowed(p){return p&&(USER.role==='sede'||p.filial_id===USER.filial_id);}
   function price(it){return typeof it.preco_unit==='number'?it.preco_unit:lookupPreco(it.desc);}
   function total(p){return (p.itens||[]).reduce(function(sum,it){return sum+price(it)*(Number(it.qtd)||0);},0);}
-  function blank(){return {desc:'',ma:'0,00',mb:'0,00',mc:'0,00',un:'PÇ',qtd:1};}
+  function blank(){return {desc:'',ma:'0,00',mb:'0,00',mc:'0,00',un:'PÇ',qtd:1,prioridade:''};}
+  function priorityOptions(value){return ['','P1','P2','P3'].map(function(p,index){return '<option value="'+p+'" '+((value||'')===p?'selected':'')+'>'+(p?p+' · Prioridade 0'+index:'Sem prioridade')+'</option>';}).join('');}
   function folderData(p){var data={};folderFields.forEach(function(key){data[key]=p[key]==null?'':p[key];});return data;}
   function requestSnapshot(state,request){
     if(!request)return null;
-    var edits=state.movimentos.filter(function(m){return m.tipo==='demanda_editada'&&m.referencia_id===request.id;});
-    return JSON.stringify({id:request.id,pasta_id:request.pasta_id,obs:request.obs||'',revision:edits.length?edits[edits.length-1].id:request.id,itens:request.itens.map(function(it){return {key:it.key,peca:it.peca,solicitado:it.solicitado};})});
+    var edits=state.movimentos.filter(function(m){return (m.tipo==='demanda_editada'||m.tipo==='prioridades_alteradas')&&m.referencia_id===request.id;});
+    return JSON.stringify({id:request.id,pasta_id:request.pasta_id,obs:request.obs||'',revision:edits.length?edits[edits.length-1].id:request.id,itens:request.itens.map(function(it){return {key:it.key,peca:it.peca,solicitado:it.solicitado,prioridade:it.prioridade||''};})});
   }
   function button(action,label,primary,extra){return '<button type="button" class="btn '+(primary?'btn-primary':'btn-outline')+'" data-p-action="'+action+'" '+(extra||'')+'>'+label+'</button>';}
   function field(label,key,value,type,extra){return '<div class="fg"><label for="p_'+key+'">'+label+'</label><input id="p_'+key+'" data-field="'+key+'" type="'+(type||'text')+'" value="'+h(value)+'" '+(extra||'')+'></div>';}
@@ -31,9 +32,9 @@
       var custom=it.custom||(!WZ_CATALOGO.some(function(c){return c.desc===it.desc;})&&!!it.desc);
       var options='<option value="">Selecione a peça</option>'+WZ_CATALOGO.filter(function(c){return c.desc!=='DEIXAR EM BRANCO (EDITÁVEL)';}).map(function(c){return '<option value="'+h(c.desc)+'" '+(c.desc===it.desc?'selected':'')+'>'+h(c.desc)+'</option>';}).join('')+'<option value="__custom__" '+(custom?'selected':'')+'>Outra peça (descrever)</option>';
       var input=function(key){return '<input aria-label="'+h(key==='qtd'?'Quantidade de '+(it.desc||'peças'):'Medida '+key.slice(1).toUpperCase())+'" data-line="'+i+'" data-line-field="'+key+'" value="'+h(it[key])+'" '+(key==='qtd'?'type="number" min="0.001" step="any"':'type="text"')+'>';};
-      return '<tr><td><select aria-label="Peça '+(i+1)+'" data-line="'+i+'" data-line-field="desc">'+options+'</select>'+(custom?'<input class="pedido-custom" placeholder="Descrição da peça" aria-label="Descrição da peça" data-line="'+i+'" data-line-field="customDesc" value="'+h(it.desc)+'">':'')+'</td>'+(draft.mode==='estoque'?'<td><input aria-label="Cor da peça" data-line="'+i+'" data-line-field="cor" value="'+h(it.cor||(/^TELA\b/i.test(it.desc)?'Prata':'Branca'))+'"></td>':'')+'<td>'+input('ma')+'</td><td>'+input('mb')+'</td><td>'+input('mc')+'</td><td>'+h(it.un)+'</td><td>'+input('qtd')+'</td><td class="num">'+fmtMoeda(price(it))+'</td><td>'+button('remove','✕',false,'aria-label="Remover peça '+(i+1)+'" data-index="'+i+'"')+'</td></tr>';
+      return '<tr><td><select aria-label="Peça '+(i+1)+'" data-line="'+i+'" data-line-field="desc">'+options+'</select>'+(custom?'<input class="pedido-custom" placeholder="Descrição da peça" aria-label="Descrição da peça" data-line="'+i+'" data-line-field="customDesc" value="'+h(it.desc)+'">':'')+'</td>'+(draft.mode==='estoque'?'<td><input aria-label="Cor da peça" data-line="'+i+'" data-line-field="cor" value="'+h(it.cor||(/^TELA\b/i.test(it.desc)?'Prata':'Branca'))+'"></td>':'')+(draft.mode!=='estoque'?'<td><select aria-label="Prioridade da peça '+(i+1)+'" data-line="'+i+'" data-line-field="prioridade">'+priorityOptions(it.prioridade)+'</select></td>':'')+'<td>'+input('ma')+'</td><td>'+input('mb')+'</td><td>'+input('mc')+'</td><td>'+h(it.un)+'</td><td>'+input('qtd')+'</td><td class="num">'+fmtMoeda(price(it))+'</td><td>'+button('remove','✕',false,'aria-label="Remover peça '+(i+1)+'" data-index="'+i+'"')+'</td></tr>';
     }).join('');
-    return '<div class="pedido-actions">'+(draft.mode==='edit'?'':button('add-row','+ Lançar peça',true))+'</div><p class="pedido-help">Escolha no catálogo e informe as medidas e a quantidade. Para braços de 4,60 m, por exemplo, preencha 4,60 na Medida A.</p><div class="tbl-wrap"><table class="pedido-table"><thead><tr><th>Peça</th>'+(draft.mode==='estoque'?'<th>Cor / acabamento</th>':'')+'<th>Med. A</th><th>Med. B</th><th>Med. C</th><th>Unid.</th><th>Quantidade</th><th>V. unit.</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div><div id="pedidoDraftTotal" class="pedido-total"></div><p id="pedidoError" class="pedido-inline-error" role="alert"></p>';
+    return '<div class="pedido-actions">'+(draft.mode==='edit'?'':button('add-row','+ Lançar peça',true))+'</div><p class="pedido-help">Escolha no catálogo e informe as medidas e a quantidade. Para braços de 4,60 m, por exemplo, preencha 4,60 na Medida A.</p><div class="tbl-wrap"><table class="pedido-table"><thead><tr><th>Peça</th>'+(draft.mode==='estoque'?'<th>Cor / acabamento</th>':'')+(draft.mode!=='estoque'?'<th>Prioridade da peça</th>':'')+'<th>Med. A</th><th>Med. B</th><th>Med. C</th><th>Unid.</th><th>Quantidade</th><th>V. unit.</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div><div id="pedidoDraftTotal" class="pedido-total"></div><p id="pedidoError" class="pedido-inline-error" role="alert"></p>';
   }
   function draftTotal(){var el=document.getElementById('pedidoDraftTotal');if(el&&draft)el.textContent=(draft.mode==='estoque'?'Valor de referência: ':'Total solicitado: ')+fmtMoeda(draft.items.reduce(function(s,it){return s+price(it)*(Number(it.qtd)||0);},0));}
   function form(){
@@ -43,7 +44,6 @@
       field('Número de vagas *','vagas',d.vagas,'number','min="1" step="1" required')+
       field('Cor da estrutura *','cor_estrutura',d.cor_estrutura,'text','list="pedidoEstruturas" required')+
       field('Tela / cobertura *','cor_tela',d.cor_tela,'text','list="pedidoTelas" required')+
-      '<div class="fg"><label for="p_prioridade">Prioridade</label><select id="p_prioridade" data-field="prioridade">'+['','P1','P2','P3'].map(function(value,index){return '<option value="'+value+'" '+((d.prioridade||'')===value?'selected':'')+'>'+(value?value+' · Prioridade 0'+index:'Sem prioridade')+'</option>';}).join('')+'</select></div>'+
       '<div class="fg"><label for="p_obs">Observações do condomínio</label><textarea id="p_obs" data-field="obs" placeholder="Informações gerais da obra">'+h(d.obs||'')+'</textarea></div>'+
       '</div><datalist id="pedidoEstruturas"><option value="Branca"><option value="Preta"><option value="Cinza"></datalist><datalist id="pedidoTelas"><option value="Prata"><option value="Verde"><option value="Azul"><option value="Vermelha"><option value="Bege"><option value="Não se aplica"></datalist>'+
       '<details class="pedido-options"><summary>Contato e informações técnicas (opcional)</summary><div class="form-grid">'+
@@ -69,7 +69,7 @@
   function novo(){
     if(!USER||USER.role!=='filial')return;
     close();
-    draft={mode:'new',data:{id:'p'+crypto.randomUUID(),cliente:'',vagas:'',cor_estrutura:'Branca',cor_tela:'Prata',tipo:'Sombrite',chumbacao:'Chumbação Direta em Solo',pilares:'Tipo Direto',endereco:'',cnpj:'',sindico:'',contato:'',email:'',obs:'',prioridade:'',prazos:prazoesPadrao()},items:[]};
+    draft={mode:'new',data:{id:'p'+crypto.randomUUID(),cliente:'',vagas:'',cor_estrutura:'Branca',cor_tela:'Prata',tipo:'Sombrite',chumbacao:'Chumbação Direta em Solo',pilares:'Tipo Direto',endereco:'',cnpj:'',sindico:'',contato:'',email:'',obs:'',prazos:prazoesPadrao()},items:[]};
     renderDraft();
   }
   function editFolder(locationId){
@@ -83,7 +83,7 @@
     var state=EstoqueApp.getState(),request=Estoque.requests(state).find(function(r){return r.id===requestId;});
     if(!request||!request.ativo||!(USER.role==='sede'||request.filial_id===USER.filial_id))return;
     if(!request.editavel){error('Esta solicitação já tem envio registrado ou é um registro anterior. Crie uma nova solicitação para complementar as peças.');return;}
-    draft={mode:'request-edit',target:request.pasta_id,requestId:requestId,entryId:'e'+crypto.randomUUID(),data:{cliente:request.condominio},snapshot:requestSnapshot(state,request),items:request.itens.map(function(it){return Object.assign({},it.peca,{qtd:it.solicitado});}),obs:request.obs||''};
+    draft={mode:'request-edit',target:request.pasta_id,requestId:requestId,entryId:'e'+crypto.randomUUID(),data:{cliente:request.condominio},snapshot:requestSnapshot(state,request),items:request.itens.map(function(it){return Object.assign({},it.peca,{qtd:it.solicitado,prioridade:it.prioridade||''});}),obs:request.obs||''};
     renderDraft();
   }
   function editInventory(mode,locationId){
@@ -100,7 +100,7 @@
       var catalog=it.custom?null:DB.catalogo().find(function(c){return c.desc===it.desc;});
       var color=it.cor===undefined?(/^TELA\b/i.test(it.desc)?'Prata':'Branca'):it.cor;
       var data=Object.assign({},it,{catalogo_id:it.custom?null:(catalog?catalog.id:it.catalogo_id),preco_unit:price(it)});
-      if(d.mode==='estoque'){data.cor=color;data.cor_tela=/^TELA\b/i.test(it.desc)?color:'';data.cor_estrutura=/^TELA\b/i.test(it.desc)?'':color;}
+      if(d.mode==='estoque'){delete data.prioridade;data.cor=color;data.cor_tela=/^TELA\b/i.test(it.desc)?color:'';data.cor_estrutura=/^TELA\b/i.test(it.desc)?'':color;}
       else if(d.mode!=='request-edit'){delete data.cor;delete data.cor_tela;delete data.cor_estrutura;}
       return data;
     });
@@ -150,6 +150,7 @@
   document.addEventListener('change',function(e){
     var t=e.target;
     if(draft&&t.dataset.field)draft.data[t.dataset.field]=t.value;
+    if(draft&&t.dataset.lineField==='prioridade'){var row=draft.items[Number(t.dataset.line)];if(row)row.prioridade=t.value;}
     if(draft&&t.dataset.lineField==='desc'){
       var it=draft.items[Number(t.dataset.line)],cat=WZ_CATALOGO.find(function(c){return c.desc===t.value;});
       if(it.desc!==t.value){delete it.catalogo_id;if(draft.mode==='request-edit'){delete it.cor;delete it.cor_estrutura;delete it.cor_tela;}}
