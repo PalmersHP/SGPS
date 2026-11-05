@@ -7,6 +7,10 @@
   function uid(prefix){return (prefix||'m')+crypto.randomUUID();}
   function text(v){return String(v==null?'':v).trim().replace(/\s+/g,' ');}
   function canonical(v){return text(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();}
+  function priority(v){if(v===undefined)return '';if(['','P1','P2','P3'].indexOf(v)<0)fail('Prioridade inválida. Escolha Sem prioridade, P1, P2 ou P3.');return v;}
+  var folderFields=['cliente','cor_estrutura','cor_tela','vagas','endereco','sindico','contato','email','tipo','obs','prioridade','chumbacao','pilares','cnpj'];
+  function folderDetails(p){var result={};folderFields.forEach(function(k){result[k]=k==='prioridade'?(p[k]||''):k==='vagas'?p[k]:text(p[k]);});return result;}
+  function legacyColors(p){return p.cores_legadas?Object.assign({},p,p.cores_legadas):p;}
   function unit(v){var u=canonical(v||'PÇ');if(['PC','PÇ','PECA','PECAS'].indexOf(u)>=0)return 'PÇ';if(['UN','UNID','UNIDADE','UNIDADES'].indexOf(u)>=0)return 'UNID';if(u==='M2')return 'M²';return u;}
   function quantity(value,un,zero){
     if(value===null||value===undefined||text(value)==='')fail('Informe uma quantidade válida.');
@@ -55,6 +59,7 @@
   function actor(ctx){if(!ctx||['sede','filial'].indexOf(ctx.role)<0)fail('Perfil sem permissão para esta ação.');if(!validDay(ctx.data))fail('Informe a data da operação.');}
   function validDay(day){return /^\d{4}-\d{2}-\d{2}$/.test(day||'')&&Number.isFinite(Date.parse(day+'T00:00:00Z'))&&new Date(day+'T00:00:00Z').toISOString().slice(0,10)===day;}
   function ownFolder(state,id,ctx){actor(ctx);var l=ensureOpen(state,id);if(l.tipo!=='condominio'||!owns(ctx,l))fail('Somente a filial responsável pode alterar esta pasta.');return l.pasta;}
+  function editableFolder(state,id,ctx){actor(ctx);var l=ensureOpen(state,id);if(l.tipo!=='condominio'||!(ctx.role==='sede'||owns(ctx,l)))fail('Somente a sede ou a filial responsável pode editar esta pasta.');return l.pasta;}
   function fresh(state,meta){var id=meta&&meta.id||uid();if(state.movimentos.some(function(m){return m.id===id;}))fail('Já registrado. Atualize a tela antes de continuar.');return id;}
   function event(state,type,ctx,meta,fields){
     actor(ctx);meta=meta||{};var d=meta.data||ctx.data;
@@ -67,7 +72,7 @@
     ids.forEach(function(id){
       var p=folder(state,id);if(!p)return;
       p.atualizado=m.data;p.log=p.log||[];
-      p.log.push({status:p.status||'rascunho',data:m.data,user:m.usuario_nome,obs:m.obs||({pasta_criada:'Pasta do condomínio criada.',demanda:'Peças solicitadas pela filial.',aceite:'Peças aceitas pela sede.',entrada:'Entrada no estoque.',transferencia:'Remanejamento despachado.',recebimento:'Recebimento de peças confirmado.',conferencia_inicial:'Estoque inicial conferido.',conferencia_fechamento:'Peças instaladas conferidas no fechamento.',finalizacao:'Obra finalizada.',reabertura:'Obra reaberta.'}[m.tipo]||m.tipo),movimento_id:m.id});
+      p.log.push({status:p.status||'rascunho',data:m.data,user:m.usuario_nome,obs:m.obs||({pasta_criada:'Pasta do condomínio criada.',pasta_editada:'Dados do condomínio editados.',demanda:'Peças solicitadas pela filial.',demanda_editada:'Solicitação de peças editada.',aceite:'Peças aceitas pela sede.',entrada:'Entrada no estoque.',transferencia:'Remanejamento despachado.',recebimento:'Recebimento de peças confirmado.',conferencia_inicial:'Estoque inicial conferido.',conferencia_fechamento:'Peças instaladas conferidas no fechamento.',finalizacao:'Obra finalizada.',reabertura:'Obra reaberta.'}[m.tipo]||m.tipo),movimento_id:m.id});
     });
   }
   function receiptIds(state){return new Set(state.movimentos.filter(function(m){return m.tipo==='recebimento';}).map(function(m){return m.referencia_id;}));}
@@ -77,24 +82,27 @@
   }
   function requestLedger(state){
     var requests=[],byId=new Map(),itemRequests=new Map(),active=new Set(),legacyTransfers=new Set(),received=receiptIds(state);
-    function add(id,p,items,data,user){
+    function demandRows(p,items){
       var rows=new Map();
       items.forEach(function(it){
         var pc=it.peca||piece(state,it,p),key=it.key||keyOf(pc),n=Number(it.qtd)||0;if(n<=0)return;
         if(!rows.has(key))rows.set(key,{key:key,peca:copy(pc),solicitado:0,enviado:0,recebido:0,pendente:0});
         rows.get(key).solicitado=round(rows.get(key).solicitado+n);
       });
-      if(!rows.size)return;
-      var l=location(state,p.id),request={id:id,pasta_id:p.id,condominio:p.cliente||p.nome,filial_id:p.filial_id,filial_nome:p.filial_nome||'',data:data||p.criado,usuario_nome:user||'',status:'pendente',itens:Array.from(rows.values()),ativo:!!(l&&l.ativo&&!l.finalizada)};
+      return Array.from(rows.values());
+    }
+    function add(id,p,items,data,user,obs,legacy){
+      var rows=demandRows(p,items);if(!rows.length)return;
+      var l=location(state,p.id),request={id:id,pasta_id:p.id,condominio:p.cliente||p.nome,filial_id:p.filial_id,filial_nome:p.filial_nome||'',data:data||p.criado,usuario_nome:user||'',prioridade:p.prioridade||'',obs:text(obs),legado:!!legacy,status:'pendente',itens:rows,ativo:!!(l&&l.ativo&&!l.finalizada)};
       request.itens.forEach(function(it){it.pendente=it.solicitado;});requests.push(request);byId.set(id,request);
     }
-    state.movimentos.forEach(function(m){if(m.tipo==='demanda')(m.itens||[]).forEach(function(it){if(it.demanda_id)itemRequests.set(m.pasta_id+'|'+it.demanda_id,m.id);});});
+    state.movimentos.forEach(function(m){if(m.tipo==='demanda'||m.tipo==='demanda_editada')(m.itens||[]).forEach(function(it){if(it.demanda_id)itemRequests.set(m.pasta_id+'|'+it.demanda_id,m.tipo==='demanda'?m.id:m.referencia_id);});});
     state.pastas.forEach(function(p){
       var id='solicitacao-legada:'+p.id;
-      add(id,p,(p.itens||[]).filter(function(it){return !itemRequests.has(p.id+'|'+it.id)&&it.item_status!=='cancelado';}),p.criado,p.criado_por||p.filial_nome);
+      add(id,p,(p.itens||[]).filter(function(it){return !itemRequests.has(p.id+'|'+it.id)&&it.item_status!=='cancelado';}),p.criado,p.criado_por||p.filial_nome,p.obs,true);
       active.add(id);
     });
-    state.movimentos.forEach(function(m){if(m.tipo==='demanda'){var p=folder(state,m.pasta_id);if(p)add(m.id,p,m.itens||[],m.data,m.usuario_nome);}});
+    state.movimentos.forEach(function(m){if(m.tipo==='demanda'){var p=folder(state,m.pasta_id);if(p)add(m.id,p,m.itens||[],m.data,m.usuario_nome,m.obs,false);}});
     function credit(request,key,n,isReceived){
       var row=request&&request.itens.find(function(it){return it.key===key;});if(!row)return 0;
       n=round(Math.min(n,row.pendente));if(n<=0)return 0;
@@ -115,13 +123,21 @@
     state.pastas.forEach(function(p){(p.remessas||[]).forEach(function(r,index){
       var legacyId='legado:'+p.id+':'+(r.id||index);legacyTransfers.add(legacyId);
       (r.itens||[]).forEach(function(it){
-        var original=(p.itens||[]).find(function(i){return i.id===it.item_id;}),pc=piece(state,Object.assign({},original||{},it),p);
+        var original=(p.itens||[]).find(function(i){return i.id===it.item_id;}),pc=piece(state,Object.assign({},original||{},it),legacyColors(p));
         var requestId=itemRequests.get(p.id+'|'+it.item_id)||'solicitacao-legada:'+p.id;
         allocate(p.id,[{key:keyOf(pc),qtd:Number(it.qtd)||0}],requestId,!!r.recebido_em||received.has(legacyId),false);
       });
     });});
     state.movimentos.forEach(function(m){
       if(m.tipo==='demanda'){active.add(m.id);return;}
+      if(m.tipo==='demanda_editada'){
+        var edited=byId.get(m.referencia_id),p=folder(state,m.pasta_id);
+        if(edited&&p&&edited.pasta_id===p.id){
+          edited.itens=demandRows(p,m.itens||[]);edited.itens.forEach(function(it){it.pendente=it.solicitado;});
+          edited.obs=text(m.obs);edited.editado_em=m.data;edited.editado_por=m.usuario_nome;
+        }
+        return;
+      }
       if(m.tipo!=='transferencia'||legacyTransfers.has(m.id))return;
       if(Array.isArray(m.atendimentos)){
         m.atendimentos.forEach(function(a){var r=byId.get(a.solicitacao_id);if(r&&r.pasta_id===m.destino_id)credit(r,a.key,Number(a.qtd)||0,received.has(m.id));});
@@ -131,7 +147,7 @@
         allocate(m.destino_id,m.itens||[],null,received.has(m.id),true);
       }
     });
-    requests.forEach(function(r){var remaining=r.itens.some(function(it){return it.pendente>0;}),sent=r.itens.some(function(it){return it.enviado>0;});r.status=remaining?(sent?'parcial':'pendente'):'enviado';});
+    requests.forEach(function(r){var remaining=r.itens.some(function(it){return it.pendente>0;}),sent=r.itens.some(function(it){return it.enviado>0;});r.status=remaining?(sent?'parcial':'pendente'):'enviado';r.editavel=r.ativo&&!r.legado&&!sent;});
     return {requests:requests,allocate:function(id,items,selected){return allocate(id,items,selected,false,false);}};
   }
   function balances(state,id){
@@ -149,7 +165,7 @@
       });
       (p.remessas||[]).forEach(function(r){(r.itens||[]).forEach(function(it){
         var original=(p.itens||[]).find(function(i,index){return (i.id||'legado-'+index)===it.item_id;});
-        var row=get(piece(state,Object.assign({},original||{},it),p)),n=Number(it.qtd)||0;
+        var row=get(piece(state,Object.assign({},original||{},it),legacyColors(p))),n=Number(it.qtd)||0;
         row.historico_enviado=round(row.historico_enviado+n);if(r.recebido_em)row.historico_recebido=round(row.historico_recebido+n);
       });});
     }
@@ -209,7 +225,7 @@
         var id='legado:'+p.id+':'+(r.id||index);
         if(state.movimentos.some(function(m){return m.id===id;}))return;
         var itens=(r.itens||[]).filter(function(it){return Number(it.qtd)>0;}).map(function(it){
-          var old=p.itens.find(function(i){return i.id===it.item_id;}),peca=piece(state,Object.assign({},old||{},it),p);
+          var old=p.itens.find(function(i){return i.id===it.item_id;}),peca=piece(state,Object.assign({},old||{},it),legacyColors(p));
           return {key:keyOf(peca),peca:peca,qtd:Number(it.qtd)};
         });
         if(itens.length)state.movimentos.push({id:id,tipo:'transferencia',legado:true,remessa_legada_id:r.id||null,origem_id:'origem-legada',origem_nome:'Envio anterior da sede',destino_id:p.id,destino_nome:p.cliente,itens:itens,data:r.data||p.criado,criado_em:r.data||p.criado,usuario_id:null,usuario_nome:r.user||'Sede (histórico)',obs:r.obs||'Remessa anterior ao controle de estoque, ainda aguardando recebimento.'});
@@ -226,13 +242,49 @@
     if(state.pastas.some(function(p){return p.filial_id===ctx.filial_id&&canonical(p.cliente||p.nome)===canonical(name);}))fail('Já existe uma pasta para este condomínio. Abra a pasta existente para lançar as peças.');
     var vagas=quantity(details.vagas,'PÇ',false);
     if(!text(details.cor_estrutura)||!text(details.cor_tela))fail('Informe as cores da estrutura e da tela.');
-    var p=Object.assign({},copy(details),{id:id,tipo_registro:'pasta_condominio',cliente:name,filial_id:ctx.filial_id,filial_nome:ctx.filial_nome||'',vagas:vagas,status:'rascunho',status_obra:'aberta',versao_pedido:2,estoque_inicial_conferido:true,criado:ctx.data,atualizado:ctx.data,itens:[],remessas:[],log:[],valor:0,subtotal_pecas:0,frete:0});
+    var p=Object.assign({},copy(details),{id:id,tipo_registro:'pasta_condominio',cliente:name,filial_id:ctx.filial_id,filial_nome:ctx.filial_nome||'',vagas:vagas,prioridade:priority(details.prioridade),status:'rascunho',status_obra:'aberta',versao_pedido:2,estoque_inicial_conferido:true,criado:ctx.data,atualizado:ctx.data,itens:[],remessas:[],log:[],valor:0,subtotal_pecas:0,frete:0});
     state.pastas.unshift(p);append(state,event(state,'pasta_criada',ctx,{id:'criacao:'+id},{pasta_id:id,itens:[]}));return state;
+  };
+  api.editFolder=function(input,pastaId,details,ctx,meta){
+    var state=copy(input),p=editableFolder(state,pastaId,ctx);
+    if(!details||typeof details!=='object'||Array.isArray(details))fail('Informe os dados do condomínio.');
+    var before=folderDetails(p),after=copy(before),aliases={nome:'cliente',condominio:'cliente'},seen=new Set();
+    Object.keys(details).forEach(function(k){
+      var field=aliases[k]||k;
+      if(folderFields.indexOf(field)<0)fail('Campo não permitido na edição da pasta: '+k+'.');
+      if(seen.has(field))fail('Informe o nome do condomínio apenas uma vez.');seen.add(field);
+      after[field]=field==='prioridade'?priority(details[k]):field==='vagas'?quantity(details[k],'PÇ',false):text(details[k]);
+    });
+    if(!after.cliente)fail('Informe o nome do condomínio.');
+    if(!after.cor_estrutura||!after.cor_tela)fail('Informe as cores da estrutura e da tela.');
+    if(state.pastas.some(function(other){return other.id!==p.id&&other.filial_id===p.filial_id&&canonical(other.cliente||other.nome)===canonical(after.cliente);}))fail('Já existe uma pasta para este condomínio. Abra a pasta existente para lançar as peças.');
+    var m=event(state,'pasta_editada',ctx,meta,{pasta_id:pastaId,antes:before,depois:after,itens:[]});
+    if(before.cor_estrutura!==after.cor_estrutura||before.cor_tela!==after.cor_tela){
+      // Legacy lines inherited their folder's colors. Materialize their current
+      // identities before changing defaults; immutable shipments keep their data.
+      p.itens.forEach(function(it){Object.assign(it,piece(state,it,p));});
+      if(!p.cores_legadas)p.cores_legadas={cor_estrutura:p.cor_estrutura,cor_tela:p.cor_tela};
+    }
+    Object.assign(p,after);append(state,m);return state;
   };
   api.addDemand=function(input,pastaId,items,ctx,meta){
     var state=copy(input),p=ownFolder(state,pastaId,ctx),m=event(state,'demanda',ctx,meta,{pasta_id:pastaId});
     var additions=demandItems(state,p,items,ctx,p.itens.length>0);p.itens=p.itens.concat(additions);priceFolder(p);
     m.itens=additions.map(function(it){var pc=piece(state,it,p);return {key:keyOf(pc),peca:pc,qtd:it.qtd,demanda_id:it.id};});append(state,m);recalc(state,p);return state;
+  };
+  api.editDemand=function(input,requestId,items,ctx,meta){
+    actor(ctx);var state=copy(input),request=requestLedger(state).requests.find(function(r){return r.id===requestId;});
+    if(!request)fail('Solicitação não encontrada.');
+    var p=editableFolder(state,request.pasta_id,ctx);
+    if(request.legado)fail('Solicitações anteriores ao controle de estoque não podem ser editadas. Registre uma nova solicitação para o complemento.');
+    if(request.itens.some(function(it){return it.enviado>0;}))fail('Esta solicitação já possui peças enviadas e não pode ser editada. Registre uma nova solicitação para o complemento.');
+    var previous=state.movimentos.filter(function(m){return m.id===requestId&&m.tipo==='demanda'||m.tipo==='demanda_editada'&&m.referencia_id===requestId;}).at(-1);
+    var ids=new Set((previous.itens||[]).map(function(it){return it.demanda_id;}));
+    var remaining=p.itens.filter(function(it){return !ids.has(it.id);});
+    var additions=demandItems(state,p,items,ctx,remaining.length>0);
+    var eventMeta=Object.assign({},meta||{});if(!Object.prototype.hasOwnProperty.call(eventMeta,'obs'))eventMeta.obs=request.obs;
+    var m=event(state,'demanda_editada',ctx,eventMeta,{pasta_id:p.id,referencia_id:requestId,itens_anteriores:copy(previous.itens),obs_anterior:request.obs,itens:additions.map(function(it){var pc=piece(state,it,p);return {key:keyOf(pc),peca:pc,qtd:it.qtd,demanda_id:it.id};})});
+    p.itens=remaining.concat(additions);priceFolder(p);append(state,m);recalc(state,p);return state;
   };
   api.approveDemand=function(input,pastaId,ctx,keys,meta){
     actor(ctx);if(ctx.role!=='sede')fail('Somente a sede pode aceitar as peças solicitadas.');
@@ -319,7 +371,7 @@
   function buildReport(state,pastaId,when){
     var p=folder(state,pastaId);if(!p)fail('Pasta não encontrada.');
     var rows=balances(state,pastaId),items=rows.map(function(b){return {key:b.key,peca:copy(b.peca),solicitado:b.solicitado,aprovado:b.aprovado,recebido:b.entradas,enviado:b.saidas,instalado:b.instalado,disponivel:b.disponivel,em_transito_entrada:b.em_transito_entrada,em_transito_saida:b.em_transito_saida,diferenca:round(b.solicitado-b.instalado),historico_enviado:b.historico_enviado,historico_recebido:b.historico_recebido};});
-    return {pasta_id:p.id,condominio:p.cliente,filial_id:p.filial_id,filial_nome:p.filial_nome,cor_estrutura:p.cor_estrutura,cor_tela:p.cor_tela,vagas:p.vagas,gerado_em:when||p.finalizado_em||p.atualizado,finalizado_em:p.finalizado_em||null,finalizado_por:p.finalizado_por||null,conhecido:known(p),saldo_base:'movimentacoes_confirmadas',itens:items,movimentacoes:copy(state.movimentos.filter(function(m){return [m.pasta_id,m.origem_id,m.destino_id].indexOf(pastaId)>=0;})),totais:{linhas:items.length,solicitado:round(items.reduce(function(n,it){return n+it.solicitado;},0)),instalado:round(items.reduce(function(n,it){return n+it.instalado;},0)),disponivel:round(items.reduce(function(n,it){return n+it.disponivel;},0)),em_transito:round(items.reduce(function(n,it){return n+it.em_transito_entrada+it.em_transito_saida;},0))}};
+    return {pasta_id:p.id,condominio:p.cliente,filial_id:p.filial_id,filial_nome:p.filial_nome,cor_estrutura:p.cor_estrutura,cor_tela:p.cor_tela,vagas:p.vagas,prioridade:p.prioridade||'',obs:text(p.obs),tipo:text(p.tipo),gerado_em:when||p.finalizado_em||p.atualizado,finalizado_em:p.finalizado_em||null,finalizado_por:p.finalizado_por||null,conhecido:known(p),saldo_base:'movimentacoes_confirmadas',itens:items,solicitacoes:copy(requestLedger(state).requests.filter(function(r){return r.pasta_id===pastaId;})),movimentacoes:copy(state.movimentos.filter(function(m){return [m.pasta_id,m.origem_id,m.destino_id].indexOf(pastaId)>=0;})),totais:{linhas:items.length,solicitado:round(items.reduce(function(n,it){return n+it.solicitado;},0)),instalado:round(items.reduce(function(n,it){return n+it.instalado;},0)),disponivel:round(items.reduce(function(n,it){return n+it.disponivel;},0)),em_transito:round(items.reduce(function(n,it){return n+it.em_transito_entrada+it.em_transito_saida;},0))}};
   }
   api.finalize=function(input,pastaId,ctx,meta){
     var state=copy(input),p=ownFolder(state,pastaId,ctx);

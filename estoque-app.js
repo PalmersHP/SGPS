@@ -85,5 +85,5 @@
     if(location.hash==='#filial-novo-pedido')PedidosUI.novo();
     else location.hash='filial-novo-pedido';
   }
-  window.EstoqueApp={getState:getState,save:save,refresh:refresh,initialize:initialize,context:context,open:open,selected:selected,createFolder:createFolder,editItems:function(mode,id){PedidosUI.editInventory(mode,id);},error:reportError,isBusy:function(){return busy;}};
+  window.EstoqueApp={getState:getState,save:save,refresh:refresh,initialize:initialize,context:context,open:open,selected:selected,createFolder:createFolder,editFolder:function(id){PedidosUI.editFolder(id);},editDemand:function(id){PedidosUI.editDemand(id);},editItems:function(mode,id){PedidosUI.editInventory(mode,id);},error:reportError,isBusy:function(){return busy;}};
 })();

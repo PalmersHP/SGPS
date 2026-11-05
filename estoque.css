@@ -35,6 +35,16 @@
 .estoque-tag-warning{background:#fff7df;color:#926200}
 .estoque-tag-done{background:#ecfdf5;color:#047857}
 .estoque-tag-muted{background:#f1f5f9;color:#64748b}
+.estoque-priority{white-space:nowrap}
+.estoque-priority-p1{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca}
+.estoque-priority-p2{background:#fff7ed;color:#9a3412;border:1px solid #fed7aa}
+.estoque-priority-p3{background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe}
+.estoque-heading-tags{width:auto;justify-content:flex-end}
+.estoque-request-observation{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;line-height:1.7;color:#475569;margin:0 20px 14px;padding:10px 12px;background:#f8fafc;border-left:3px solid #c8d9b3;border-radius:4px}
+.estoque-pending-requests .estoque-request-observation{margin:7px 0 0;padding:0;background:transparent;border:0;font-size:11px}
+.estoque-general p,.estoque-report-observation,.estoque-edited-fields li{white-space:pre-wrap;overflow-wrap:anywhere}
+.pedido-form textarea{min-height:82px;resize:vertical}
+.pedido-modal #p_demanda_obs{min-height:88px;resize:vertical}
 .estoque-empty{grid-column:1/-1;padding:40px 24px;text-align:center;border:1px dashed #dbe2ea;border-radius:10px;background:#fff;color:#64748b}
 .estoque-empty strong{display:block;font-size:14px;color:#475569}
 .estoque-empty p{font-size:12px;line-height:1.7;margin:8px 0 18px}
@@ -144,4 +154,6 @@
   .estoque-pending-print-qty{font-weight:700}
   .estoque-pending-print-notes{break-inside:avoid;break-before:avoid;font-size:9pt;margin-top:8px}
   .estoque-pending-print-notes p{margin:7px 0}
+  .estoque-print .estoque-priority{color:#111!important;border:1px solid #777;background:#fff!important;font-size:9pt;margin:3px 0 6px}
+  .estoque-pending-print-context .estoque-request-observation{white-space:pre-wrap;padding:7px 9px;margin:6px 0 2px;border:1px solid #cbd5e1;background:#fff!important;color:#111}
 }

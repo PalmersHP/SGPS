@@ -37,7 +37,7 @@ const TOOLS=[
   tool('consultar_saldo','Consulta estoque disponível, em trânsito, instalado e solicitado por SKU.',{local_id:id()},['local_id']),
   tool('consultar_historico','Consulta o histórico de movimentações acessíveis ao operador.',{local_id:id(),...pagination}),
   tool('consultar_relatorio','Consulta o relatório da obra; quando finalizada, retorna o relatório congelado.',{pasta_id:id()},['pasta_id']),
-  tool('criar_pasta','Cria a pasta vazia de um condomínio no contexto da filial responsável.',{...mutation,condominio:str('Nome do condomínio.'),cor_estrutura:str('Cor da estrutura.',100),cor_tela:str('Cor da tela.',100),vagas:{type:'integer',minimum:1},endereco:{type:'string',maxLength:500},sindico:{type:'string',maxLength:200},contato:{type:'string',maxLength:200},email:{type:'string',maxLength:200},tipo:{type:'string',maxLength:100}},['operation_id','condominio','cor_estrutura','cor_tela','vagas'],true),
+  tool('criar_pasta','Cria a pasta vazia de um condomínio no contexto da filial responsável.',{...mutation,condominio:str('Nome do condomínio.'),cor_estrutura:str('Cor da estrutura.',100),cor_tela:str('Cor da tela.',100),vagas:{type:'integer',minimum:1},prioridade:{type:'string',enum:['','P1','P2','P3'],description:'Prioridade do condomínio; vazio significa sem prioridade definida.'},endereco:{type:'string',maxLength:500},sindico:{type:'string',maxLength:200},contato:{type:'string',maxLength:200},email:{type:'string',maxLength:200},tipo:{type:'string',maxLength:100}},['operation_id','condominio','cor_estrutura','cor_tela','vagas'],true),
   tool('solicitar_pecas','Adiciona uma solicitação à pasta. As cores seguem os parâmetros do condomínio; não cria estoque físico.',{...mutation,pasta_id:id(),itens:pieces(false)},['operation_id','pasta_id','itens'],true),
   tool('registrar_entrada','Registra peças prontas em um depósito. GO é operado pela sede; depósito de filial exige contexto próprio e observação de origem.',{...mutation,local_id:id(),itens:pieces(true)},['operation_id','local_id','itens'],true),
   tool('remanejar_pecas','Despacha peças disponíveis da origem para o destino. A entrada no destino ocorre após confirmação de recebimento.',{...mutation,origem_id:id(),destino_id:id(),itens:entries},['operation_id','origem_id','destino_id','itens'],true),
@@ -82,7 +82,7 @@ function publicLocation(location){
   const result={id:location.id,tipo:location.tipo,nome:location.nome,filial_id:location.filial_id,ativo:location.ativo,finalizada:location.finalizada,conhecido:location.conhecido};
   if(location.pasta){
     result.pasta={};
-    for(const key of ['id','cliente','filial_id','filial_nome','cor_estrutura','cor_tela','vagas','endereco','sindico','contato','email','tipo','obs','status','status_obra','criado','atualizado','finalizado_em','finalizado_por'])if(location.pasta[key]!==undefined)result.pasta[key]=location.pasta[key];
+    for(const key of ['id','cliente','filial_id','filial_nome','cor_estrutura','cor_tela','vagas','prioridade','endereco','sindico','contato','email','tipo','obs','status','status_obra','criado','atualizado','finalizado_em','finalizado_por'])if(location.pasta[key]!==undefined)result.pasta[key]=location.pasta[key];
   }return result;
 }
 function publicMovement(movement){const result=clone(movement);delete result.operacao_mcp;return result;}
@@ -163,7 +163,7 @@ function createOperations({store,now=()=>new Date()}={}){
   function transform(name,args,principal,snapshot,ctx){
     const state=snapshot.state,operationId=args.operation_id.toLowerCase(),meta={id:'mcp:'+operationId,data:args.data||ctx.data,obs:args.obs||''};
     switch(name){
-      case 'criar_pasta':return Estoque.createFolder(state,{id:'p-mcp-'+operationId,cliente:args.condominio,cor_estrutura:args.cor_estrutura,cor_tela:args.cor_tela,vagas:args.vagas,endereco:args.endereco||'',sindico:args.sindico||'',contato:args.contato||'',email:args.email||'',tipo:args.tipo||'Sombrite',obs:args.obs||''},{...ctx,data:args.data||ctx.data});
+      case 'criar_pasta':return Estoque.createFolder(state,{id:'p-mcp-'+operationId,cliente:args.condominio,cor_estrutura:args.cor_estrutura,cor_tela:args.cor_tela,vagas:args.vagas,prioridade:args.prioridade||'',endereco:args.endereco||'',sindico:args.sindico||'',contato:args.contato||'',email:args.email||'',tipo:args.tipo||'Sombrite',obs:args.obs||''},{...ctx,data:args.data||ctx.data});
       case 'solicitar_pecas':getLocation(snapshot,principal,args.pasta_id,true);return Estoque.addDemand(state,args.pasta_id,normalizePieces(args.itens,snapshot,false),ctx,meta);
       case 'registrar_entrada':getLocation(snapshot,principal,args.local_id);return Estoque.addStock(state,args.local_id,normalizePieces(args.itens,snapshot,true),ctx,meta);
       case 'remanejar_pecas':getLocation(snapshot,principal,args.origem_id);getLocation(snapshot,principal,args.destino_id);return Estoque.transfer(state,args.origem_id,args.destino_id,args.itens,ctx,meta);
